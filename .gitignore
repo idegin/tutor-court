@@ -48,3 +48,10 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Ignore SQLite database files
+*.sqlite
+*.sqlite3
+
+# Ignore database files
+*.db

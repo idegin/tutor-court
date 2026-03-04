@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+.next
+out
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git
+.gitignore
+
+# Tests
+tests
+playwright.config.ts
+vitest.config.mts
+vitest.setup.ts
+test.env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Config files not needed in build
+README.md
+AGENTS.md
+.cursor
+.env
+.env.local
+.env.example
+
+# Fly
+fly.toml
