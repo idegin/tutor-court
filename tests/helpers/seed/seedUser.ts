@@ -1,5 +1,5 @@
 import { getPayload } from 'payload'
-import config from '../../src/payload.config.js'
+import config from '../../../src/payload.config.js'
 
 export const testUser = {
   firstName: 'Dev',

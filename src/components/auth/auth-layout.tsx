@@ -21,6 +21,7 @@ type AuthLayoutProps = {
     primaryActionHref?: string
     className?: string
     variant?: 'split' | 'card'
+    flipped?: boolean
     imagePosition?: 'left' | 'right'
     imageStyle?: 'full' | 'floating'
     imageUrl?: string
@@ -38,12 +39,13 @@ export function AuthLayout({
     primaryActionHref = '/auth/login',
     className,
     variant = 'split',
+    flipped = false,
     imagePosition = 'right',
     imageStyle = 'full',
     imageUrl = "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=2000&auto=format&fit=crop",
 }: AuthLayoutProps) {
     if (variant === 'card') {
-        const isImageLeft = imagePosition === 'left'
+        const isImageLeft = flipped || imagePosition === 'left'
         return (
             <div className={cn("min-h-screen flex flex-col bg-slate-50/50", className)}>
                 {/* Global Header */}
@@ -98,7 +100,7 @@ export function AuthLayout({
                                     <div className="absolute inset-0 bg-linear-to-b from-transparent to-black/80" />
                                     {panelContent ? (
                                         <div className="absolute inset-0 z-10">
-                                            {panelContent} 
+                                            {panelContent}
                                         </div>
                                     ) : panelTitle ? (
                                         <div className="absolute bottom-0 left-0 right-0 z-10 p-10 lg:p-14">
@@ -134,7 +136,7 @@ export function AuthLayout({
                         </div>
                     </div>
                 </main>
-                
+
                 <footer className="py-8 text-center text-sm font-medium text-muted-foreground/80 border-t border-border/40">
                     <div className="flex items-center justify-center gap-8 mb-4">
                         <Link href="#" className="hover:text-foreground transition-colors">Terms of Service</Link>
@@ -149,21 +151,32 @@ export function AuthLayout({
 
     return (
         <div className={cn('relative flex min-h-screen flex-col bg-background lg:grid lg:grid-cols-2', className)}>
+            {/* Absolute Global Header for Split Layout */}
+            <header className="absolute top-0 left-0 right-0 h-24 px-6 sm:px-10 lg:px-16 flex items-center justify-between z-50">
+                <Link href="/" className="inline-flex items-center gap-2.5">
+                    <Image
+                        src="/logo.png"
+                        alt="TutorCourt logo"
+                        width={32}
+                        height={32}
+                        className="rounded-md"
+                    />
+                    <span className="text-xl font-bold tracking-tight text-foreground">TutorCourt</span>
+                </Link>
+
+                {navLinks && navLinks.length > 0 && (
+                    <nav className="flex items-center gap-8">
+                        {navLinks.map((item) => (
+                            <Link key={item.href + item.label} href={item.href} className="text-[15px] font-semibold hover:text-primary transition-colors">
+                                {item.label}
+                            </Link>
+                        ))}
+                    </nav>
+                )}
+            </header>
+
             {/* Left Column (Content) */}
-            <div className="flex flex-col border-border/50 lg:order-1 px-6 sm:px-10 lg:px-16">
-                {/* Header - just logo */}
-                <header className="flex h-24 items-center">
-                    <Link href="/" className="inline-flex items-center gap-2.5">
-                        <Image
-                            src="/logo.png"
-                            alt="TutorCourt logo"
-                            width={32}
-                            height={32}
-                            className="rounded-md"
-                        />
-                        <span className="text-xl font-bold tracking-tight text-foreground">TutorCourt</span>
-                    </Link>
-                </header>
+            <div className={cn("flex flex-col border-border/50 px-6 sm:px-10 lg:px-16 pt-24", flipped ? "lg:order-2" : "lg:order-1")}>
 
                 {/* Content Wrapper */}
                 <div className="flex flex-1 items-center justify-center py-10 lg:py-20 lg:pr-8">
@@ -182,7 +195,7 @@ export function AuthLayout({
             </div>
 
             {/* Right Column (Image + Panel) */}
-            <div className="relative hidden w-full lg:order-2 lg:block bg-[#0e1f18]">
+            <div className={cn("relative hidden w-full lg:block bg-[#0e1f18]", flipped ? "lg:order-1" : "lg:order-2")}>
                 <Image
                     src={imageUrl}
                     alt="Students studying"
