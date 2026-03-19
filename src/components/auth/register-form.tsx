@@ -9,7 +9,7 @@ import type {
 } from '@/components/auth/auth-types'
 import { PASSWORD_POLICY_TEXT } from '@/components/auth/auth-validation'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldTitle } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import * as React from 'react'
 
 import {
@@ -18,8 +18,10 @@ const INITIAL_VALUES: UpdatePasswordValues = {
     confirmNewPassword: '',
 }
 
-export default function UpdatePasswordPage() {
+function UpdatePasswordContent() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const token = searchParams.get('token')
     const [values, setValues] = React.useState<UpdatePasswordValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateUpdatePassword>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -40,37 +42,46 @@ export default function UpdatePasswordPage() {
             }
 
             setIsSubmitting(true)
-            setTimeout(() => {
+            if (!token) {
+                setErrors({ form: 'No reset token found in URL.' })
                 setIsSubmitting(false)
+                return
+            }
+            fetch('/api/users/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, password: values.newPassword }),
+            }).then(async (res) => {
+                if (!res.ok) {
+                    const data = await res.json()
+                    throw new Error(data.message || 'Error resetting password.')
+                }
+                setIsSubmitting(false)
+                alert('Password reset successfully!')
                 router.push('/auth/login')
-            }, 300)
+            }).catch((err) => {
+                setIsSubmitting(false)
+                setErrors({ form: err.message })
+            })
         },
         [router, values]
     )
 
     return (
         <AuthLayout
-            variant="card"
-            imagePosition="right"
-            imageUrl="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=2084&auto=format&fit=crop"
+            imageUrl="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=2073&auto=format&fit=crop"
             heading="Reset Password"
             subheading="Choose a new password for your account to regain access to your dashboard."
             navLinks={NAV_LINKS}
             primaryActionLabel="Log In"
             primaryActionHref="/auth/login"
+            panelTitle="A secure environment for growth"
+            panelDescription="Maintain a strong password to keep your progress and learning materials private."
             panelContent={
-                <div className="absolute inset-0 flex flex-col items-center justify-end p-10 bg-gradient-to-t from-[#f0fff4] via-transparent to-transparent text-center">
-                    <div className="bg-white/95 backdrop-blur-sm p-8 rounded-3xl w-[95%] shadow-xl mb-4 border border-white">
-                        <h2 className="text-xl font-bold text-[#1A1F26]">Secure Learning Environment</h2>
-                        <p className="mt-3 text-[#1A1F26]/70 leading-relaxed text-sm">
-                            TutorCourt provides a safe space for educators and students to connect. Keep your account secure with a strong password.
-                        </p>
-                        <div className="flex gap-2 justify-center mt-6">
-                            <div className="w-2 h-2 rounded-full bg-primary" />
-                            <div className="w-2 h-2 rounded-full bg-primary/20" />
-                            <div className="w-2 h-2 rounded-full bg-primary/20" />
-                        </div>
-                    </div>
+                <div className="flex gap-2 justify-center mt-8 pb-4">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    <div className="w-2 h-2 rounded-full bg-primary/20" />
+                    <div className="w-2 h-2 rounded-full bg-primary/20" />
                 </div>
             }
         >
@@ -83,5 +94,23 @@ export default function UpdatePasswordPage() {
                 onBackToLoginClick={() => router.push('/auth/login')}
             />
         </AuthLayout>
+    )
+}
+
+
+export default function UpdatePasswordPage() {
+    return (
+        <React.Suspense fallback={<div>Loading...</div>}>
+            <UpdatePasswordContent />
+        </React.Suspense>
+    )
+}
+
+
+export default function UpdatePasswordPage() {
+    return (
+        <React.Suspense fallback={<div>Loading...</div>}>
+            <UpdatePasswordContent />
+        </React.Suspense>
     )
 }

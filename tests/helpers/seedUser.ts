@@ -6,6 +6,7 @@ export const testUser = {
   lastName: 'User',
   email: 'dev@payloadcms.com',
   password: 'test',
+  accountType: 'student' as const,
 }
 
 /**

@@ -168,13 +168,15 @@ export function AuthLayout({
                 {/* Content Wrapper */}
                 <div className="flex flex-1 items-center justify-center py-10 lg:py-20 lg:pr-8">
                     <div className="mx-auto w-full max-w-110">
-                        <h1 className="text-[2.5rem] font-bold tracking-tight text-[#1A1F26] dark:text-foreground leading-tight">{heading}</h1>
+                        {heading ? (
+                            <h1 className="text-[2.5rem] font-bold tracking-tight text-[#1A1F26] dark:text-foreground leading-tight">{heading}</h1>
+                        ) : null}
                         {subheading ? (
                             <p className="mt-3 text-[1.05rem] leading-relaxed text-muted-foreground">
                                 {subheading}
                             </p>
                         ) : null}
-                        <div className="mt-10">{children}</div>
+                        <div className={cn(heading || subheading ? "mt-10" : "")}>{children}</div>
                     </div>
                 </div>
             </div>

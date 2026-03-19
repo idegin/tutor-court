@@ -78,9 +78,7 @@ export function validateRegister(
     errors.password = PASSWORD_POLICY_TEXT
   }
 
-  if (!values.agreeToTerms) {
-    errors.agreeToTerms = 'You must agree to the terms to continue.'
-  }
+
 
   return errors
 }

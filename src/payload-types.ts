@@ -69,6 +69,7 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    'tutor-profiles': TutorProfile;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +79,7 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'tutor-profiles': TutorProfilesSelect<false> | TutorProfilesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -125,6 +127,7 @@ export interface User {
   id: string;
   firstName: string;
   lastName: string;
+  accountType: 'tutor' | 'parent' | 'student';
   avatar?: (string | null) | Media;
   updatedAt: string;
   createdAt: string;
@@ -133,6 +136,8 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  _verified?: boolean | null;
+  _verificationToken?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -176,6 +181,20 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutor-profiles".
+ */
+export interface TutorProfile {
+  id: string;
+  user: string | User;
+  /**
+   * Check to approve this tutor profile.
+   */
+  isApproved?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -205,6 +224,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: string | Media;
+      } | null)
+    | ({
+        relationTo: 'tutor-profiles';
+        value: string | TutorProfile;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -255,6 +278,7 @@ export interface PayloadMigration {
 export interface UsersSelect<T extends boolean = true> {
   firstName?: T;
   lastName?: T;
+  accountType?: T;
   avatar?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -263,6 +287,8 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  _verified?: T;
+  _verificationToken?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -304,6 +330,16 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutor-profiles_select".
+ */
+export interface TutorProfilesSelect<T extends boolean = true> {
+  user?: T;
+  isApproved?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

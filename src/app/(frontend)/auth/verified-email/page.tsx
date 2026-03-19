@@ -10,11 +10,11 @@ export default function VerifiedEmailPage() {
 
     return (
         <AuthLayout
-            variant="card"
-            imagePosition="right"
-            imageUrl="https://images.unsplash.com/photo-1523240795612-9a054b0fc644?q=80&w=2070&auto=format&fit=crop"
+            imageUrl="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=2073&auto=format&fit=crop"
+            panelTitle="Welcome to the community"
+            panelDescription="Connect with learners and educators from around the globe."
             panelContent={
-                <div className="bg-white/90 backdrop-blur pb-4 px-8 pt-4 rounded-3xl w-[90%] shadow-xl flex items-center justify-start gap-6 border border-white">
+                <div className="relative z-20 -mt-16 bg-white/95 backdrop-blur pb-4 px-8 pt-4 rounded-3xl w-[90%] max-w-[380px] shadow-xl flex items-center justify-start gap-5 border border-white">
                     <div className="flex -space-x-3">
                         <div className="w-10 h-10 rounded-full border-2 border-white bg-[#ffd3b6]" />
                         <div className="w-10 h-10 rounded-full border-2 border-white bg-[#ffaaa5]" />

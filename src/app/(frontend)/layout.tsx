@@ -1,5 +1,6 @@
 import React from 'react'
 import { Lato } from 'next/font/google'
+import { QueryProvider } from '@/components/providers/query-provider'
 import './global.css'
 
 const lato = Lato({
@@ -19,7 +20,9 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
       <body>
-        <main>{children}</main>
+        <QueryProvider>
+          <main>{children}</main>
+        </QueryProvider>
       </body>
     </html>
   )

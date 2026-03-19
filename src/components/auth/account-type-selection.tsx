@@ -61,9 +61,18 @@ export function AccountTypeSelection({
 
             {error ? <p className="text-sm text-destructive text-center font-medium">{error}</p> : null}
 
-            {/* Note: I'm leaving the Submit empty rendering if you want auto-progress on select, but following the component structure we keep it unless user didn't want it. Actually the third image HAS NO button! It just says "Already have an account?". It looks like the choice auto-forwards or they submit inside? Ah, wait, no submit button in image 3! But let's leave it visually matched or hidden. Wait, the third image ONLY has cards and "Already have an account? Log In" below a divider. Let's hide the button if none selected, or keep it, up to you. Let's match image exactly if we can! I will keep button if selected, otherwise hide. */}
-            
-            <div className="pt-6 border-t border-border/50 text-center">
+            <div className="pt-4 pb-2">
+                <Button 
+                    type="submit" 
+                    size="lg" 
+                    className="w-full h-12 text-[15px] rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2" 
+                    disabled={!selectedTypeId || isSubmitting}
+                >
+                    {isSubmitting ? 'Continuing...' : 'Continue'}
+                    {!isSubmitting && <FiChevronRight className="h-5 w-5" />}
+                </Button>
+            </div>
+<div className="pt-6 border-t border-border/50 text-center">
                 <p className="text-sm text-muted-foreground">
                     Already have an account?{' '}
                     <button type="button" className="font-bold text-primary hover:underline ml-1" onClick={onLoginClick}>
@@ -73,9 +82,7 @@ export function AccountTypeSelection({
             </div>
             
             {/* Keeping the button accessible for keyboard but visually hidden if we want auto-advance, or just standard solid button */}
-            <div className="sr-only">
-               <Button type="submit" disabled={isSubmitting}>Continue</Button>
-            </div>
+            
         </form>
     )
 }

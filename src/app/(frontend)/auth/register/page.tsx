@@ -50,6 +50,10 @@ export default function RegisterPage() {
             }
 
             setIsSubmitting(true)
+            
+            // Store registration data to complete step 2
+            sessionStorage.setItem('registrationData', JSON.stringify(values))
+            
             setTimeout(() => {
                 setIsSubmitting(false)
                 router.push('/auth/account-type')
@@ -60,13 +64,11 @@ export default function RegisterPage() {
 
     return (
         <AuthLayout
-            variant="card"
-            imagePosition="left"
-            imageUrl="https://images.unsplash.com/photo-1571260899304-425dea4cf36e?q=80&w=2072&auto=format&fit=crop"
+            imageUrl="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=2070&auto=format&fit=crop"
             heading="Create Your Account"
             subheading="Join our growing community of parents and tutors to start your learning journey today."
-            panelTitle="Empowering the next generation"
-            panelDescription="Join thousands of students who have found their perfect mentor on TutorCourt."
+            panelTitle="A platform built for excellence"
+            panelDescription="Connect with top-tier tutors or discover students eager to learn."
             navLinks={NAV_LINKS}
             primaryActionLabel="Log In"
             primaryActionHref="/auth/login"

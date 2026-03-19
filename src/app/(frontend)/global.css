@@ -4,10 +4,68 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 'primary': {
+    '50': '#f5fbea',
+    '100': '#e8f6d1',
+    '200': '#d3eea8',
+    '300': '#aadc61',
+    '400': '#98d04b',
+    '500': '#7ab62c',
+    '600': '#5d911f',
+    '700': '#486f1c',
+    '800': '#3b581c',
+    '900': '#334b1c',
+    '950': '#19290a',
+}, */
+
+
+/* secondary: {
+    '50': '#e8ffff',
+    '100': '#c5feff',
+    '200': '#92fbff',
+    '300': '#47f6ff',
+    '400': '#00eeff',
+    '500': '#00ebff',
+    '600': '#00bbd7',
+    '700': '#0092ac',
+    '800': '#006d84',
+    '900': '#055d74',
+    '950': '#003f51',
+}, */
+
+/* 'tutor-purple': {
+    '50': '#faf5ff',
+    '100': '#f2e8ff',
+    '200': '#e7d4ff',
+    '300': '#ddc1ff',
+    '400': '#bc82fe',
+    '500': '#a253f9',
+    '600': '#8d31ec',
+    '700': '#7820d0',
+    '800': '#661faa',
+    '900': '#541b88',
+    '950': '#380665',
+}, */
+
+/* 'tutor-red': {
+    '50': '#fef3ee',
+    '100': '#fde4d7',
+    '200': '#fbc6ad',
+    '300': '#f79e7a',
+    '400': '#f25f33',
+    '500': '#f0471f',
+    '600': '#e12e15',
+    '700': '#ba2014',
+    '800': '#941c18',
+    '900': '#781916',
+    '950': '#410909',
+}, */
+
+
 :root {
-  --background: oklch(0.98 0.004 200);
+  --background: oklch(0.9766 0.0034 174.48);
   --foreground: oklch(0.21 0.03 252);
-  --card: oklch(0.96 0.02 197);
+  --card: oklch(100% 0.00011 271.152);
   --card-foreground: oklch(0.21 0.03 252);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.03 252);
@@ -74,6 +132,30 @@
 }
 
 @theme inline {
+    --color-tutor-purple-50: #faf5ff;
+    --color-tutor-purple-100: #f2e8ff;
+    --color-tutor-purple-200: #e7d4ff;
+    --color-tutor-purple-300: #ddc1ff;
+    --color-tutor-purple-400: #bc82fe;
+    --color-tutor-purple-500: #a253f9;
+    --color-tutor-purple-600: #8d31ec;
+    --color-tutor-purple-700: #7820d0;
+    --color-tutor-purple-800: #661faa;
+    --color-tutor-purple-900: #541b88;
+    --color-tutor-purple-950: #380665;
+    
+    --color-tutor-red-50: #fef3ee;
+    --color-tutor-red-100: #fde4d7;
+    --color-tutor-red-200: #fbc6ad;
+    --color-tutor-red-300: #f79e7a;
+    --color-tutor-red-400: #f25f33;
+    --color-tutor-red-500: #f0471f;
+    --color-tutor-red-600: #e12e15;
+    --color-tutor-red-700: #ba2014;
+    --color-tutor-red-800: #941c18;
+    --color-tutor-red-900: #781916;
+    --color-tutor-red-950: #410909;
+
     --font-sans: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);

@@ -39,23 +39,30 @@ export default function ResetPasswordPage() {
             }
 
             setIsSubmitting(true)
-            setTimeout(() => {
+            fetch('/api/users/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: values.email }),
+            }).then(() => {
                 setIsSubmitting(false)
-                router.push('/auth/update-password')
-            }, 300)
+                sessionStorage.setItem('resetEmail', values.email)
+                // the user should check their email to go to /auth/update-password?token=...
+                alert('If an account with that email exists, we sent a password reset link.')
+            }).catch(() => {
+                setIsSubmitting(false)
+                alert('Error sending reset email.')
+            })
         },
         [router, values]
     )
 
     return (
         <AuthLayout
-            variant="card"
-            imagePosition="right"
-            imageUrl="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=2071&auto=format&fit=crop"
+            imageUrl="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2070&auto=format&fit=crop"
             heading="Forgot Password?"
             subheading="Don't worry, it happens. Enter your email address below and we'll send you a link to reset your password."
-            panelTitle="Unlock your potential."
-            panelDescription="Access world-class tutoring and educational resources with TutorCourt."
+            panelTitle="Stay focused on what matters"
+            panelDescription="Let us help you get back to learning without any interruptions."
             navLinks={NAV_LINKS}
             primaryActionLabel="Log In"
             primaryActionHref="/auth/login"

@@ -48,10 +48,23 @@ export default function LoginPage() {
             }
 
             setIsSubmitting(true)
-            setTimeout(() => {
+            fetch('/api/users/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: values.email, password: values.password }),
+            }).then(async (res) => {
+                if (!res.ok) {
+                    const data = await res.json()
+                    throw new Error(data.errors?.[0]?.message || 'Login failed')
+                }
                 setIsSubmitting(false)
-                router.push('/auth/verified-email')
-            }, 300)
+                // Refresh to get new header state
+                router.push('/')
+                router.refresh()
+            }).catch((err) => {
+                setIsSubmitting(false)
+                setErrors({ form: err.message })
+            })
         },
         [router, values]
     )

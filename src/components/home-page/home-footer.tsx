@@ -1,5 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
+import { FaFacebook, FaXTwitter, FaEnvelope } from "react-icons/fa6"
 
 import { Separator } from "@/components/ui/separator"
 import { WwwLayout } from "@/components/layout/www-layout"
@@ -14,54 +15,57 @@ const platformLinks = [
 const companyLinks = [
     { href: "#about", label: "About Us" },
     { href: "#contact", label: "Contact" },
+]
+
+const legalLinks = [
     { href: "#privacy", label: "Privacy Policy" },
     { href: "#terms", label: "Terms of Service" },
 ]
 
 export function HomeFooter() {
     return (
-        <footer className="bg-foreground py-14 text-background">
+        <footer className="border-t bg-secondary py-16 text-secondary-foreground">
             <WwwLayout>
-                <div className="grid gap-10 md:grid-cols-3">
-                    <div className="space-y-4">
+                <div className="grid gap-12 md:grid-cols-4 lg:grid-cols-5">
+                    <div className="space-y-6 md:col-span-2 lg:col-span-3">
                         <Link href="/" className="inline-flex items-center gap-2">
                             <Image
                                 src="/logo.png"
                                 alt="TutorCourt logo"
-                                width={32}
-                                height={32}
+                                width={28}
+                                height={28}
                                 className="rounded-lg"
                             />
-                            <span className="text-2xl font-black text-background">TutorCourt</span>
+                            <span className="text-xl font-bold tracking-tight">TutorCourt</span>
                         </Link>
-                        <p className="max-w-sm text-sm leading-relaxed text-background/75">
+                        <p className="max-w-xs text-sm leading-relaxed text-secondary-foreground/80">
                             The all-in-one platform for seamless home tutoring management and
                             data-driven student success.
                         </p>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-4">
                             {[
-                                { label: "Facebook", short: "f" },
-                                { label: "X", short: "x" },
-                                { label: "Email", short: "@" },
+                                { label: "Facebook", icon: <FaFacebook className="size-4" /> },
+                                { label: "X", icon: <FaXTwitter className="size-4" /> },
+                                { label: "Email", icon: <FaEnvelope className="size-4" /> },
                             ].map((item) => (
                                 <a
                                     key={item.label}
                                     href="#"
                                     aria-label={item.label}
-                                    className="inline-flex size-9 items-center justify-center rounded-full bg-background/10 text-sm font-bold text-background transition-colors hover:bg-background/20"
+                                    className="inline-flex size-10 items-center justify-center rounded-full bg-secondary-foreground/10 text-secondary-foreground shadow-sm transition-colors hover:bg-secondary-foreground/20"
                                 >
-                                    {item.short}
+                                    {item.icon}
                                 </a>
                             ))}
                         </div>
                     </div>
 
-                    <div>
-                        <h3 className="mb-3 text-lg font-semibold text-background">Platform</h3>
-                        <ul className="space-y-2 text-sm text-background/75">
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Platform</h3>
+                        <ul className="space-y-3 text-sm text-secondary-foreground/80">
                             {platformLinks.map((link) => (
                                 <li key={link.label}>
-                                    <a className="transition-colors hover:text-background" href={link.href}>
+                                    <a className="transition-colors hover:text-secondary-foreground" href={link.href}>
                                         {link.label}
                                     </a>
                                 </li>
@@ -69,12 +73,12 @@ export function HomeFooter() {
                         </ul>
                     </div>
 
-                    <div>
-                        <h3 className="mb-3 text-lg font-semibold text-background">Company</h3>
-                        <ul className="space-y-2 text-sm text-background/75">
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Company</h3>
+                        <ul className="space-y-3 text-sm text-secondary-foreground/80">
                             {companyLinks.map((link) => (
                                 <li key={link.label}>
-                                    <a className="transition-colors hover:text-background" href={link.href}>
+                                    <a className="transition-colors hover:text-secondary-foreground" href={link.href}>
                                         {link.label}
                                     </a>
                                 </li>
@@ -83,12 +87,22 @@ export function HomeFooter() {
                     </div>
                 </div>
 
-                <Separator className="my-8 bg-background/15" />
+                <Separator className="my-10 bg-secondary-foreground/20" />
 
-                <p className="text-center text-xs text-background/60">
-                    © 2026 TutorCourt. All rights reserved. Elevating the standard of home
-                    tutoring.
-                </p>
+                <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                    <p className="text-sm text-secondary-foreground/80">
+                        © {new Date().getFullYear()} TutorCourt. All rights reserved.
+                    </p>
+                    <ul className="flex gap-4 text-sm text-secondary-foreground/80">
+                        {legalLinks.map((link) => (
+                            <li key={link.label}>
+                                <a className="transition-colors hover:text-secondary-foreground hover:underline hover:underline-offset-4" href={link.href}>
+                                    {link.label}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             </WwwLayout>
         </footer>
     )
