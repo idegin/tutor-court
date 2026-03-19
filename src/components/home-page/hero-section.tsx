@@ -4,7 +4,7 @@ import { WwwLayout } from "@/components/layout/www-layout"
 
 export function HeroSection() {
     return (
-        <section className="relative overflow-hidden bg-background py-16 sm:py-24">
+        <section className="relative overflow-hidden bg-secondary/10 py-16 sm:py-24 min-h-screen flex items-center">
             <WwwLayout className="relative">
                 <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
                     <div>
@@ -31,7 +31,7 @@ export function HeroSection() {
                             </Button>
                             <Button
                                 variant="outline"
-                                className="h-11 px-8 text-base font-semibold shadow-sm"
+                                className="h-11 px-8 text-base font-semibold shadow-sm bg-card"
                             >
                                 Start Tutoring
                             </Button>

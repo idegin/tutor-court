@@ -4,20 +4,19 @@ import { FaInfoCircle } from 'react-icons/fa'
 
 import { Button } from '@/components/ui/button'
 
-type VerifiedEmailCardProps = {
-    title?: string
-    description?: string
+type SuccessMessageCardProps = {
+    title: string
+    description: string
     ctaLabel?: string
     onContinueClick?: () => void
 }
 
-export function VerifiedEmailCard({
-    title = 'Email Verified!',
-    description =
-    'Your email has been successfully verified. You can now access all the features of TutorCourt and start your learning journey.',
-    ctaLabel = 'Proceed to Login',
+export function SuccessMessageCard({
+    title,
+    description,
+    ctaLabel = 'Continue',
     onContinueClick,
-}: VerifiedEmailCardProps) {
+}: SuccessMessageCardProps) {
     return (
         <div className="space-y-6">
             <div className="inline-flex size-16 items-center justify-center rounded-full bg-tutor-purple-100 dark:bg-tutor-purple-900/50">
@@ -34,11 +33,6 @@ export function VerifiedEmailCard({
             <Button type="button" size="lg" className="h-12 w-auto px-8 text-[15px] rounded-xl font-bold bg-tutor-purple-600 text-white hover:bg-tutor-purple-700" onClick={onContinueClick}>
                 {ctaLabel}
             </Button>
-
-            <p className="pt-4 flex items-center gap-1.5 text-sm text-muted-foreground/80">
-                <FaInfoCircle className="h-4 w-4" />
-                Need help? Visit our <a href="#" className="font-semibold text-tutor-purple-600 hover:underline ml-1">Help Center</a>
-            </p>
         </div>
     )
 }

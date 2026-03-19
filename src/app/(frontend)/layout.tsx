@@ -1,6 +1,8 @@
 import React from 'react'
 import { Lato } from 'next/font/google'
 import { QueryProvider } from '@/components/providers/query-provider'
+import { AuthProvider } from '@/components/providers/auth-provider'
+import { getServerSideUser } from '@/lib/auth'
 import './global.css'
 
 const lato = Lato({
@@ -16,13 +18,16 @@ export const metadata = {
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
+  const { user, tutorProfile } = await getServerSideUser()
 
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
       <body>
-        <QueryProvider>
-          <main>{children}</main>
-        </QueryProvider>
+        <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
+          <QueryProvider>
+            {children}
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
   )

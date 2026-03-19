@@ -2,8 +2,8 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { HiUser, HiSquares2X2, HiArrowRightOnRectangle } from "react-icons/hi2"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -13,7 +13,17 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { WwwLayout } from "@/components/layout/www-layout"
+import { useAuth } from "@/components/providers/auth-provider"
 
 const navLinks = [
     { href: "#for-parents", label: "For Parents" },
@@ -23,25 +33,17 @@ const navLinks = [
 ]
 
 export function HomeHeader() {
-    const [user, setUser] = useState<{ firstName?: string, lastName?: string, email?: string, accountType?: string } | null>(null)
+    const { user } = useAuth()
     const router = useRouter()
-
-    useEffect(() => {
-        fetch('/api/users/me')
-            .then(res => res.json())
-            .then(data => {
-                if (data?.user) {
-                    setUser(data.user)
-                }
-            })
-            .catch(() => {})
-    }, [])
 
     const handleLogout = async () => {
         await fetch('/api/users/logout', { method: 'POST' })
-        setUser(null)
-        router.push('/')
+        window.location.href = '/'
     }
+
+    const initials = user?.firstName && user?.lastName 
+        ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+        : user?.email?.[0].toUpperCase() || 'U'
 
     return (
         <header className="sticky top-0 z-40 border-b bg-card">
@@ -73,15 +75,45 @@ export function HomeHeader() {
                         ))}
                     </nav>
 
-                    <div className="hidden md:block">
+                    <div className="hidden md:flex items-center">
                         {user ? (
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm font-medium">Hello, {user.firstName || user.email}</span>
-                                <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
-                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                                        <Avatar className="h-10 w-10 border border-border">
+                                            <AvatarImage src={user.avatarUrl} alt={user.firstName} />
+                                            <AvatarFallback className="bg-tutor-purple-100 text-tutor-purple-700 font-semibold">{initials}</AvatarFallback>
+                                        </Avatar>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-56" align="end" forceMount>
+                                    <DropdownMenuLabel className="font-normal">
+                                        <div className="flex flex-col space-y-1">
+                                            <p className="text-sm font-medium leading-none">{user.firstName} {user.lastName}</p>
+                                            <p className="text-xs leading-none text-muted-foreground">
+                                                {user.email}
+                                            </p>
+                                        </div>
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => router.push('/dashboard/profile')} className="cursor-pointer">
+                                        <HiUser className="mr-2 h-4 w-4" />
+                                        <span>Profile</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.push('/dashboard')} className="cursor-pointer">
+                                        <HiSquares2X2 className="mr-2 h-4 w-4" />
+                                        <span>Dashboard</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-700">
+                                        <HiArrowRightOnRectangle className="mr-2 h-4 w-4" />
+                                        <span>Log out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         ) : (
                             <Button
-                                className="px-6 font-semibold shadow-sm"
+                                className="px-6 font-semibold shadow-sm bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
                                 size="sm"
                                 onClick={() => router.push('/auth/login')}
                             >
@@ -114,30 +146,65 @@ export function HomeHeader() {
                                 </svg>
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="right" className="bg-background">
-                            <SheetHeader>
-                                <SheetTitle className="text-left text-foreground">Menu</SheetTitle>
+                        <SheetContent side="right" className="bg-background w-[300px] border-l sm:w-[400px]">
+                            <SheetHeader className="pb-4 border-b">
+                                <SheetTitle className="text-left text-foreground inline-flex items-center gap-2">
+                                     <Image
+                                        src="/logo.png"
+                                        alt="TutorCourt logo"
+                                        width={24}
+                                        height={24}
+                                        className="rounded-md"
+                                    />
+                                    TutorCourt
+                                </SheetTitle>
                             </SheetHeader>
-                            <div className="flex flex-col gap-3 px-6 pb-6">
-                                {navLinks.map((link) => (
-                                    <a
-                                        key={link.label}
-                                        href={link.href}
-                                        className="rounded-2xl border px-4 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                                    >
-                                        {link.label}
-                                    </a>
-                                ))}
-                                {user ? (
-                                     <div className="flex flex-col gap-2 mt-2">
-                                         <div className="text-sm font-medium">Hello, {user.firstName}</div>
-                                         <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
+                            
+                            <div className="flex flex-col gap-4 py-6">
+                                {user && (
+                                     <div className="flex items-center gap-3 px-2 mb-2 pb-4 border-b">
+                                        <Avatar className="h-12 w-12 border border-border">
+                                            <AvatarImage src={user.avatarUrl} alt={user.firstName} />
+                                            <AvatarFallback className="bg-tutor-purple-100 text-tutor-purple-700 font-semibold">{initials}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold">{user.firstName} {user.lastName}</span>
+                                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                                        </div>
                                      </div>
-                                ) : (
-                                    <Button className="mt-2 text-sm font-semibold shadow-sm" onClick={() => router.push('/auth/login')}>
-                                    Login
-                                </Button>
                                 )}
+                                
+                                <div className="flex flex-col space-y-2">
+                                    {navLinks.map((link) => (
+                                        <a
+                                            key={link.label}
+                                            href={link.href}
+                                            className="rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            {link.label}
+                                        </a>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-4 pt-4 border-t flex flex-col gap-2">
+                                    {user ? (
+                                        <>
+                                            <Button variant="ghost" className="justify-start gap-2 h-11" onClick={() => router.push('/dashboard/profile')}>
+                                                <HiUser className="h-5 w-5" /> Profile
+                                            </Button>
+                                            <Button variant="ghost" className="justify-start gap-2 h-11" onClick={() => router.push('/dashboard')}>
+                                                <HiSquares2X2 className="h-5 w-5" /> Dashboard
+                                            </Button>
+                                            <Button variant="ghost" className="justify-start gap-2 h-11 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={handleLogout}>
+                                                <HiArrowRightOnRectangle className="h-5 w-5" /> Logout
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button className="w-full h-12 text-[15px] font-semibold bg-tutor-purple-600 hover:bg-tutor-purple-700" onClick={() => router.push('/auth/login')}>
+                                            Login
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </SheetContent>
                     </Sheet>

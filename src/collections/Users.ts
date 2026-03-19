@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { getBaseEmailLayout } from '../lib/email-template'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -8,15 +9,39 @@ export const Users: CollectionConfig = {
   },
   auth: {
     verify: {
-      generateEmailHTML: ({ token, user }) => {
-        return `Click <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/verified-email?token=${token}">here</a> to verify your email.`
+      generateEmailHTML: (args) => {
+        const token = args?.token
+        const url = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/verified-email?token=${token}`
+        const content = `
+          <p class="text">Hi there,</p>
+          <p class="text">Welcome to TutorCourt! We're excited to have you on board. Please verify your email address to get started.</p>
+          <div class="btn-container">
+            <a href="${url}" class="btn">Verify My Email</a>
+          </div>
+        `;
+        return getBaseEmailLayout('Verify Your Email', content)
       }
     },
     forgotPassword: {
-      generateEmailHTML: ({ token, user }) => {
-        return `Click <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/update-password?token=${token}">here</a> to reset your password.`
+      generateEmailHTML: (args) => {
+        const token = args?.token
+        const url = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/update-password?token=${token}`
+        const content = `
+          <p class="text">Hi there,</p>
+          <p class="text">We received a request to reset your password for your TutorCourt account.</p>
+          <div class="btn-container">
+            <a href="${url}" class="btn">Reset Password</a>
+          </div>
+        `;
+        return getBaseEmailLayout('Reset Your Password', content)
       }
     }
+  },
+  access: {
+    create: () => true, // Allow public signup
+    read: () => true,
+    update: ({ req: { user } }) => Boolean(user), // Restrict updates to logged-in
+    delete: ({ req: { user } }) => Boolean(user), // Restrict deletes to logged-in
   },
   hooks: {
     beforeValidate: [

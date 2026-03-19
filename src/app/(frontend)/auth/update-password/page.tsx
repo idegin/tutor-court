@@ -5,6 +5,7 @@ import * as React from 'react'
 
 import {
     AuthLayout,
+    SuccessMessageCard,
     type UpdatePasswordField,
     type UpdatePasswordValues,
     UpdatePasswordForm,
@@ -25,6 +26,7 @@ function UpdatePasswordContent() {
     const [values, setValues] = React.useState<UpdatePasswordValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateUpdatePassword>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+    const [isSuccess, setIsSuccess] = React.useState(false)
 
     const onChange = React.useCallback((field: UpdatePasswordField, value: string) => {
         setValues((prev) => ({ ...prev, [field]: value }))
@@ -43,7 +45,7 @@ function UpdatePasswordContent() {
 
             setIsSubmitting(true)
             if (!token) {
-                setErrors({ form: 'No reset token found in URL.' })
+                setErrors({ form: 'No reset token found in URL. Please request a new password reset link.' })
                 setIsSubmitting(false)
                 return
             }
@@ -54,24 +56,23 @@ function UpdatePasswordContent() {
             }).then(async (res) => {
                 if (!res.ok) {
                     const data = await res.json()
-                    throw new Error(data.message || 'Error resetting password.')
+                    throw new Error(data.message || data.errors?.[0]?.message || 'Error resetting password.')
                 }
                 setIsSubmitting(false)
-                alert('Password reset successfully!')
-                router.push('/auth/login')
+                setIsSuccess(true)
             }).catch((err) => {
                 setIsSubmitting(false)
                 setErrors({ form: err.message })
             })
         },
-        [router, values]
+        [token, values]
     )
 
     return (
         <AuthLayout
             imageUrl="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=2073&auto=format&fit=crop"
-            heading="Reset Password"
-            subheading="Choose a new password for your account to regain access to your dashboard."
+            heading={isSuccess ? "Password updated" : "Reset Password"}
+            subheading={isSuccess ? "Your password has been successfully reset. You can now log in securely." : "Choose a new password for your account to regain access to your dashboard."}
             navLinks={NAV_LINKS}
             primaryActionLabel="Log In"
             primaryActionHref="/auth/login"
@@ -85,27 +86,26 @@ function UpdatePasswordContent() {
                 </div>
             }
         >
-            <UpdatePasswordForm
-                values={values}
-                errors={errors}
-                isSubmitting={isSubmitting}
-                onChange={onChange}
-                onSubmit={onSubmit}
-                onBackToLoginClick={() => router.push('/auth/login')}
-            />
+            {isSuccess ? (
+                <SuccessMessageCard
+                    title="Password Reset Successful"
+                    description="You have successfully updated your password. Please log in using your new credentials."
+                    ctaLabel="Proceed to Login"
+                    onContinueClick={() => router.push('/auth/login')}
+                />
+            ) : (
+                <UpdatePasswordForm
+                    values={values}
+                    errors={errors}
+                    isSubmitting={isSubmitting}
+                    onChange={onChange}
+                    onSubmit={onSubmit}
+                    onBackToLoginClick={() => router.push('/auth/login')}
+                />
+            )}
         </AuthLayout>
     )
 }
-
-
-export default function UpdatePasswordPage() {
-    return (
-        <React.Suspense fallback={<div>Loading...</div>}>
-            <UpdatePasswordContent />
-        </React.Suspense>
-    )
-}
-
 
 export default function UpdatePasswordPage() {
     return (

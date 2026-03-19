@@ -4,8 +4,10 @@ import { useRouter } from 'next/navigation'
 import * as React from 'react'
 
 import {
+    AccountTypeSelection,
     AuthLayout,
     RegisterForm,
+    type AccountTypeOption,
     type RegisterField,
     type RegisterValues,
     validateRegister,
@@ -15,6 +17,24 @@ const NAV_LINKS = [
     { href: '/', label: 'Home' },
     { href: '#', label: 'About' },
     { href: '#', label: 'Find a Tutor' },
+]
+
+const ACCOUNT_TYPES: AccountTypeOption[] = [
+    {
+        id: 'tutor',
+        title: 'Tutor',
+        description: 'I want to share my knowledge and help students succeed.',
+    },
+    {
+        id: 'parent',
+        title: 'Parent',
+        description: 'I am looking for the right tutor to meet my child\'s learning goals.',
+    },
+    {
+        id: 'student',
+        title: 'Student',
+        description: 'I am looking for the right tutor to meet my learning goals.',
+    },
 ]
 
 const INITIAL_VALUES: RegisterValues = {
@@ -27,9 +47,16 @@ const INITIAL_VALUES: RegisterValues = {
 
 export default function RegisterPage() {
     const router = useRouter()
+    const [step, setStep] = React.useState<1 | 2>(1)
+    const [selectedTypeId, setSelectedTypeId] = React.useState<string | undefined>(undefined)
     const [values, setValues] = React.useState<RegisterValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateRegister>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+    const onAccountTypeSelect = React.useCallback((id: string) => {
+        setSelectedTypeId(id)
+        setStep(2)
+    }, [])
 
     const onChange = React.useCallback(
         (field: RegisterField, value: string | boolean) => {
@@ -40,7 +67,7 @@ export default function RegisterPage() {
     )
 
     const onSubmit = React.useCallback(
-        (event: React.FormEvent<HTMLFormElement>) => {
+        async (event: React.FormEvent<HTMLFormElement>) => {
             event.preventDefault()
             const nextErrors = validateRegister(values)
             setErrors(nextErrors)
@@ -49,38 +76,77 @@ export default function RegisterPage() {
                 return
             }
 
+            if (!selectedTypeId) {
+                setErrors({ form: 'Please go back and select an account type.' })
+                return
+            }
+
             setIsSubmitting(true)
-            
-            // Store registration data to complete step 2
-            sessionStorage.setItem('registrationData', JSON.stringify(values))
-            
-            setTimeout(() => {
+
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        firstName: values.firstName,
+                        lastName: values.lastName,
+                        email: values.email,
+                        password: values.password,
+                        accountType: selectedTypeId,
+                    }),
+                })
+
+                if (!response.ok) {
+                    const data = await response.json()
+                    throw new Error(data.errors?.[0]?.message || 'Failed to create account. Please try again.')
+                }
+
+                router.push(`/auth/check-email?email=${encodeURIComponent(details.email)}`)
+            } catch (err: any) {
+                setErrors((prev) => ({ ...prev, form: err.message }))
                 setIsSubmitting(false)
-                router.push('/auth/account-type')
-            }, 300)
+            }
         },
-        [router, values]
+        [router, values, selectedTypeId]
     )
 
     return (
         <AuthLayout
             imageUrl="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=2070&auto=format&fit=crop"
-            heading="Create Your Account"
-            subheading="Join our growing community of parents and tutors to start your learning journey today."
+            heading={step === 1 ? "Choose your account type" : "Create Your Account"}
+            subheading={step === 1 ? "Select the option that best describes you to get started." : "Join our growing community."}
             panelTitle="A platform built for excellence"
             panelDescription="Connect with top-tier tutors or discover students eager to learn."
             navLinks={NAV_LINKS}
             primaryActionLabel="Log In"
             primaryActionHref="/auth/login"
         >
-            <RegisterForm
-                values={values}
-                errors={errors}
-                isSubmitting={isSubmitting}
-                onChange={onChange}
-                onSubmit={onSubmit}
-                onLoginClick={() => router.push('/auth/login')}
-            />
+            {step === 1 ? (
+                <AccountTypeSelection
+                    options={ACCOUNT_TYPES}
+                    selectedTypeId={selectedTypeId}
+                    onSelect={onAccountTypeSelect}
+                    onLoginClick={() => router.push('/auth/login')}
+                />
+            ) : (
+                <div className="space-y-6">
+                    <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="text-sm font-semibold text-tutor-purple-600 dark:text-tutor-purple-400 hover:underline"
+                    >
+                        ← Back to account type
+                    </button>
+                    <RegisterForm
+                        values={values}
+                        errors={errors}
+                        isSubmitting={isSubmitting}
+                        onChange={onChange}
+                        onSubmit={onSubmit}
+                        onLoginClick={() => router.push('/auth/login')}
+                    />
+                </div>
+            )}
         </AuthLayout>
     )
 }
