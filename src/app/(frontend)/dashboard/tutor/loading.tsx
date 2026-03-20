@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function Loading() {
     return (
-        <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto">
+        <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-10 p-4 md:p-6 lg:p-8">
             {/* Header Skeleton */}
             <div className="flex items-center justify-between mb-4">
                 <div className="space-y-2">
@@ -96,8 +96,8 @@ export default function Loading() {
                     </CardContent>
                 </Card>
             </div>
-            
-             {/* Grid 3: Student Performance Table */}
+
+            {/* Grid 3: Student Performance Table */}
             <Card className="shadow-none border-border mb-8">
                 <CardHeader>
                     <Skeleton className="h-6 w-48 mb-2" />

@@ -28,7 +28,7 @@ import {
 
 export default function TutorOverviewPage() {
     return (
-        <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-10">
+        <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-10 p-4 md:p-6 lg:p-8">
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back, Tutor</h1>
@@ -101,7 +101,7 @@ export default function TutorOverviewPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle>Upcoming Schedule</CardTitle>
-                            <Button variant="ghost" size="sm" className="text-primary h-8 px-2" asChild>
+                            <Button variant="ghost" size="sm" className="text-secondary h-8 px-2" asChild>
                                 <Link href="/dashboard/tutor/calendar">
                                     View Full Calendar <HiOutlineArrowRight className="ml-1 h-3 w-3" />
                                 </Link>

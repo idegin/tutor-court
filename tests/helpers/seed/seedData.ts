@@ -95,6 +95,29 @@ export async function seedData() {
         })
       }
     }
+    
+    const wallet = await payload.create({
+      collection: 'wallets',
+      data: {
+        user: user.id,
+        currency: isTutor ? 'usd' : 'ngn',
+        balance: faker.number.int({ min: 100, max: 5000 }),
+      },
+    })
+    
+    for (let j = 0; j < 3; j++) {
+       await payload.create({
+          collection: 'transactions',
+          data: {
+            sender: user.id,
+            receiver: user.id,
+            tutor: isTutor ? user.id : null,
+            amount: faker.number.int({ min: 10, max: 500 }),
+            currency: isTutor ? 'usd' : 'ngn',
+            status: faker.helpers.arrayElement(['paid', 'pending']),
+          },
+       })
+    }
   }
 
   console.log('Seeding complete!')

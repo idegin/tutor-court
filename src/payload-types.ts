@@ -71,6 +71,10 @@ export interface Config {
     media: Media;
     'tutor-profiles': TutorProfile;
     subjects: Subject;
+    classes: Class;
+    reviews: Review;
+    wallets: Wallet;
+    transactions: Transaction;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -82,6 +86,10 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'tutor-profiles': TutorProfilesSelect<false> | TutorProfilesSelect<true>;
     subjects: SubjectsSelect<false> | SubjectsSelect<true>;
+    classes: ClassesSelect<false> | ClassesSelect<true>;
+    reviews: ReviewsSelect<false> | ReviewsSelect<true>;
+    wallets: WalletsSelect<false> | WalletsSelect<true>;
+    transactions: TransactionsSelect<false> | TransactionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -196,6 +204,10 @@ export interface TutorProfile {
    */
   isApproved?: boolean | null;
   /**
+   * Average rating for this tutor (0-5).
+   */
+  rating?: number | null;
+  /**
    * Whether the tutor has completed the onboarding flow.
    */
   onboardingCompleted?: boolean | null;
@@ -225,6 +237,72 @@ export interface Subject {
   id: string;
   name: string;
   slug?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "classes".
+ */
+export interface Class {
+  id: string;
+  name: string;
+  description?: string | null;
+  thumbnail?: (string | null) | Media;
+  subject?: (string | null) | Subject;
+  tutorProfile?: (string | null) | TutorProfile;
+  type: 'one-on-one' | 'group' | 'self-paced';
+  learningOutcomes?:
+    | {
+        outcome: string;
+        id?: string | null;
+      }[]
+    | null;
+  minAge?: number | null;
+  maxAge?: number | null;
+  durationInMinutes?: number | null;
+  user: string | User;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reviews".
+ */
+export interface Review {
+  id: string;
+  review: string;
+  rating: number;
+  user: string | User;
+  tutor: string | TutorProfile;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "wallets".
+ */
+export interface Wallet {
+  id: string;
+  user: string | User;
+  currency: 'usd' | 'ngn';
+  balance: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transactions".
+ */
+export interface Transaction {
+  id: string;
+  sender: string | User;
+  receiver: string | User;
+  tutor?: (string | null) | User;
+  amount: number;
+  currency: 'usd' | 'ngn';
+  status: 'paid' | 'pending';
   updatedAt: string;
   createdAt: string;
 }
@@ -267,6 +345,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'subjects';
         value: string | Subject;
+      } | null)
+    | ({
+        relationTo: 'classes';
+        value: string | Class;
+      } | null)
+    | ({
+        relationTo: 'reviews';
+        value: string | Review;
+      } | null)
+    | ({
+        relationTo: 'wallets';
+        value: string | Wallet;
+      } | null)
+    | ({
+        relationTo: 'transactions';
+        value: string | Transaction;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -380,6 +474,7 @@ export interface MediaSelect<T extends boolean = true> {
 export interface TutorProfilesSelect<T extends boolean = true> {
   user?: T;
   isApproved?: T;
+  rating?: T;
   onboardingCompleted?: T;
   bio?: T;
   yearsOfExperience?: T;
@@ -397,6 +492,68 @@ export interface TutorProfilesSelect<T extends boolean = true> {
 export interface SubjectsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "classes_select".
+ */
+export interface ClassesSelect<T extends boolean = true> {
+  name?: T;
+  description?: T;
+  thumbnail?: T;
+  subject?: T;
+  tutorProfile?: T;
+  type?: T;
+  learningOutcomes?:
+    | T
+    | {
+        outcome?: T;
+        id?: T;
+      };
+  minAge?: T;
+  maxAge?: T;
+  durationInMinutes?: T;
+  user?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reviews_select".
+ */
+export interface ReviewsSelect<T extends boolean = true> {
+  review?: T;
+  rating?: T;
+  user?: T;
+  tutor?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "wallets_select".
+ */
+export interface WalletsSelect<T extends boolean = true> {
+  user?: T;
+  currency?: T;
+  balance?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transactions_select".
+ */
+export interface TransactionsSelect<T extends boolean = true> {
+  sender?: T;
+  receiver?: T;
+  tutor?: T;
+  amount?: T;
+  currency?: T;
+  status?: T;
   updatedAt?: T;
   createdAt?: T;
 }

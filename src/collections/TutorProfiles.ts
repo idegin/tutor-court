@@ -26,6 +26,16 @@ export const TutorProfiles: CollectionConfig = {
       },
     },
     {
+      name: 'rating',
+      type: 'number',
+      min: 0,
+      max: 5,
+      defaultValue: 0,
+      admin: {
+        description: 'Average rating for this tutor (0-5).',
+      },
+    },
+    {
       name: 'onboardingCompleted',
       type: 'checkbox',
       defaultValue: false,
