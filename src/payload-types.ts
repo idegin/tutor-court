@@ -202,6 +202,14 @@ export interface TutorProfile {
   bio?: string | null;
   yearsOfExperience?: number | null;
   mode?: ('online' | 'hybrid') | null;
+  /**
+   * Subjects this tutor teaches.
+   */
+  subjects?: (string | Subject)[] | null;
+  /**
+   * Hourly rate in Naira.
+   */
+  hourlyRate?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -372,6 +380,8 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   bio?: T;
   yearsOfExperience?: T;
   mode?: T;
+  subjects?: T;
+  hourlyRate?: T;
   updatedAt?: T;
   createdAt?: T;
 }

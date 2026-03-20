@@ -76,7 +76,7 @@ export default function RegisterPage() {
             setErrors({ form: err.message })
         }
     })
-    
+
 
     const onAccountTypeSelect = React.useCallback((id: string) => {
         setSelectedTypeId(id)
@@ -126,7 +126,7 @@ export default function RegisterPage() {
                     throw new Error(data.errors?.[0]?.message || 'Failed to create account. Please try again.')
                 }
 
-                router.push(`/auth/check-email?email=${encodeURIComponent(details.email)}`)
+                router.push(`/auth/check-email?email=${encodeURIComponent(values.email)}`)
             } catch (err: any) {
                 setErrors((prev) => ({ ...prev, form: err.message }))
                 setIsSubmitting(false)

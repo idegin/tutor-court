@@ -7,7 +7,13 @@ export const getServerSideUser = async () => {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers })
 
-  if (!user) return { user: null, tutorProfile: null }
+  const { docs: subjects } = await payload.find({
+      collection: 'subjects',
+      depth: 0,
+      limit: 100,
+  })
+
+  if (!user) return { user: null, tutorProfile: null, dependencies: { subjects } }
 
   let tutorProfile = null
   if (user.accountType === 'tutor') {
@@ -19,5 +25,5 @@ export const getServerSideUser = async () => {
       tutorProfile = docs[0] || null
   }
 
-  return { user, tutorProfile }
+  return { user, tutorProfile, dependencies: { subjects } }
 }

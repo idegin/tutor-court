@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { HiArrowRight as ArrowRight, HiUser as User } from 'react-icons/hi2'
 import * as z from 'zod'
 import { useAuth } from '@/components/providers/auth-provider'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,6 +32,7 @@ type AccountBasicsStepProps = {
 
 export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
     const { user } = useAuth()
+    const queryClient = useQueryClient()
 
     const [values, setValues] = useState({
         firstName: '',
@@ -47,6 +49,27 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
 
     const countries = Country.getAllCountries()
 
+    const mutation = useMutation({
+        mutationFn: async (data: FormData) => {
+            const res = await fetch('/api/private/user', {
+                method: 'PATCH',
+                body: data,
+            })
+            if (!res.ok) {
+                const errorData = await res.json()
+                throw new Error(errorData.error || 'Failed to update profile')
+            }
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['user'] })
+            onNext()
+        },
+        onError: (err: any) => {
+            setErrors(prev => ({ ...prev, form: err.message }))
+        }
+    })
+
     useEffect(() => {
         if (user) {
             setValues((prev) => ({
@@ -62,7 +85,7 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
         const result = accountBasicsSchema.safeParse(values)
         if (!result.success) {
             const formattedErrors: Record<string, string> = {}
-            result.error.errors.forEach((err: any) => {
+            result.error.issues.forEach((err: any) => {
                 if (err.path[0]) {
                     formattedErrors[err.path[0].toString()] = err.message
                 }
@@ -71,8 +94,18 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
             return
         }
         setErrors({})
-        console.log('Account Basics:', values)
-        onNext()
+
+        const formData = new FormData()
+        formData.append('firstName', values.firstName)
+        formData.append('lastName', values.lastName)
+        formData.append('phoneNumber', values.phoneNumber)
+        formData.append('country', values.country)
+        formData.append('timezone', values.timezone)
+        if (values.photo) {
+            formData.append('photo', values.photo)
+        }
+
+        mutation.mutate(formData)
     }
 
     const handleChange = (field: string, value: any) => {
@@ -212,12 +245,15 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
                     {errors.timezone && <p className="text-sm text-destructive font-medium">{errors.timezone}</p>}
                 </div>
 
-                <Button type="submit" size="lg" className="w-full h-12 text-[15px] font-bold rounded-xl">
-                    Continue <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {errors.form && <p className="text-sm text-destructive font-medium text-center">{errors.form}</p>}
 
-                <p className="text-xs text-center text-muted-foreground mt-2">
-                </p>
+                <Button type="submit" size="lg" className="w-full h-12 text-[15px] font-bold rounded-xl" disabled={mutation.isPending}>
+                    {mutation.isPending ? 'Saving...' : (
+                        <>
+                            Continue <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                    )}
+                </Button>
             </form>
         </div >
     )

@@ -1,20 +1,23 @@
-import React, { useState } from 'react'
-import { HiArrowRight as ArrowRight, HiArrowLeft as ArrowLeft, HiAcademicCap as AcademicCap, HiBriefcase as Briefcase } from 'react-icons/hi2'
+"use client";
+import React, { useState, useEffect } from 'react'
+import { HiArrowRight as ArrowRight, HiArrowLeft as ArrowLeft, HiXMark as XMark } from 'react-icons/hi2'
 import * as z from 'zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
+import { SearchableSelect } from '@/components/ui/searchable-select'
+import { useAuth } from '@/components/providers/auth-provider'
+import { useOptions } from '@/components/providers/options-provider'
 
 const teachingProfileSchema = z.object({
-    subjectPrimary: z.string().min(1, 'Primary subject is required'),
-    subjectSecondary: z.string().optional(),
-    yearsExperience: z.string().min(1, 'Years of experience is required'),
-    educationLevel: z.string().min(1, 'Education level is required'),
-    certifications: z.boolean().optional(),
+    subjects: z.array(z.string()).min(1, 'Please select at least one subject'),
+    yearsOfExperience: z.number().min(0, 'Years of experience must be 0 or more').max(100),
+    hourlyRate: z.number().min(500, 'Minimum hourly rate is 500 NGN'),
+    bio: z.string().min(10, 'Your bio is too short.').max(500, 'Bio must be at most 500 characters'),
 })
 
 type TeachingProfileStepProps = {
@@ -23,22 +26,59 @@ type TeachingProfileStepProps = {
 }
 
 export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps) {
-    const [values, setValues] = useState({
-        subjectPrimary: '',
-        subjectSecondary: '',
-        yearsExperience: '',
-        educationLevel: '',
-        certifications: false,
+    const { tutorProfile } = useAuth()
+    const { subjects } = useOptions()
+    const queryClient = useQueryClient()
+
+    const [values, setValues] = useState<{
+        subjects: string[],
+        yearsOfExperience: number | '',
+        hourlyRate: number | '',
+        bio: string
+    }>({
+        subjects: tutorProfile?.subjects?.map((s: any) => typeof s === 'string' ? s : s.id) || [],
+        yearsOfExperience: tutorProfile?.yearsOfExperience ?? '',
+        hourlyRate: tutorProfile?.hourlyRate ?? '',
+        bio: tutorProfile?.bio || '',
     })
 
     const [errors, setErrors] = useState<Record<string, string>>({})
 
+    const mutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await fetch('/api/private/tutor', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            if (!res.ok) {
+                const result = await res.json()
+                throw new Error(result.error || 'Failed to update profile')
+            }
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['auth'] }) // Optional
+            onNext()
+        },
+        onError: (err: any) => {
+            setErrors(prev => ({ ...prev, form: err.message }))
+        }
+    })
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        const result = teachingProfileSchema.safeParse(values)
+        const result = teachingProfileSchema.safeParse({
+            ...values,
+            yearsOfExperience: values.yearsOfExperience === '' ? undefined : Number(values.yearsOfExperience),
+            hourlyRate: values.hourlyRate === '' ? undefined : Number(values.hourlyRate),
+        })
+
         if (!result.success) {
             const formattedErrors: Record<string, string> = {}
-            result.error.errors.forEach((err) => {
+            result.error.issues.forEach((err: any) => {
                 if (err.path[0]) {
                     formattedErrors[err.path[0].toString()] = err.message
                 }
@@ -47,16 +87,29 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
             return
         }
         setErrors({})
-        console.log('Teaching Profile:', values)
-        onNext()
+        mutation.mutate(result.data)
     }
 
-    const handleChange = (field: string, value: string | boolean) => {
+    const handleChange = (field: string, value: any) => {
         setValues((prev) => ({ ...prev, [field]: value }))
         if (errors[field]) {
             setErrors((prev) => ({ ...prev, [field]: '' }))
         }
     }
+
+    const handleSubjectSelect = (selectedOption: any) => {
+        if (!selectedOption) return;
+        const newSubjectId = selectedOption.value;
+        if (!values.subjects.includes(newSubjectId)) {
+            handleChange('subjects', [...values.subjects, newSubjectId]);
+        }
+    }
+
+    const handleRemoveSubject = (idToRemove: string) => {
+        handleChange('subjects', values.subjects.filter(id => id !== idToRemove));
+    }
+
+    const subjectOptions = subjects.map(s => ({ label: s.name, value: s.id }))
 
     return (
         <div className="flex flex-col max-w-xl w-full mx-auto md:ml-0 md:mr-auto justify-center">
@@ -76,120 +129,108 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-3 leading-tight">
-                What do you teach?
+                Build your teaching profile
             </h1>
             <p className="text-[1.05rem] text-muted-foreground mb-8">
-                Share your expertise and credentials with potential students.
+                Tell us about your expertise to help students find the right match.
             </p>
+
+            {errors.form && (
+                <div className="mb-4 p-4 text-sm text-destructive-foreground bg-destructive/10 rounded-xl border border-destructive/20 font-medium">
+                    {errors.form}
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-                <div className="space-y-4">
-                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
-                        <AcademicCap className="h-5 w-5 text-primary" />
-                        Subjects & Expertise
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-sm font-bold">Primary Subject</Label>
-                            <Select value={values.subjectPrimary} onValueChange={(val) => handleChange('subjectPrimary', val)}>
-                                <SelectTrigger className="h-12 rounded-xl border-input">
-                                    <SelectValue placeholder="Mathematics" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="math">Mathematics</SelectItem>
-                                    <SelectItem value="science">Science</SelectItem>
-                                    <SelectItem value="english">English</SelectItem>
-                                    <SelectItem value="history">History</SelectItem>
-                                    <SelectItem value="languages">Languages</SelectItem>
-                                    <SelectItem value="test-prep">Test Prep (SAT, ACT, etc.)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {errors.subjectPrimary && <p className="text-sm text-destructive font-medium">{errors.subjectPrimary}</p>}
+                <div className="space-y-2">
+                    <Label className="font-bold text-foreground">Subjects You Teach</Label>
+                    <SearchableSelect
+                        placeholder="Select subjects..."
+                        options={subjectOptions}
+                        value={null}
+                        onChange={handleSubjectSelect}
+                        error={!!errors.subjects}
+                        isClearable={false}
+                        components={{ IndicatorSeparator: () => null }}
+                    />
+                    
+                    {values.subjects.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {values.subjects.map(subjectId => {
+                                const subjectInfo = subjects.find(s => s.id === subjectId)
+                                return (
+                                    <div key={subjectId} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-semibold">
+                                        <span>{subjectInfo?.name || subjectId}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveSubject(subjectId)}
+                                            className="hover:text-primary/70 transition-colors"
+                                        >
+                                            <XMark className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )
+                            })}
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-sm font-bold">Secondary Subject (Optional)</Label>
-                            <Select value={values.subjectSecondary} onValueChange={(val) => handleChange('subjectSecondary', val)}>
-                                <SelectTrigger className="h-12 rounded-xl border-input">
-                                    <SelectValue placeholder="Select subject" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="math">Mathematics</SelectItem>
-                                    <SelectItem value="science">Science</SelectItem>
-                                    <SelectItem value="english">English</SelectItem>
-                                    <SelectItem value="history">History</SelectItem>
-                                    <SelectItem value="languages">Languages</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {errors.subjectSecondary && <p className="text-sm text-destructive font-medium">{errors.subjectSecondary}</p>}
-                        </div>
-                    </div>
+                    )}
+                    {errors.subjects && <p className="text-sm text-destructive font-medium">{errors.subjects}</p>}
                 </div>
 
-                <div className="w-full h-px bg-border my-2" />
+                <div className="space-y-2">
+                    <Label className="font-bold text-foreground">Years of Experience</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 5"
+                        value={values.yearsOfExperience}
+                        onChange={(e) => handleChange('yearsOfExperience', e.target.value ? Number(e.target.value) : '')}
+                        className={`h-12 rounded-xl text-[15px] ${errors.yearsOfExperience ? 'border-destructive focus-visible:ring-destructive' : 'border-input'}`}
+                    />
+                    {errors.yearsOfExperience && <p className="text-sm text-destructive font-medium">{errors.yearsOfExperience}</p>}
+                </div>
 
-                <div className="space-y-4">
-                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
-                        <Briefcase className="h-5 w-5 text-primary" />
-                        Experience & Education
-                    </h3>
+                <div className="space-y-2">
+                    <Label className="font-bold text-foreground">Hourly Rate (₦)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 5000"
+                        value={values.hourlyRate}
+                        onChange={(e) => handleChange('hourlyRate', e.target.value ? Number(e.target.value) : '')}
+                        className={`h-12 rounded-xl text-[15px] ${errors.hourlyRate ? 'border-destructive focus-visible:ring-destructive' : 'border-input'}`}
+                    />
+                    {errors.hourlyRate && <p className="text-sm text-destructive font-medium">{errors.hourlyRate}</p>}
+                </div>
 
-                    <div className="space-y-2">
-                        <Label className="text-sm font-bold">Years of Experience</Label>
-                        <Select value={values.yearsExperience} onValueChange={(val) => handleChange('yearsExperience', val)}>
-                            <SelectTrigger className="h-12 rounded-xl border-input">
-                                <SelectValue placeholder="Select experience level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="0-2">0-2 years</SelectItem>
-                                <SelectItem value="3-5">3-5 years</SelectItem>
-                                <SelectItem value="6-10">6-10 years</SelectItem>
-                                <SelectItem value="10+">10+ years</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors.yearsExperience && <p className="text-sm text-destructive font-medium">{errors.yearsExperience}</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="text-sm font-bold">Highest Education Level</Label>
-                        <Select value={values.educationLevel} onValueChange={(val) => handleChange('educationLevel', val)}>
-                            <SelectTrigger className="h-12 rounded-xl border-input">
-                                <SelectValue placeholder="Select education level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="high-school">High School</SelectItem>
-                                <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
-                                <SelectItem value="masters">Master's Degree</SelectItem>
-                                <SelectItem value="phd">Doctorate (Ph.D.)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors.educationLevel && <p className="text-sm text-destructive font-medium">{errors.educationLevel}</p>}
-                    </div>
-
-                    <div className="flex items-center space-x-3 bg-muted/50 p-4 rounded-xl border border-border mt-4">
-                        <Checkbox
-                            id="certifications"
-                            checked={values.certifications}
-                            onCheckedChange={(val) => handleChange('certifications', val as boolean)}
-                            className="h-5 w-5 rounded-md border-input data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
-                        <div className="space-y-1 leading-none">
-                            <label htmlFor="certifications" className="text-sm font-bold leading-none cursor-pointer">
-                                I have teaching certifications
-                            </label>
-                            <p className="text-[13px] text-muted-foreground mt-1">
-                                (State teaching license, TEFL/TESOL, specialized training)
-                            </p>
-                        </div>
+                <div className="space-y-2">
+                    <Label className="font-bold text-foreground">Short Bio</Label>
+                    <Textarea
+                        placeholder="Briefly describe your teaching style and academic background..."
+                        value={values.bio}
+                        onChange={(e) => handleChange('bio', e.target.value)}
+                        className={`min-h-[120px] rounded-xl text-[15px] resize-none ${errors.bio ? 'border-destructive focus-visible:ring-destructive' : 'border-input'}`}
+                    />
+                    <div className="flex justify-between items-center text-sm mt-1">
+                        {errors.bio ? (
+                            <span className="text-destructive font-medium">{errors.bio}</span>
+                        ) : (
+                            <span />
+                        )}
+                        <span className="text-muted-foreground font-medium">
+                            {values.bio.length} / 500 characters
+                        </span>
                     </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-border">
-                    <Button type="button" variant="outline" size="lg" onClick={onBack} className="w-full sm:w-1/3 h-12 text-[15px] font-bold rounded-xl shadow-sm">
+                    <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={mutation.isPending} className="w-full sm:w-1/3 h-12 text-[15px] font-bold rounded-xl shadow-sm">
                         Back
                     </Button>
-                    <Button type="submit" size="lg" className="w-full sm:w-2/3 h-12 text-[15px] font-bold rounded-xl shadow-sm">
-                        Continue to Preferences <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button type="submit" size="lg" disabled={mutation.isPending} className="w-full sm:w-2/3 h-12 text-[15px] font-bold rounded-xl shadow-sm">
+                        {mutation.isPending ? 'Saving...' : (
+                            <>Continue to Preferences <ArrowRight className="ml-2 h-4 w-4" /></>
+                        )}
                     </Button>
                 </div>
             </form>

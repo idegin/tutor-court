@@ -10,8 +10,8 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
     return (
         <div className="flex flex-col max-w-md w-full mx-auto md:ml-0 md:mr-auto justify-center h-full">
             <div className="flex items-center gap-2 mb-6">
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary border border-primary/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary mr-1.5 animate-pulse" />
+                <span className="inline-flex items-center rounded-full bg-secondary/10 px-2.5 py-0.5 text-xs font-semibold text-secondary border border-secondary/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-secondary mr-1.5 animate-pulse" />
                     New Tutor Onboarding
                 </span>
             </div>

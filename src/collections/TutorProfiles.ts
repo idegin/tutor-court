@@ -49,6 +49,21 @@ export const TutorProfiles: CollectionConfig = {
         { label: 'Hybrid', value: 'hybrid' },
       ],
     },
-    // Add additional tutor-specific fields here (e.g., subjects, rate)
+    {
+      name: 'subjects',
+      type: 'relationship',
+      relationTo: 'subjects',
+      hasMany: true,
+      admin: {
+        description: 'Subjects this tutor teaches.',
+      },
+    },
+    {
+      name: 'hourlyRate',
+      type: 'number',
+      admin: {
+        description: 'Hourly rate in Naira.',
+      },
+    },
   ],
 }

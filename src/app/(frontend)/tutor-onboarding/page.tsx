@@ -29,7 +29,7 @@ export default function TutorOnboarding() {
         },
         {
             id: 3,
-            component: <PreferencesStep onNext={() => console.log('Finish!')} onBack={() => setStep(2)} />,
+            component: <PreferencesStep onComplete={() => console.log('Finish!')} onBack={() => setStep(2)} />,
             panelContext: "preferences"
         }
     ];

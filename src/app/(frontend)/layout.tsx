@@ -2,6 +2,7 @@ import React from 'react'
 import { Lato } from 'next/font/google'
 import { QueryProvider } from '@/components/providers/query-provider'
 import { AuthProvider } from '@/components/providers/auth-provider'
+import { OptionsProvider } from '@/components/providers/options-provider'
 import { getServerSideUser } from '@/lib/auth'
 import './global.css'
 
@@ -18,16 +19,18 @@ export const metadata = {
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
-  const { user, tutorProfile } = await getServerSideUser()
+  const { user, tutorProfile, dependencies } = await getServerSideUser()
 
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
       <body>
-        <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
-          <QueryProvider>
-            {children}
-          </QueryProvider>
-        </AuthProvider>
+        <OptionsProvider initialSubjects={dependencies?.subjects || []}>
+          <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
+            <QueryProvider>
+              {children}
+            </QueryProvider>
+          </AuthProvider>
+        </OptionsProvider>
       </body>
     </html>
   )

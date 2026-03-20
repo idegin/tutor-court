@@ -27,7 +27,9 @@ export async function PATCH(request: Request) {
       
       const media = await payload.create({
         collection: 'media',
-        data: {},
+        data: {
+          alt: 'Avatar'
+        },
         file: {
           data: buffer,
           name: photo.name,

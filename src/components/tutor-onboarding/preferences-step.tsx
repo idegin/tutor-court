@@ -34,7 +34,7 @@ export function PreferencesStep({ onComplete, onBack }: PreferencesStepProps) {
         const result = preferencesSchema.safeParse(values)
         if (!result.success) {
             const formattedErrors: Record<string, string> = {}
-            result.error.errors.forEach((err) => {
+            result.error.issues.forEach((err: any) => {
                 if (err.path[0]) {
                     formattedErrors[err.path[0].toString()] = err.message
                 }

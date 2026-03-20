@@ -81,8 +81,8 @@ export function HomeHeader() {
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                                         <Avatar className="h-10 w-10 border border-border">
-                                            <AvatarImage src={user.avatarUrl} alt={user.firstName} />
-                                            <AvatarFallback className="bg-tutor-purple-100 text-tutor-purple-700 font-semibold">{initials}</AvatarFallback>
+                                            <AvatarImage src={typeof user.avatar === 'object' && user.avatar?.url ? user.avatar.url : undefined} alt={user.firstName} />
+                                            <AvatarFallback className="bg-primary/10 text-primary font-semibold">{initials}</AvatarFallback>
                                         </Avatar>
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -164,8 +164,8 @@ export function HomeHeader() {
                                 {user && (
                                     <div className="flex items-center gap-3 px-2 mb-2 pb-4 border-b">
                                         <Avatar className="h-12 w-12 border border-border">
-                                            <AvatarImage src={user.avatarUrl} alt={user.firstName} />
-                                            <AvatarFallback className="bg-tutor-purple-100 text-tutor-purple-700 font-semibold">{initials}</AvatarFallback>
+                                            <AvatarImage src={typeof user.avatar === 'object' && user.avatar?.url ? user.avatar.url : undefined} alt={user.firstName} />
+                                            <AvatarFallback className="bg-primary/10 text-primary font-semibold">{initials}</AvatarFallback>
                                         </Avatar>
                                         <div className="flex flex-col">
                                             <span className="text-sm font-semibold">{user.firstName} {user.lastName}</span>
