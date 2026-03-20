@@ -101,6 +101,7 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
         formData.append('phoneNumber', values.phoneNumber)
         formData.append('country', values.country)
         formData.append('timezone', values.timezone)
+        formData.append('isTutorOnboarding', 'true')
         if (values.photo) {
             formData.append('photo', values.photo)
         }

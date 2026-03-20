@@ -154,13 +154,13 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
                         isClearable={false}
                         components={{ IndicatorSeparator: () => null }}
                     />
-                    
+
                     {values.subjects.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">
                             {values.subjects.map(subjectId => {
                                 const subjectInfo = subjects.find(s => s.id === subjectId)
                                 return (
-                                    <div key={subjectId} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-semibold">
+                                    <div key={subjectId} className="flex items-center gap-2 bg-secondary/10 text-secondary px-3 py-1.5 rounded-full text-sm font-semibold">
                                         <span>{subjectInfo?.name || subjectId}</span>
                                         <button
                                             type="button"

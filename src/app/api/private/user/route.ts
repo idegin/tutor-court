@@ -16,6 +16,7 @@ export async function PATCH(request: Request) {
     const phoneNumber = formData.get('phoneNumber') as string
     const country = formData.get('country') as string
     const timezone = formData.get('timezone') as string
+    const isTutorOnboarding = formData.get('isTutorOnboarding') === 'true'
     const photo = formData.get('photo') as File | null
 
     const payload = await getPayload({ config })
@@ -48,11 +49,36 @@ export async function PATCH(request: Request) {
     if (timezone) updateData.timezone = timezone
     if (avatarId && avatarId !== user.avatar) updateData.avatar = avatarId
 
+    if (isTutorOnboarding) {
+      updateData.accountType = 'tutor'
+    }
+
     const updatedUser = await payload.update({
       collection: 'users',
       id: user.id,
       data: updateData,
     })
+
+    if (isTutorOnboarding) {
+      const existingProfile = await payload.find({
+        collection: 'tutor-profiles',
+        where: {
+          user: {
+            equals: user.id,
+          },
+        },
+      })
+
+      if (existingProfile.totalDocs === 0) {
+        await payload.create({
+          collection: 'tutor-profiles',
+          data: {
+            user: user.id,
+            isApproved: false,
+          },
+        })
+      }
+    }
 
     return NextResponse.json({ user: updatedUser })
   } catch (error: any) {

@@ -15,9 +15,7 @@ import {
 } from '@/components/auth'
 
 const NAV_LINKS = [
-    { href: '/', label: 'Home' },
-    { href: '#', label: 'About' },
-    { href: '#', label: 'Find a Tutor' },
+
 ]
 
 const ACCOUNT_TYPES: AccountTypeOption[] = [

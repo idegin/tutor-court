@@ -11,7 +11,7 @@ export async function PATCH(request: Request) {
         }
 
         const data = await request.json()
-        const { subjects, yearsOfExperience, bio, hourlyRate } = data
+        const { subjects, yearsOfExperience, bio, hourlyRate, mode, usagePlan, onboardingCompleted } = data
 
         const payload = await getPayload({ config })
 
@@ -27,6 +27,9 @@ export async function PATCH(request: Request) {
         if (yearsOfExperience !== undefined) updateData.yearsOfExperience = yearsOfExperience
         if (bio !== undefined) updateData.bio = bio
         if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate
+        if (mode !== undefined) updateData.mode = mode
+        if (usagePlan !== undefined) updateData.usagePlan = usagePlan
+        if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted
 
         let tutorProfile
         if (existingProfiles.length > 0) {
@@ -41,6 +44,17 @@ export async function PATCH(request: Request) {
                 data: {
                     user: user.id,
                     ...updateData
+                },
+            })
+        }
+
+        // Update the user accountType to tutor if they aren't already
+        if (user.accountType !== 'tutor') {
+            await payload.update({
+                collection: 'users',
+                id: user.id,
+                data: {
+                    accountType: 'tutor'
                 },
             })
         }

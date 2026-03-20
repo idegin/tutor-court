@@ -1,18 +1,17 @@
-import React, { useState } from 'react'
-import { HiArrowRight as ArrowRight, HiArrowLeft as ArrowLeft, HiBanknotes as Banknotes, HiBuildingStorefront as BuildingStorefront } from 'react-icons/hi2'
+"use client";
+import React, { useState, useEffect } from 'react'
+import { HiArrowRight as ArrowRight, HiArrowLeft as ArrowLeft, HiVideoCamera as VideoCamera, HiHome as Home } from 'react-icons/hi2'
 import * as z from 'zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useAuth } from '@/components/providers/auth-provider'
 
 const preferencesSchema = z.object({
-    hourlyRate: z.string().min(1, 'Hourly rate is required'),
-    teachingMode: z.string().min(1, 'Teaching mode is required'),
-    availabilityDays: z.string().min(8, 'Days of availability are required'),
+    mode: z.enum(['online', 'hybrid'], { message: 'Please select a tutoring mode' }),
+    usagePlan: z.enum(['existing', 'marketplace', 'both'], { message: 'Please select how you plan to use TutorCourt' }),
 })
 
 type PreferencesStepProps = {
@@ -21,13 +20,39 @@ type PreferencesStepProps = {
 }
 
 export function PreferencesStep({ onComplete, onBack }: PreferencesStepProps) {
+    const { tutorProfile } = useAuth()
+    const queryClient = useQueryClient()
+
     const [values, setValues] = useState({
-        hourlyRate: '',
-        teachingMode: '',
-        availabilityDays: 'weekdays',
+        mode: tutorProfile?.mode || 'online',
+        usagePlan: tutorProfile?.usagePlan || '',
     })
 
     const [errors, setErrors] = useState<Record<string, string>>({})
+
+    const mutation = useMutation({
+        mutationFn: async (data: any) => {
+            const res = await fetch('/api/private/tutor', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            if (!res.ok) {
+                const result = await res.json()
+                throw new Error(result.error || 'Failed to update preferences')
+            }
+            return res.json()
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['auth'] })
+            onComplete()
+        },
+        onError: (err: any) => {
+            setErrors(prev => ({ ...prev, form: err.message }))
+        }
+    })
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -43,8 +68,10 @@ export function PreferencesStep({ onComplete, onBack }: PreferencesStepProps) {
             return
         }
         setErrors({})
-        console.log('Preferences:', values)
-        onComplete()
+        mutation.mutate({
+            ...result.data,
+            onboardingCompleted: true,
+        })
     }
 
     const handleChange = (field: string, value: string) => {
@@ -63,113 +90,95 @@ export function PreferencesStep({ onComplete, onBack }: PreferencesStepProps) {
             <Progress value={100} className="h-2 mb-6" />
 
             <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 rounded-full mb-4 mt-1 bg-muted hover:bg-accent hover:text-accent-foreground">
+                <button onClick={onBack} className="h-8 min-w-8 rounded-full mb-4 mt-1 bg-muted hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-center">
                     <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                </Button>
-                <span className="text-sm text-muted-foreground mb-4">Location & Rates</span>
+                </button>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-3 leading-tight">
-                Set your rates & location
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-8 leading-tight">
+                Preferences & Setup
             </h1>
-            <p className="text-[1.05rem] text-muted-foreground mb-8">
-                How much do you want to earn and where will you teach?
-            </p>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-8">
 
                 <div className="space-y-4">
-                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
-                        <Banknotes className="h-5 w-5 text-primary" />
-                        Hourly Rate
+                    <h3 className="font-bold text-foreground text-base">
+                        Tutoring Mode
                     </h3>
-                    <div className="space-y-2">
-                        <Label className="text-sm font-bold">Your Base Rate (per hour)</Label>
-                        <div className="relative flex items-center">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-lg">$</span>
-                            <Input
-                                placeholder="35"
-                                className="h-14 rounded-xl border-input pl-8 text-lg font-semibold"
-                                value={values.hourlyRate}
-                                onChange={(e) => handleChange('hourlyRate', e.target.value)}
-                            />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div
+                            onClick={() => handleChange('mode', 'online')}
+                            className={`flex flex-col p-5 cursor-pointer rounded-xl border-2 transition-all ${values.mode === 'online' ? 'border-primary bg-primary/5' : 'border-border hover:border-accent-foreground/20 bg-background'}`}
+                        >
+                            <VideoCamera className={`h-6 w-6 mb-3 ${values.mode === 'online' ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <p className="font-bold text-base text-foreground mb-1">Online only</p>
+                            <p className="text-sm text-muted-foreground">Sessions via video call</p>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-                            <span className="inline-block w-2 h-2 rounded-full bg-primary"></span>
-                            Average rate for your subjects is $35-50/hr
-                        </p>
-                        {errors.hourlyRate && <p className="text-sm text-destructive font-medium">{errors.hourlyRate}</p>}
+
+                        <div
+                            onClick={() => handleChange('mode', 'hybrid')}
+                            className={`flex flex-col p-5 cursor-pointer rounded-xl border-2 transition-all ${values.mode === 'hybrid' ? 'border-primary bg-primary/5' : 'border-border hover:border-accent-foreground/20 bg-background'}`}
+                        >
+                            <Home className={`h-6 w-6 mb-3 ${values.mode === 'hybrid' ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <p className="font-bold text-base text-foreground mb-1">Hybrid</p>
+                            <p className="text-sm text-muted-foreground">Remote & in-person options</p>
+                        </div>
                     </div>
+                    {errors.mode && <p className="text-sm text-destructive font-medium">{errors.mode}</p>}
                 </div>
 
-                <div className="w-full h-px bg-border my-2" />
-
                 <div className="space-y-4">
-                    <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
-                        <BuildingStorefront className="h-5 w-5 text-primary" />
-                        Teaching Environment
+                    <h3 className="font-bold text-foreground text-base">
+                        How do you plan to use TutorCourt?
                     </h3>
 
-                    <div className="space-y-2">
-                        <Label className="text-sm font-bold">Where will you tutor?</Label>
-                        <Select value={values.teachingMode} onValueChange={(val) => handleChange('teachingMode', val)}>
-                            <SelectTrigger className="h-12 rounded-xl border-input">
-                                <SelectValue placeholder="Select teaching mode" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="online">Online Only</SelectItem>
-                                <SelectItem value="in-person">In-Person Only</SelectItem>
-                                <SelectItem value="hybrid">Both Online & In-Person</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors.teachingMode && <p className="text-sm text-destructive font-medium">{errors.teachingMode}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                        <label className={`
-                            relative flex items-center justify-between p-4 cursor-pointer rounded-xl border-2 transition-all
-                            ${values.availabilityDays === 'weekdays' ? 'border-primary bg-primary/10' : 'border-border hover:border-accent-foreground/20 bg-background'}
-                        `}>
-                            <div className="flex items-center gap-3">
-                                <div>
-                                    <p className="font-bold text-sm text-foreground">Weekdays</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Mon - Fri</p>
-                                </div>
-                            </div>
+                    <div className="flex flex-col gap-3">
+                        <label className={`flex items-start gap-4 p-5 cursor-pointer rounded-xl border transition-all ${values.usagePlan === 'existing' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50 bg-background'}`}>
                             <Checkbox
-                                checked={values.availabilityDays === 'weekdays'}
-                                onCheckedChange={() => handleChange('availabilityDays', 'weekdays')}
-                                className="h-5 w-5 rounded-full border-input data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                checked={values.usagePlan === 'existing'}
+                                onCheckedChange={() => handleChange('usagePlan', 'existing')}
+                                className="mt-1 h-5 w-5 rounded border-2 border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                             />
+                            <div className="flex flex-col">
+                                <p className="font-bold text-[15px] text-foreground mb-0.5">Use TutorCourt with my existing students</p>
+                                <p className="text-sm text-muted-foreground">Manage invoicing and scheduling for current clients</p>
+                            </div>
                         </label>
 
-                        <label className={`
-                            relative flex items-center justify-between p-4 cursor-pointer rounded-xl border-2 transition-all
-                            ${values.availabilityDays === 'weekends' ? 'border-primary bg-primary/10' : 'border-border hover:border-accent-foreground/20 bg-background'}
-                        `}>
-                            <div className="flex items-center gap-3">
-                                <div>
-                                    <p className="font-bold text-sm text-foreground">Weekends</p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">Sat - Sun</p>
-                                </div>
-                            </div>
+                        <label className={`flex items-start gap-4 p-5 cursor-pointer rounded-xl border transition-all ${values.usagePlan === 'marketplace' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50 bg-background'}`}>
                             <Checkbox
-                                checked={values.availabilityDays === 'weekends'}
-                                onCheckedChange={() => handleChange('availabilityDays', 'weekends')}
-                                className="h-5 w-5 rounded-full border-input data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                checked={values.usagePlan === 'marketplace'}
+                                onCheckedChange={() => handleChange('usagePlan', 'marketplace')}
+                                className="mt-1 h-5 w-5 rounded border-2 border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                             />
+                            <div className="flex flex-col">
+                                <p className="font-bold text-[15px] text-foreground mb-0.5">Apply to be listed on TutorCourt marketplace</p>
+                                <p className="text-sm text-muted-foreground">Get discovered by new students looking for your expertise</p>
+                            </div>
+                        </label>
+
+                        <label className={`flex items-start gap-4 p-5 cursor-pointer rounded-xl border transition-all ${values.usagePlan === 'both' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50 bg-background'}`}>
+                            <Checkbox
+                                checked={values.usagePlan === 'both'}
+                                onCheckedChange={() => handleChange('usagePlan', 'both')}
+                                className="mt-1 h-5 w-5 rounded border-2 border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                            <div className="flex flex-col">
+                                <p className="font-bold text-[15px] text-foreground mb-0.5">Both</p>
+                                <p className="text-sm text-muted-foreground">The full TutorCourt experience for all your students</p>
+                            </div>
                         </label>
                     </div>
-                    {errors.availabilityDays && <p className="text-sm text-destructive font-medium">{errors.availabilityDays}</p>}
+                    {errors.usagePlan && <p className="text-sm text-destructive font-medium">{errors.usagePlan}</p>}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-4 border-t border-border">
-                    <Button type="button" variant="outline" size="lg" onClick={onBack} className="w-full sm:w-1/3 h-12 text-[15px] font-bold rounded-xl border-border shadow-sm">
+                    <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={mutation.isPending} className="w-full sm:w-1/3 h-12 text-[15px] font-bold rounded-xl border-border shadow-sm">
                         Back
                     </Button>
-                    <Button type="submit" size="lg" className="w-full sm:w-2/3 h-12 text-[15px] font-bold rounded-xl shadow-sm group">
-                        Complete Profile
-                        <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    <Button type="submit" size="lg" disabled={mutation.isPending} className="w-full sm:w-2/3 h-12 text-[15px] font-bold rounded-xl shadow-sm group">
+                        {mutation.isPending ? 'Saving...' : 'Complete Profile'}
+                        {!mutation.isPending && <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />}
                     </Button>
                 </div>
             </form>

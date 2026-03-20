@@ -3,6 +3,7 @@ import { Lato } from 'next/font/google'
 import { QueryProvider } from '@/components/providers/query-provider'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { OptionsProvider } from '@/components/providers/options-provider'
+import { Toaster } from '@/components/ui/sonner'
 import { getServerSideUser } from '@/lib/auth'
 import './global.css'
 
@@ -28,6 +29,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
           <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
             <QueryProvider>
               {children}
+              <Toaster position="top-right" />
             </QueryProvider>
           </AuthProvider>
         </OptionsProvider>

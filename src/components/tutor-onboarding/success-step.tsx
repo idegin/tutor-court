@@ -1,13 +1,41 @@
+"use client";
 import * as React from 'react'
 import { HiCheck } from 'react-icons/hi2'
 import { FaInfoCircle } from 'react-icons/fa'
 import { Button } from '@/components/ui/button'
+import confetti from 'canvas-confetti'
 
 type SuccessStepProps = {
     onContinueClick: () => void
 }
 
 export function SuccessStep({ onContinueClick }: SuccessStepProps) {
+    React.useEffect(() => {
+        const end = Date.now() + 3 * 1000;
+        const colors = ['#2563eb', '#16a34a', '#d97706'];
+
+        (function frame() {
+            confetti({
+                particleCount: 5,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: colors
+            });
+            confetti({
+                particleCount: 5,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: colors
+            });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        }());
+    }, []);
+
     return (
         <div className="space-y-6">
             <div className="inline-flex size-16 items-center justify-center rounded-full bg-primary/10">

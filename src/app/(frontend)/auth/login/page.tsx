@@ -1,8 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
+import { Suspense } from 'react'
+import { toast } from 'sonner'
 
 import {
     AuthLayout,
@@ -13,9 +15,7 @@ import {
 } from '@/components/auth'
 
 const NAV_LINKS = [
-    { href: '/', label: 'Home' },
-    { href: '#', label: 'About' },
-    { href: '#', label: 'Find a Tutor' },
+ 
 ]
 
 const INITIAL_VALUES: LoginValues = {
@@ -24,8 +24,11 @@ const INITIAL_VALUES: LoginValues = {
     rememberMe: false,
 }
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectUrl = searchParams.get('redirect') || '/'
+
     const [values, setValues] = React.useState<LoginValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateLogin>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -45,15 +48,31 @@ export default function LoginPage() {
         },
         onMutate: () => setIsSubmitting(true),
         onSettled: () => setIsSubmitting(false),
-        onSuccess: () => {
-            router.push('/')
-            router.refresh()
+        onSuccess: (data) => {
+            const redirectParam = searchParams.get('redirect')
+            if (redirectParam) {
+                router.push(redirectParam)
+                router.refresh()
+            } else {
+                const accountType = data?.user?.accountType;
+                if (accountType) {
+                    window.location.href = `/dashboard/${accountType}`
+                } else {
+                    window.location.reload()
+                }
+            }
         },
         onError: (err: any) => {
-            setErrors({ form: err.message })
+            if (err.message === 'The email or password provided is incorrect.') {
+                toast.error(err.message, {
+                    description: 'Please check your credentials and try again.'
+                })
+            } else {
+                toast.error(err.message || 'An error occurred during log in')
+            }
         }
     })
-    
+
 
     const onChange = React.useCallback(
         (field: LoginField, value: string | boolean) => {
@@ -98,5 +117,13 @@ export default function LoginPage() {
                 onCreateAccountClick={() => router.push('/auth/register')}
             />
         </AuthLayout>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <LoginContent />
+        </Suspense>
     )
 }

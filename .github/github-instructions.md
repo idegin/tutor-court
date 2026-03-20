@@ -4,6 +4,9 @@
 3. Use pnpm and not npm
 4. Don't use the terminal to update files, you are a vs code AI agent that can update the files directly.
 5. Use Shadcn colors.
+6. Always do things server side.
+7. Always use server side data fetching.
+8. Make sure the UI is very beautiful. Don't add shadows or gradients.
 
 
 

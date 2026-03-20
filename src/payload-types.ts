@@ -203,6 +203,10 @@ export interface TutorProfile {
   yearsOfExperience?: number | null;
   mode?: ('online' | 'hybrid') | null;
   /**
+   * How the tutor plans to use TutorCourt.
+   */
+  usagePlan?: ('existing' | 'marketplace' | 'both') | null;
+  /**
    * Subjects this tutor teaches.
    */
   subjects?: (string | Subject)[] | null;
@@ -380,6 +384,7 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   bio?: T;
   yearsOfExperience?: T;
   mode?: T;
+  usagePlan?: T;
   subjects?: T;
   hourlyRate?: T;
   updatedAt?: T;

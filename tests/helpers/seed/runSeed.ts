@@ -1,3 +1,6 @@
+import { config } from 'dotenv'
+config() // Load .env variables before anything else
+
 import { seedData } from './seedData.js'
 
 async function run() {

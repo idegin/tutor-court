@@ -50,6 +50,18 @@ export const TutorProfiles: CollectionConfig = {
       ],
     },
     {
+      name: 'usagePlan',
+      type: 'select',
+      options: [
+        { label: 'Existing Students', value: 'existing' },
+        { label: 'Marketplace', value: 'marketplace' },
+        { label: 'Both', value: 'both' },
+      ],
+      admin: {
+        description: 'How the tutor plans to use TutorCourt.',
+      },
+    },
+    {
       name: 'subjects',
       type: 'relationship',
       relationTo: 'subjects',

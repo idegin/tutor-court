@@ -13,12 +13,6 @@ export default async function DashboardLayout({ children }: Props) {
         redirect('/auth/login')
     }
 
-    if (user.accountType === 'tutor') {
-        if (!tutorProfile?.onboardingCompleted) {
-            redirect('/tutor-onboarding')
-        }
-    }
-
     return (
         <div>
             {children}

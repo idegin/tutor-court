@@ -58,6 +58,7 @@ export async function seedData() {
         lastName,
         accountType: isTutor ? 'tutor' : 'student',
       },
+      disableVerificationEmail: true,
     })
 
     if (isTutor) {
@@ -67,17 +68,30 @@ export async function seedData() {
         limit: 1
       })
       
+      // Pick 1-3 random subjects
+      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
+      
+      const profileData = {
+        user: user.id,
+        bio: faker.person.bio(),
+        yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
+        mode: faker.helpers.arrayElement(['online', 'hybrid']),
+        subjects: tutorSubjects,
+        hourlyRate: faker.number.int({ min: 500, max: 50000 }),
+        isApproved: true,
+        onboardingCompleted: true,
+      }
+
       if (existingProfile.docs.length === 0) {
         await payload.create({
           collection: 'tutor-profiles',
-          data: {
-            user: user.id,
-            bio: faker.person.bio(),
-            yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
-            mode: faker.helpers.arrayElement(['online', 'hybrid']),
-            isApproved: true,
-            onboardingCompleted: true,
-          },
+          data: profileData,
+        })
+      } else {
+        await payload.update({
+          collection: 'tutor-profiles',
+          id: existingProfile.docs[0].id,
+          data: profileData,
         })
       }
     }
