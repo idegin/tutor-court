@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
 
 import {
@@ -52,6 +53,30 @@ export default function RegisterPage() {
     const [values, setValues] = React.useState<RegisterValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateRegister>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+    const mutation = useMutation({
+        mutationFn: async (vars: any) => {
+            const res = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(vars),
+            })
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.errors?.[0]?.message || 'Request failed')
+            }
+            return res.json()
+        },
+        onMutate: () => setIsSubmitting(true),
+        onSettled: () => setIsSubmitting(false),
+        onSuccess: () => {
+            router.push('/auth/check-email')
+        },
+        onError: (err: any) => {
+            setErrors({ form: err.message })
+        }
+    })
+    
 
     const onAccountTypeSelect = React.useCallback((id: string) => {
         setSelectedTypeId(id)

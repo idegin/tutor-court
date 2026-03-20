@@ -150,7 +150,7 @@ export function AuthLayout({
     }
 
     return (
-        <div className={cn('relative flex min-h-screen flex-col bg-background lg:grid lg:grid-cols-2', className)}>
+        <div className={cn('relative flex min-h-screen lg:h-screen flex-col bg-background lg:grid lg:grid-cols-2 lg:overflow-hidden', className)}>
             {/* Absolute Global Header for Split Layout */}
             <header className="absolute top-0 left-0 right-0 h-24 px-6 sm:px-10 lg:px-16 flex items-center justify-between z-50">
                 <Link href="/" className="inline-flex items-center gap-2.5">
@@ -176,7 +176,7 @@ export function AuthLayout({
             </header>
 
             {/* Left Column (Content) */}
-            <div className={cn("flex flex-col border-border/50 px-6 sm:px-10 lg:px-16 pt-24", flipped ? "lg:order-2" : "lg:order-1")}>
+            <div className={cn("flex flex-col border-border/50 px-6 sm:px-10 lg:px-16 pt-24 lg:overflow-y-auto h-full", flipped ? "lg:order-2" : "lg:order-1")}>
 
                 {/* Content Wrapper */}
                 <div className="flex flex-1 items-center justify-center py-10 lg:py-20 lg:pr-8">
@@ -195,7 +195,7 @@ export function AuthLayout({
             </div>
 
             {/* Right Column (Image + Panel) */}
-            <div className={cn("relative hidden w-full lg:block bg-[#0e1f18]", flipped ? "lg:order-1" : "lg:order-2")}>
+            <div className={cn("relative hidden w-full h-full lg:block bg-[#0e1f18]", flipped ? "lg:order-1" : "lg:order-2")}>
                 <Image
                     src={imageUrl}
                     alt="Students studying"

@@ -10,6 +10,7 @@ import nodemailer from 'nodemailer'
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { TutorProfiles } from './collections/TutorProfiles'
+import { Subjects } from './collections/Subjects'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -35,7 +36,7 @@ export default buildConfig({
     defaultFromName: 'TutorCourt',
     transport,
   }),
-  collections: [Users, Media, TutorProfiles],
+  collections: [Users, Media, TutorProfiles, Subjects],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

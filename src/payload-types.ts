@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     media: Media;
     'tutor-profiles': TutorProfile;
+    subjects: Subject;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -80,6 +81,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'tutor-profiles': TutorProfilesSelect<false> | TutorProfilesSelect<true>;
+    subjects: SubjectsSelect<false> | SubjectsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -128,6 +130,9 @@ export interface User {
   firstName: string;
   lastName: string;
   accountType: 'tutor' | 'parent' | 'student';
+  phoneNumber?: string | null;
+  country?: string | null;
+  timezone?: string | null;
   avatar?: (string | null) | Media;
   updatedAt: string;
   createdAt: string;
@@ -190,6 +195,24 @@ export interface TutorProfile {
    * Check to approve this tutor profile.
    */
   isApproved?: boolean | null;
+  /**
+   * Whether the tutor has completed the onboarding flow.
+   */
+  onboardingCompleted?: boolean | null;
+  bio?: string | null;
+  yearsOfExperience?: number | null;
+  mode?: ('online' | 'hybrid') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subjects".
+ */
+export interface Subject {
+  id: string;
+  name: string;
+  slug?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -228,6 +251,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tutor-profiles';
         value: string | TutorProfile;
+      } | null)
+    | ({
+        relationTo: 'subjects';
+        value: string | Subject;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -279,6 +306,9 @@ export interface UsersSelect<T extends boolean = true> {
   firstName?: T;
   lastName?: T;
   accountType?: T;
+  phoneNumber?: T;
+  country?: T;
+  timezone?: T;
   avatar?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -338,6 +368,20 @@ export interface MediaSelect<T extends boolean = true> {
 export interface TutorProfilesSelect<T extends boolean = true> {
   user?: T;
   isApproved?: T;
+  onboardingCompleted?: T;
+  bio?: T;
+  yearsOfExperience?: T;
+  mode?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subjects_select".
+ */
+export interface SubjectsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
   updatedAt?: T;
   createdAt?: T;
 }

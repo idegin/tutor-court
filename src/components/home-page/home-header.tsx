@@ -41,7 +41,7 @@ export function HomeHeader() {
         window.location.href = '/'
     }
 
-    const initials = user?.firstName && user?.lastName 
+    const initials = user?.firstName && user?.lastName
         ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
         : user?.email?.[0].toUpperCase() || 'U'
 
@@ -100,7 +100,7 @@ export function HomeHeader() {
                                         <HiUser className="mr-2 h-4 w-4" />
                                         <span>Profile</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => router.push('/dashboard')} className="cursor-pointer">
+                                    <DropdownMenuItem onClick={() => router.push(`/dashboard/${user?.accountType || ''}`)} className="cursor-pointer">
                                         <HiSquares2X2 className="mr-2 h-4 w-4" />
                                         <span>Dashboard</span>
                                     </DropdownMenuItem>
@@ -149,7 +149,7 @@ export function HomeHeader() {
                         <SheetContent side="right" className="bg-background w-[300px] border-l sm:w-[400px]">
                             <SheetHeader className="pb-4 border-b">
                                 <SheetTitle className="text-left text-foreground inline-flex items-center gap-2">
-                                     <Image
+                                    <Image
                                         src="/logo.png"
                                         alt="TutorCourt logo"
                                         width={24}
@@ -159,10 +159,10 @@ export function HomeHeader() {
                                     TutorCourt
                                 </SheetTitle>
                             </SheetHeader>
-                            
+
                             <div className="flex flex-col gap-4 py-6">
                                 {user && (
-                                     <div className="flex items-center gap-3 px-2 mb-2 pb-4 border-b">
+                                    <div className="flex items-center gap-3 px-2 mb-2 pb-4 border-b">
                                         <Avatar className="h-12 w-12 border border-border">
                                             <AvatarImage src={user.avatarUrl} alt={user.firstName} />
                                             <AvatarFallback className="bg-tutor-purple-100 text-tutor-purple-700 font-semibold">{initials}</AvatarFallback>
@@ -171,9 +171,9 @@ export function HomeHeader() {
                                             <span className="text-sm font-semibold">{user.firstName} {user.lastName}</span>
                                             <span className="text-xs text-muted-foreground">{user.email}</span>
                                         </div>
-                                     </div>
+                                    </div>
                                 )}
-                                
+
                                 <div className="flex flex-col space-y-2">
                                     {navLinks.map((link) => (
                                         <a
@@ -185,14 +185,14 @@ export function HomeHeader() {
                                         </a>
                                     ))}
                                 </div>
-                                
+
                                 <div className="mt-4 pt-4 border-t flex flex-col gap-2">
                                     {user ? (
                                         <>
                                             <Button variant="ghost" className="justify-start gap-2 h-11" onClick={() => router.push('/dashboard/profile')}>
                                                 <HiUser className="h-5 w-5" /> Profile
                                             </Button>
-                                            <Button variant="ghost" className="justify-start gap-2 h-11" onClick={() => router.push('/dashboard')}>
+                                            <Button variant="ghost" className="justify-start gap-2 h-11" onClick={() => router.push(`/dashboard/${user?.accountType || ''}`)}>
                                                 <HiSquares2X2 className="h-5 w-5" /> Dashboard
                                             </Button>
                                             <Button variant="ghost" className="justify-start gap-2 h-11 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={handleLogout}>

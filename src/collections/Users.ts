@@ -90,6 +90,21 @@ export const Users: CollectionConfig = {
       defaultValue: 'student',
     },
     {
+      name: 'phoneNumber',
+      type: 'text',
+      required: false,
+    },
+    {
+      name: 'country',
+      type: 'text',
+      required: false,
+    },
+    {
+      name: 'timezone',
+      type: 'text',
+      required: false,
+    },
+    {
       name: 'avatar',
       type: 'upload',
       relationTo: 'media',

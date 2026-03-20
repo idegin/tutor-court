@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
 
 import {
@@ -29,6 +30,31 @@ export default function LoginPage() {
     const [errors, setErrors] = React.useState<ReturnType<typeof validateLogin>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
+    const mutation = useMutation({
+        mutationFn: async (vars: any) => {
+            const res = await fetch('/api/users/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(vars),
+            })
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.errors?.[0]?.message || 'Request failed')
+            }
+            return res.json()
+        },
+        onMutate: () => setIsSubmitting(true),
+        onSettled: () => setIsSubmitting(false),
+        onSuccess: () => {
+            router.push('/')
+            router.refresh()
+        },
+        onError: (err: any) => {
+            setErrors({ form: err.message })
+        }
+    })
+    
+
     const onChange = React.useCallback(
         (field: LoginField, value: string | boolean) => {
             setValues((prev) => ({ ...prev, [field]: value }))
@@ -47,24 +73,7 @@ export default function LoginPage() {
                 return
             }
 
-            setIsSubmitting(true)
-            fetch('/api/users/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: values.email, password: values.password }),
-            }).then(async (res) => {
-                if (!res.ok) {
-                    const data = await res.json()
-                    throw new Error(data.errors?.[0]?.message || 'Login failed')
-                }
-                setIsSubmitting(false)
-                // Refresh to get new header state
-                router.push('/')
-                router.refresh()
-            }).catch((err) => {
-                setIsSubmitting(false)
-                setErrors({ form: err.message })
-            })
+            mutation.mutate({ email: values.email, password: values.password })
         },
         [router, values]
     )
