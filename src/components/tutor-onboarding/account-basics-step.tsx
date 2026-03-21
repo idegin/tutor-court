@@ -13,13 +13,10 @@ import { Label } from '@/components/ui/label'
 import { SearchableSelect, getSelectClassNames } from '@/components/ui/searchable-select'
 import { Country } from 'country-state-city'
 import TimezoneSelect from 'react-timezone-select'
-import PhoneInput, { isPossiblePhoneNumber } from 'react-phone-number-input'
-import 'react-phone-number-input/style.css'
 
 const accountBasicsSchema = z.object({
     firstName: z.string().min(2, 'First name is required'),
     lastName: z.string().min(2, 'Last name is required'),
-    phoneNumber: z.any().refine((val: any) => typeof val === 'string' && isPossiblePhoneNumber(val), 'Valid phone number is required'),
     country: z.string().min(1, 'Country is required'),
     timezone: z.string().min(1, 'Timezone is required'),
     photo: z.any().refine((val: any) => val instanceof File, 'Profile photo is required'),
@@ -37,7 +34,6 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
     const [values, setValues] = useState({
         firstName: '',
         lastName: '',
-        phoneNumber: '',
         country: '',
         timezone: '',
         photo: null as File | null,
@@ -98,7 +94,6 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
         const formData = new FormData()
         formData.append('firstName', values.firstName)
         formData.append('lastName', values.lastName)
-        formData.append('phoneNumber', values.phoneNumber)
         formData.append('country', values.country)
         formData.append('timezone', values.timezone)
         formData.append('isTutorOnboarding', 'true')
@@ -130,21 +125,6 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
 
     return (
         <div className="flex flex-col max-w-xl w-full mx-auto md:ml-0 md:mr-auto justify-center">
-            <style>
-                {`
-                  .PhoneInputInput {
-                      appearance: none;
-                      background-color: transparent;
-                      border: none;
-                      outline: none;
-                      padding-left: 0.5rem;
-                  }
-                  .PhoneInputInput:focus {
-                      outline: none;
-                      border: none;
-                  }
-                `}
-            </style>
             <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-foreground">Step 1 of 3</span>
                 <span className="text-sm font-semibold text-primary">33% Complete</span>
@@ -207,19 +187,6 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
                         />
                         {errors.lastName && <p className="text-sm text-destructive font-medium">{errors.lastName}</p>}
                     </div>
-                </div>
-
-                <div className="space-y-2">
-                    <Label className="text-sm font-bold">Phone Number <span className="text-destructive">*</span></Label>
-                    <div className={`flex items-center h-12 w-full rounded-xl border bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${errors.phoneNumber ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive' : 'border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2'}`}>
-                        <PhoneInput
-                            placeholder="Enter phone number"
-                            value={values.phoneNumber}
-                            onChange={(val) => handleChange('phoneNumber', val)}
-                            className="flex-1"
-                        />
-                    </div>
-                    {errors.phoneNumber && <p className="text-sm text-destructive font-medium">{errors.phoneNumber}</p>}
                 </div>
 
                 <div className="space-y-2">

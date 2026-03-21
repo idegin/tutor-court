@@ -13,7 +13,6 @@ export async function PATCH(request: Request) {
     const formData = await request.formData()
     const firstName = formData.get('firstName') as string
     const lastName = formData.get('lastName') as string
-    const phoneNumber = formData.get('phoneNumber') as string
     const country = formData.get('country') as string
     const timezone = formData.get('timezone') as string
     const isTutorOnboarding = formData.get('isTutorOnboarding') === 'true'
@@ -44,7 +43,6 @@ export async function PATCH(request: Request) {
     const updateData: any = {}
     if (firstName) updateData.firstName = firstName
     if (lastName) updateData.lastName = lastName
-    if (phoneNumber) updateData.phoneNumber = phoneNumber
     if (country) updateData.country = country
     if (timezone) updateData.timezone = timezone
     if (avatarId && avatarId !== user.avatar) updateData.avatar = avatarId

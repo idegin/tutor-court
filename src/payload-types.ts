@@ -138,7 +138,7 @@ export interface User {
   firstName: string;
   lastName: string;
   accountType: 'tutor' | 'parent' | 'student';
-  phoneNumber?: string | null;
+  phoneNumber: string;
   country?: string | null;
   timezone?: string | null;
   avatar?: (string | null) | Media;

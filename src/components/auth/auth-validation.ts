@@ -14,6 +14,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i
 
 const PASSWORD_POLICY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,128}$/
 
+import { isPossiblePhoneNumber } from 'react-phone-number-input'
+
 export const PASSWORD_POLICY_TEXT =
   'Use 8 to 128 characters with uppercase, lowercase, number, and symbol.'
 
@@ -70,6 +72,12 @@ export function validateRegister(
     errors.email = 'Email is required.'
   } else if (!isValidEmail(values.email)) {
     errors.email = 'Enter a valid email address.'
+  }
+
+  if (!values.phoneNumber) {
+    errors.phoneNumber = 'Phone number is required.'
+  } else if (!isPossiblePhoneNumber(values.phoneNumber)) {
+    errors.phoneNumber = 'Enter a valid phone number.'
   }
 
   if (!values.password) {

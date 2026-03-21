@@ -14,7 +14,7 @@ import {
     validateRegister,
 } from '@/components/auth'
 
-const NAV_LINKS = [
+const NAV_LINKS: any[] = [
 
 ]
 
@@ -40,6 +40,7 @@ const INITIAL_VALUES: RegisterValues = {
     firstName: '',
     lastName: '',
     email: '',
+    phoneNumber: '',
     password: '',
     agreeToTerms: false,
 }
@@ -114,6 +115,7 @@ export default function RegisterPage() {
                         firstName: values.firstName,
                         lastName: values.lastName,
                         email: values.email,
+                        phoneNumber: values.phoneNumber,
                         password: values.password,
                         accountType: selectedTypeId,
                     }),

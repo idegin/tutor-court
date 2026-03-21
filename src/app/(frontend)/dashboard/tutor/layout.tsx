@@ -15,7 +15,9 @@ import {
     HiOutlineWallet,
     HiWallet,
     HiOutlineChatBubbleLeftRight,
-    HiChatBubbleLeftRight
+    HiChatBubbleLeftRight,
+    HiOutlineClipboardDocumentList,
+    HiClipboardDocumentList
 } from 'react-icons/hi2';
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout';
 
@@ -43,6 +45,12 @@ const tutorNavItems = [
         href: '/dashboard/tutor/classes',
         icon: HiOutlineAcademicCap,
         activeIcon: HiAcademicCap,
+    },
+    {
+        name: 'Bookings',
+        href: '/dashboard/tutor/bookings',
+        icon: HiOutlineClipboardDocumentList,
+        activeIcon: HiClipboardDocumentList,
     },
     {
         name: 'Wallet',

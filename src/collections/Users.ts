@@ -92,7 +92,7 @@ export const Users: CollectionConfig = {
     {
       name: 'phoneNumber',
       type: 'text',
-      required: false,
+      required: true,
     },
     {
       name: 'country',

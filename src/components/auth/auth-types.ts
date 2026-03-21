@@ -14,6 +14,7 @@ export type RegisterField =
   | 'firstName'
   | 'lastName'
   | 'email'
+  | 'phoneNumber'
   | 'password'
   | 'agreeToTerms'
 
@@ -21,6 +22,7 @@ export type RegisterValues = {
   firstName: string
   lastName: string
   email: string
+  phoneNumber: string
   password: string
   agreeToTerms: boolean
 }

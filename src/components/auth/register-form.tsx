@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { HiUser, HiEnvelope, HiLockClosed, HiEye, HiEyeSlash } from 'react-icons/hi2'
 import { FiArrowRight } from 'react-icons/fi'
+import PhoneInput from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 
 import type {
     FieldErrors,
@@ -34,6 +36,22 @@ export function RegisterForm({
 
     return (
         <form className="space-y-6" onSubmit={onSubmit} noValidate>
+            <style>
+                {`
+                  .PhoneInputInput {
+                      appearance: none;
+                      background-color: transparent;
+                      border: none;
+                      outline: none;
+                      padding-left: 0.5rem;
+                      width: 100%;
+                  }
+                  .PhoneInputInput:focus {
+                      outline: none;
+                      border: none;
+                  }
+                `}
+            </style>
             <div className="grid gap-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(errors?.firstName)} className="gap-2">
                     <FieldLabel htmlFor="register-first-name" className="font-bold text-foreground">First Name</FieldLabel>
@@ -108,6 +126,29 @@ export function RegisterForm({
                 </FieldContent>
             </Field>
 
+            <Field data-invalid={Boolean(errors?.phoneNumber)} className="gap-2">
+                <FieldLabel htmlFor="register-phone" className="font-bold text-foreground">Phone Number</FieldLabel>
+                <FieldContent>
+                    <div className="relative">
+                        <div className={`flex items-center h-12 w-full rounded-xl border bg-transparent px-3 py-2 text-base ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${errors?.phoneNumber ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive' : 'border-border/80 focus-within:ring-2 focus-within:ring-primary/50'}`}>
+                            <PhoneInput
+                                id="register-phone"
+                                name="phoneNumber"
+                                placeholder="Enter phone number"
+                                value={values.phoneNumber || ''}
+                                onChange={(val) => onChange('phoneNumber', val || '')}
+                                className="flex-1 PhoneInput-custom"
+                                style={{
+                                    '--PhoneInput-color--focus': 'hsl(var(--primary))',
+                                    '--PhoneInputInternationalIconPhone-opacity': '0.8',
+                                } as React.CSSProperties}
+                            />
+                        </div>
+                    </div>
+                    <FieldError>{errors?.phoneNumber}</FieldError>
+                </FieldContent>
+            </Field>
+
             <Field data-invalid={Boolean(errors?.password)} className="gap-2">
                 <FieldLabel htmlFor="register-password" className="font-bold text-foreground">Password</FieldLabel>
                 <FieldContent>
@@ -142,7 +183,7 @@ export function RegisterForm({
                     </div>
                     {/* Only show default description if there's no error */}
                     {!errors?.password ? (
-                       <FieldDescription className="text-xs text-muted-foreground mt-1.5">{PASSWORD_POLICY_TEXT}</FieldDescription>
+                        <FieldDescription className="text-xs text-muted-foreground mt-1.5">{PASSWORD_POLICY_TEXT}</FieldDescription>
                     ) : null}
                     <FieldError>{errors?.password}</FieldError>
                 </FieldContent>

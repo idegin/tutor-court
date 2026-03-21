@@ -3,8 +3,9 @@ import { Metadata } from 'next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TutorClassCard, MockClass } from '@/components/classes/tutor-classes/tutor-class-card';
-import { 
-    HiOutlinePlus, 
+import { CreateClassModal } from './create-class-modal';
+import {
+    HiOutlinePlus,
     HiOutlineMagnifyingGlass,
     HiOutlineArrowPath
 } from 'react-icons/hi2';
@@ -111,19 +112,16 @@ export default function TutorClassesPage() {
                     <h1 className="text-2xl font-bold tracking-tight text-foreground">My Classes</h1>
                     <p className="text-muted-foreground mt-1 text-sm">Create, manage, and monitor all your active subject classes.</p>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative w-full sm:w-64">
                         <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Search classes..." 
+                        <Input
+                            placeholder="Search classes..."
                             className="pl-9 bg-background shadow-none border-border"
                         />
                     </div>
-                    <Button className="shadow-none flex-shrink-0">
-                        <HiOutlinePlus className="mr-2 h-4 w-4" />
-                        Add New Class
-                    </Button>
+                    <CreateClassModal />
                 </div>
             </div>
 
