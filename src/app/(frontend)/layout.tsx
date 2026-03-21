@@ -6,6 +6,7 @@ import { OptionsProvider } from '@/components/providers/options-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { getServerSideUser } from '@/lib/auth'
 import './global.css'
+import Providers from '@/components/providers'
 
 const lato = Lato({
   weight: ['400', '700', '900'],
@@ -25,14 +26,16 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
       <body>
-        <OptionsProvider initialSubjects={dependencies?.subjects || []}>
-          <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
-            <QueryProvider>
-              {children}
-              <Toaster position="top-right" />
-            </QueryProvider>
-          </AuthProvider>
-        </OptionsProvider>
+        <Providers>
+          <OptionsProvider initialSubjects={dependencies?.subjects || []}>
+            <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
+              <QueryProvider>
+                {children}
+                <Toaster position="top-right" />
+              </QueryProvider>
+            </AuthProvider>
+          </OptionsProvider>
+        </Providers>
       </body>
     </html>
   )
