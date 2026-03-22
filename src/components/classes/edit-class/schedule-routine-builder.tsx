@@ -2,17 +2,8 @@ import React, { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineClock } from 'react-icons/hi2';
+import { useOptions } from '@/components/providers/options-provider';
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-    const hour24 = Math.floor(i / 2);
-    const minute = i % 2 === 0 ? '00' : '30';
-    const ampm = hour24 < 12 ? 'AM' : 'PM';
-    const hour12 = hour24 % 12 || 12;
-    const hourString = hour12 < 10 ? `0${hour12}` : `${hour12}`;
-    return `${hourString}:${minute} ${ampm}`;
-});
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 type TimeSlot = {
     from: string;
@@ -37,6 +28,7 @@ const DEFAULT_SCHEDULE: ScheduleState = {
 };
 
 export function ScheduleRoutineBuilder() {
+    const { timeOptions, days } = useOptions();
     const [schedule, setSchedule] = useState<ScheduleState>(DEFAULT_SCHEDULE);
 
     const toggleDay = (day: string) => {
@@ -79,7 +71,7 @@ export function ScheduleRoutineBuilder() {
     };
 
     return (
-        <div className="bg-card rounded-3xl shadow-none border-none flex flex-col gap-6 w-full">
+        <div className="bg-card rounded-3xl shadow-none border-none flex flex-col gap-6 w-full md:p-8">
             <div className="mb-2">
                 <h2 className="text-[26px] font-black text-foreground tracking-[0px] mb-2">Weekly Routine</h2>
                 <p className="text-muted-foreground font-medium text-[17px]">
@@ -88,14 +80,14 @@ export function ScheduleRoutineBuilder() {
             </div>
 
             <div className="flex flex-col gap-4">
-                {DAYS.map((day) => {
+                {days.map((day) => {
                     const { enabled, slots } = schedule[day];
                     const isMultiple = slots.length > 1;
 
                     return (
                         <div
                             key={day}
-                            className={`rounded-[20px] p-6 transition-colors ${!enabled ? 'bg-muted opacity-60' : isMultiple ? 'bg-primary/5 border border-primary/20' : 'bg-muted border border-transparent'}`}
+                            className={`rounded-[20px] p-6 transition-colors ${!enabled ? 'bg-muted/40 opacity-70' : isMultiple ? 'bg-primary/5 border border-primary/20' : 'bg-muted/80 border border-transparent'}`}
                         >
                             <div className="flex flex-col md:flex-row md:items-start lg:items-center gap-4">
                                 {/* Left: Toggle & Day */}
@@ -120,8 +112,8 @@ export function ScheduleRoutineBuilder() {
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <HiOutlineClock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground pointer-events-none" />
-                                                        <SelectContent className="max-h-[300px] shadow-none rounded-xl">
-                                                            {TIME_OPTIONS.map(time => (
+                                                        <SelectContent position="popper" className="max-h-[300px] shadow-none rounded-xl">
+                                                            {timeOptions?.map(time => (
                                                                 <SelectItem key={time} value={time} className="font-medium">{time}</SelectItem>
                                                             ))}
                                                         </SelectContent>
@@ -137,8 +129,8 @@ export function ScheduleRoutineBuilder() {
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <HiOutlineClock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground pointer-events-none" />
-                                                        <SelectContent className="max-h-[300px] shadow-none rounded-xl">
-                                                            {TIME_OPTIONS.map(time => (
+                                                        <SelectContent position="popper" className="max-h-[300px] shadow-none rounded-xl">
+                                                            {timeOptions?.map(time => (
                                                                 <SelectItem key={time} value={time} className="font-medium">{time}</SelectItem>
                                                             ))}
                                                         </SelectContent>

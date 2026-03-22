@@ -18,13 +18,13 @@ export function ClassLivePreview({
             {/* Header */}
             <div className="flex items-center justify-between px-1">
                 <h3 className="uppercase text-xs font-bold text-muted-foreground tracking-widest">Live Preview</h3>
-                <span className="bg-primary/20 text-primary font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-full">
+                <span className="bg-secondary/20 text-secondary font-bold text-[10px] uppercase tracking-wider px-3 py-1 rounded-full">
                     Student View
                 </span>
             </div>
 
             {/* Preview Card */}
-            <div className="bg-card border-none rounded-3xl overflow-hidden shadow-sm flex flex-col">
+            <div className="bg-card border rounded-3xl overflow-hidden flex flex-col">
                 {/* Image Placeholder */}
                 <div className="bg-muted/40 aspect-[4/3] w-full relative flex items-center justify-center">
                     <div className="absolute top-4 left-4 bg-background border border-border/50 text-foreground text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full shadow-sm">
@@ -46,7 +46,7 @@ export function ClassLivePreview({
                         </div>
                         <div className="flex flex-col items-end">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Starting at</span>
-                            <span className="text-xl font-black text-orange-500">$0.00</span>
+                            <span className="text-xl font-black text-tutor-red-400">$0.00</span>
                         </div>
                     </div>
 
@@ -60,7 +60,7 @@ export function ClassLivePreview({
 
                     <div className="grid grid-cols-2 mt-4 pt-4 border-t border-border/50 items-center">
                         <div className="flex items-center gap-1.5">
-                            <HiMiniStar className="w-5 h-5 text-orange-400" />
+                            <HiMiniStar className="w-5 h-5 text-tutor-red-400" />
                             <span className="font-bold text-sm text-foreground">5.0</span>
                             <span className="text-muted-foreground text-sm font-medium">(0 reviews)</span>
                         </div>

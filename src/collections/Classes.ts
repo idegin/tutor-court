@@ -1,19 +1,60 @@
 import type { CollectionConfig } from 'payload'
+import slugify from 'slugify'
 
 export const Classes: CollectionConfig = {
   slug: 'classes',
   admin: {
-    useAsTitle: 'name',
-    defaultColumns: ['name', 'subject', 'isPublished', 'updatedAt'],
+    useAsTitle: 'title',
+    defaultColumns: ['title', 'subject', 'isPublished', 'updatedAt'],
   },
   access: {
     read: () => true,
   },
+  hooks: {
+    beforeValidate: [
+      async ({ data, req, operation }) => {
+        if (operation === 'create' && data.title && !data.slug) {
+          const baseSlug = slugify(data.title, { lower: true, strict: true })
+          
+          // Check if it's already in use
+          const existing = await req.payload.find({
+            collection: 'classes',
+            where: {
+              slug: { equals: baseSlug }
+            },
+            depth: 0,
+            limit: 1,
+            req
+          })
+          
+          if (existing.totalDocs > 0) {
+            // Append 5 char unique ID if in use
+            const suffix = Math.random().toString(36).substring(2, 7)
+            data.slug = `${baseSlug}-${suffix}`
+          } else {
+            data.slug = baseSlug
+          }
+        }
+        return data
+      },
+    ],
+  },
   fields: [
     {
-      name: 'name',
+      name: 'title',
       type: 'text',
       required: true,
+    },
+    {
+      name: 'slug',
+      type: 'text',
+      required: true,
+      unique: true,
+      index: true,
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+      },
     },
     {
       name: 'description',
@@ -40,7 +81,6 @@ export const Classes: CollectionConfig = {
       options: [
         { label: 'One on One', value: 'one-on-one' },
         { label: 'Group', value: 'group' },
-        { label: 'Self Paced', value: 'self-paced' },
       ],
       required: true,
       defaultValue: 'one-on-one',
@@ -70,11 +110,6 @@ export const Classes: CollectionConfig = {
           min: 0,
         },
       ],
-    },
-    {
-      name: 'durationInMinutes',
-      type: 'number',
-      min: 0,
     },
     {
       name: 'user',

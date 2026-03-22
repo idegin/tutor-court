@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 const mockClasses: MockClass[] = [
     {
         id: 'cls-1',
-        name: 'Advanced Calculus Prep',
+        title: 'Advanced Calculus Prep',
         description: 'Intensive preparation for end-of-year calculus exams. Covers limits, derivatives, and integrals with real-world applications.',
         subjectName: 'Mathematics',
         tutorName: 'Sarah Tutor',
@@ -34,7 +34,7 @@ const mockClasses: MockClass[] = [
     },
     {
         id: 'cls-2',
-        name: 'Introduction to Physics',
+        title: 'Introduction to Physics',
         description: 'Basic mechanics, kinematics, and energy principles designed for high school juniors and seniors.',
         subjectName: 'Physics',
         tutorName: 'Sarah Tutor',
@@ -49,7 +49,7 @@ const mockClasses: MockClass[] = [
     },
     {
         id: 'cls-3',
-        name: 'English Literature Mastery',
+        title: 'English Literature Mastery',
         description: 'Deep dive into 19th-century literature. Students will learn critical analysis and advanced essay writing.',
         subjectName: 'English',
         tutorName: 'Sarah Tutor',
@@ -62,7 +62,7 @@ const mockClasses: MockClass[] = [
     },
     {
         id: 'cls-4',
-        name: 'AP Chemistry Basics',
+        title: 'AP Chemistry Basics',
         description: 'Foundation course for students preparing to take AP Chemistry next semester. Focuses on atomic structure and stoichiometry.',
         subjectName: 'Chemistry',
         tutorName: 'Sarah Tutor',
@@ -75,7 +75,7 @@ const mockClasses: MockClass[] = [
     },
     {
         id: 'cls-5',
-        name: 'Spanish Conversation',
+        title: 'Spanish Conversation',
         description: 'Intermediate conversational Spanish for students looking to improve their speaking and listening comprehension.',
         subjectName: 'Languages',
         tutorName: 'Sarah Tutor',
@@ -89,7 +89,7 @@ const mockClasses: MockClass[] = [
     },
     {
         id: 'cls-6',
-        name: 'SAT Test Prep',
+        title: 'SAT Test Prep',
         description: 'Comprehensive SAT preparation covering both math and evidence-based reading/writing sections.',
         subjectName: 'Test Prep',
         tutorName: 'Sarah Tutor',

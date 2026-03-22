@@ -18,7 +18,7 @@ import {
 
 export interface MockClass {
     id: string;
-    name: string;
+    title: string;
     description: string;
     thumbnail?: string;
     subjectName?: string;
@@ -53,7 +53,7 @@ export function TutorClassCard({ classData }: ClassCardProps) {
                 {classData.thumbnail ? (
                     <img
                         src={classData.thumbnail}
-                        alt={classData.name}
+                        alt={classData.title}
                         className="w-full h-full object-cover"
                     />
                 ) : (
@@ -83,7 +83,7 @@ export function TutorClassCard({ classData }: ClassCardProps) {
                                 {formatType(classData.type)}
                             </Badge>
                         </div>
-                        <h3 className="font-bold text-lg leading-tight tracking-tight line-clamp-1">{classData.name}</h3>
+                        <h3 className="font-bold text-lg leading-tight tracking-tight line-clamp-1">{classData.title}</h3>
                     </div>
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mt-1 min-h-[40px]">

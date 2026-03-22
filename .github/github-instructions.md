@@ -16,3 +16,5 @@ TutorCourt is a dual-purpose platform designed for online tutoring, combining a 
 
 # Copilot Chat
 #codebase #web #search  short answer, browse the web if needed. Just do whatever you feel is best. The UI should be very beautiful with no gradient and shadows. NOTE: update the files directly, don't use the terminal to update the files. Make sure what you are implementing is production ready. Don't use hardcoded colors, use the colors in the global.css file.
+
+getServerSideUser

@@ -19,6 +19,7 @@ import { HiOutlinePlus } from 'react-icons/hi2';
 import { useOptions } from '@/components/providers/options-provider';
 import { useRouter } from 'next13-progressbar';
 import { z } from 'zod';
+import { createClassAction } from './actions';
 
 const createClassSchema = z.object({
     title: z.string()
@@ -44,9 +45,13 @@ export function CreateClassModal() {
     const router = useRouter();
     const { subjects } = useOptions();
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrors({});
+        setSubmitError(null);
 
         const result = createClassSchema.safeParse({ title, subject, description });
 
@@ -55,17 +60,33 @@ export function CreateClassModal() {
             return;
         }
 
-        // Generate random ID for prototype purposes
-        const randomId = Math.random().toString(36).substring(2, 9);
+        setIsLoading(true);
+        try {
+            const formData = { title, subject, description };
+            const res = await createClassAction(formData);
 
-        // Reset state
-        setOpen(false);
-        setTitle('');
-        setSubject('');
-        setDescription('');
-        setErrors({});
+            if (res.error) {
+                setSubmitError(res.error);
+                setIsLoading(false);
+                return;
+            }
 
-        router.push(`/dashboard/tutor/classes/edit/${randomId}`);
+            // Reset state
+            setOpen(false);
+            setTitle('');
+            setSubject('');
+            setDescription('');
+            setErrors({});
+            setIsLoading(false);
+
+            if (res.id) {
+                router.push(`/dashboard/tutor/classes/edit/${res.id}`);
+            }
+        } catch (err: any) {
+            console.error(err);
+            setSubmitError(err.message || 'Something went wrong');
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -86,6 +107,11 @@ export function CreateClassModal() {
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-5 py-4">
+                    {submitError && (
+                        <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md border border-destructive/20">
+                            {submitError}
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor="title" className={`text-sm font-semibold ${errors.title ? 'text-destructive' : 'text-foreground'}`}>Class Title</Label>
                         <Input
@@ -158,9 +184,11 @@ export function CreateClassModal() {
                         <Button
                             type="button"
                             variant="outline"
+                            disabled={isLoading}
                             onClick={() => {
                                 setOpen(false);
                                 setErrors({});
+                                setSubmitError(null);
                             }}
                             className="shadow-none border-border/60 hover:bg-muted"
                         >
@@ -168,9 +196,10 @@ export function CreateClassModal() {
                         </Button>
                         <Button
                             type="submit"
+                            disabled={isLoading}
                             className="shadow-none"
                         >
-                            Continue
+                            {isLoading ? 'Creating...' : 'Continue'}
                         </Button>
                     </DialogFooter>
                 </form>

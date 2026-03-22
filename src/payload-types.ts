@@ -246,12 +246,13 @@ export interface Subject {
  */
 export interface Class {
   id: string;
-  name: string;
+  title: string;
+  slug: string;
   description?: string | null;
   thumbnail?: (string | null) | Media;
   subject?: (string | null) | Subject;
   tutorProfile?: (string | null) | TutorProfile;
-  type: 'one-on-one' | 'group' | 'self-paced';
+  type: 'one-on-one' | 'group';
   learningOutcomes?:
     | {
         outcome: string;
@@ -260,7 +261,6 @@ export interface Class {
     | null;
   minAge?: number | null;
   maxAge?: number | null;
-  durationInMinutes?: number | null;
   user: string | User;
   isPublished?: boolean | null;
   updatedAt: string;
@@ -500,7 +500,8 @@ export interface SubjectsSelect<T extends boolean = true> {
  * via the `definition` "classes_select".
  */
 export interface ClassesSelect<T extends boolean = true> {
-  name?: T;
+  title?: T;
+  slug?: T;
   description?: T;
   thumbnail?: T;
   subject?: T;
@@ -514,7 +515,6 @@ export interface ClassesSelect<T extends boolean = true> {
       };
   minAge?: T;
   maxAge?: T;
-  durationInMinutes?: T;
   user?: T;
   isPublished?: T;
   updatedAt?: T;
