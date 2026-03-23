@@ -11,7 +11,7 @@ export async function PATCH(request: Request) {
         }
 
         const data = await request.json()
-        const { subjects, yearsOfExperience, bio, hourlyRate, mode, usagePlan, onboardingCompleted } = data
+        const { subjects, yearsOfExperience, bio, hourlyRate, mode, usagePlan, onboardingCompleted, type, minAge, maxAge } = data
 
         const payload = await getPayload({ config })
 
@@ -30,6 +30,9 @@ export async function PATCH(request: Request) {
         if (mode !== undefined) updateData.mode = mode
         if (usagePlan !== undefined) updateData.usagePlan = usagePlan
         if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted
+        if (type !== undefined) updateData.type = type
+        if (minAge !== undefined) updateData.minAge = minAge
+        if (maxAge !== undefined) updateData.maxAge = maxAge
 
         let tutorProfile
         if (existingProfiles.length > 0) {

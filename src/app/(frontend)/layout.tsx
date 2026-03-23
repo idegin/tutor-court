@@ -25,7 +25,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
 
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
-      <body>
+      <body className="bg-background text-foreground min-h-screen">
         <Providers>
           <OptionsProvider initialSubjects={dependencies?.subjects || []}>
             <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
