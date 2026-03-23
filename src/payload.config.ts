@@ -11,7 +11,6 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { TutorProfiles } from './collections/TutorProfiles'
 import { Subjects } from './collections/Subjects'
-import { Classes } from './collections/Classes'
 import { Reviews } from './collections/Reviews'
 import { Wallets } from './collections/Wallets'
 import { Transactions } from './collections/Transactions'
@@ -40,7 +39,7 @@ export default buildConfig({
     defaultFromName: 'TutorCourt',
     transport,
   }),
-  collections: [Users, Media, TutorProfiles, Subjects, Classes, Reviews, Wallets, Transactions],
+  collections: [Users, Media, TutorProfiles, Subjects, Reviews, Wallets, Transactions],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

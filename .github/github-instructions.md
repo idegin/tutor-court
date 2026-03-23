@@ -12,7 +12,7 @@
 
 
 # About TutorCourt
-TutorCourt is a dual-purpose platform designed for online tutoring, combining a SaaS workspace for tutors who already have students with a future marketplace for tutor discovery. At its core, the platform enables tutors to manage their entire teaching workflow in one place, with a central calendar system that functions similarly to Calendly but is purpose-built for tutoring contexts. Tutors can create classes, define recurring or one-time sessions, set their availability windows, and manage student bookings all within a unified scheduling interface. This calendar automatically prevents double booking by syncing all class events, availability slots, and session times into a single source of truth, ensuring that tutors never accidentally commit to overlapping sessions.
+TutorCourt is a tutor search engine.
 
 # Copilot Chat
 #codebase #web #search  short answer, browse the web if needed. Just do whatever you feel is best. The UI should be very beautiful with no gradient and shadows. NOTE: update the files directly, don't use the terminal to update the files. Make sure what you are implementing is production ready. Don't use hardcoded colors, use the colors in the global.css file.

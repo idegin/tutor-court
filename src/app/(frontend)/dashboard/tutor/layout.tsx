@@ -8,8 +8,6 @@ import {
     HiHome,
     HiOutlineCalendar,
     HiCalendar,
-    HiOutlineAcademicCap,
-    HiAcademicCap,
     HiOutlineCog6Tooth,
     HiCog6Tooth,
     HiOutlineWallet,
@@ -39,12 +37,6 @@ const tutorNavItems = [
         href: '/dashboard/tutor/calendar',
         icon: HiOutlineCalendar,
         activeIcon: HiCalendar,
-    },
-    {
-        name: 'Classes',
-        href: '/dashboard/tutor/classes',
-        icon: HiOutlineAcademicCap,
-        activeIcon: HiAcademicCap,
     },
     {
         name: 'Bookings',

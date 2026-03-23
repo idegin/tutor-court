@@ -87,5 +87,31 @@ export const TutorProfiles: CollectionConfig = {
         description: 'Hourly rate in Naira.',
       },
     },
+    {
+      name: 'type',
+      type: 'select',
+      hasMany: true,
+      options: [
+        { label: 'One on One', value: 'one-on-one' },
+        { label: 'Group', value: 'group' },
+      ],
+      admin: {
+        description: 'Types of classes standardly offered by this tutor.',
+      },
+    },
+    {
+      name: 'minAge',
+      type: 'number',
+      admin: {
+        description: 'Minimum age of students the tutor teaches.',
+      },
+    },
+    {
+      name: 'maxAge',
+      type: 'number',
+      admin: {
+        description: 'Maximum age of students the tutor teaches.',
+      },
+    },
   ],
 }

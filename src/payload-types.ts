@@ -71,7 +71,6 @@ export interface Config {
     media: Media;
     'tutor-profiles': TutorProfile;
     subjects: Subject;
-    classes: Class;
     reviews: Review;
     wallets: Wallet;
     transactions: Transaction;
@@ -86,7 +85,6 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'tutor-profiles': TutorProfilesSelect<false> | TutorProfilesSelect<true>;
     subjects: SubjectsSelect<false> | SubjectsSelect<true>;
-    classes: ClassesSelect<false> | ClassesSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
@@ -226,6 +224,18 @@ export interface TutorProfile {
    * Hourly rate in Naira.
    */
   hourlyRate?: number | null;
+  /**
+   * Types of classes standardly offered by this tutor.
+   */
+  type?: ('one-on-one' | 'group')[] | null;
+  /**
+   * Minimum age of students the tutor teaches.
+   */
+  minAge?: number | null;
+  /**
+   * Maximum age of students the tutor teaches.
+   */
+  maxAge?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -237,32 +247,6 @@ export interface Subject {
   id: string;
   name: string;
   slug?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "classes".
- */
-export interface Class {
-  id: string;
-  title: string;
-  slug: string;
-  description?: string | null;
-  thumbnail?: (string | null) | Media;
-  subject?: (string | null) | Subject;
-  tutorProfile?: (string | null) | TutorProfile;
-  type: 'one-on-one' | 'group';
-  learningOutcomes?:
-    | {
-        outcome: string;
-        id?: string | null;
-      }[]
-    | null;
-  minAge?: number | null;
-  maxAge?: number | null;
-  user: string | User;
-  isPublished?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -345,10 +329,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'subjects';
         value: string | Subject;
-      } | null)
-    | ({
-        relationTo: 'classes';
-        value: string | Class;
       } | null)
     | ({
         relationTo: 'reviews';
@@ -482,6 +462,9 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   usagePlan?: T;
   subjects?: T;
   hourlyRate?: T;
+  type?: T;
+  minAge?: T;
+  maxAge?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -492,31 +475,6 @@ export interface TutorProfilesSelect<T extends boolean = true> {
 export interface SubjectsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "classes_select".
- */
-export interface ClassesSelect<T extends boolean = true> {
-  title?: T;
-  slug?: T;
-  description?: T;
-  thumbnail?: T;
-  subject?: T;
-  tutorProfile?: T;
-  type?: T;
-  learningOutcomes?:
-    | T
-    | {
-        outcome?: T;
-        id?: T;
-      };
-  minAge?: T;
-  maxAge?: T;
-  user?: T;
-  isPublished?: T;
   updatedAt?: T;
   createdAt?: T;
 }
