@@ -7,7 +7,7 @@ export function SiteHeader() {
             <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-8">
                 <div className="flex items-center gap-10">
                     <Link href="/" className="flex items-center space-x-2">
-                        <img src="/logo.png" alt="Academia Logo" width={40} className='rounded-md' />
+                        <img src="/logo.png" alt="Academia Logo" width={40} className='rounded-lg' />
                         <span className='text-xl font-bold'>TutorCourt</span>
                     </Link>
                     <nav className="hidden md:flex gap-8 px-8">

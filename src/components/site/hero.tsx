@@ -3,7 +3,7 @@ import { HiMagnifyingGlass, HiChevronDown } from 'react-icons/hi2'
 
 export function SiteHero() {
     return (
-        <div className="relative min-h-[80vh] flex flex-col items-center pt-24 pb-32 overflow-hidden bg-background">
+        <div className="relative min-h-[80vh] flex flex-col items-center pt-24 pb-32 overflow-hidden bg-card">
             {/* Decorative Background Circles */}
             <div className="absolute right-[-5%] top-[10%] w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-tutor-purple-50 rounded-full z-0 pointer-events-none"></div>
             <div className="absolute left-[5%] bottom-[5%] w-[100px] h-[100px] md:w-[200px] md:h-[200px] bg-primary/20 rounded-full z-0 pointer-events-none"></div>
@@ -11,9 +11,9 @@ export function SiteHero() {
             <div className="container relative z-10 px-4 md:px-8 mx-auto flex flex-col justify-center max-w-7xl">
                 <div className="max-w-3xl pt-10">
                     <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tight text-foreground leading-[1.05] mb-6">
-                        The art of <br className="hidden md:block" />
+                        Fine qualified <br className="hidden md:block" />
                         <span className="relative inline-block">
-                            <span className="italic text-primary relative z-10">learning</span>
+                            <span className="italic text-primary relative z-10">tutors</span>
                             <span className="absolute bottom-2 left-0 w-full h-[10px] bg-tutor-purple-200 z-0 rounded-sm"></span>
                         </span>
                         ,<br className="hidden md:block" /> curated for you.
