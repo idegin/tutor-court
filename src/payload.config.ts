@@ -14,6 +14,7 @@ import { Subjects } from './collections/Subjects'
 import { Reviews } from './collections/Reviews'
 import { Wallets } from './collections/Wallets'
 import { Transactions } from './collections/Transactions'
+import { Bookings } from './collections/Bookings'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -39,7 +40,7 @@ export default buildConfig({
     defaultFromName: 'TutorCourt',
     transport,
   }),
-  collections: [Users, Media, TutorProfiles, Subjects, Reviews, Wallets, Transactions],
+  collections: [Users, Media, TutorProfiles, Subjects, Reviews, Wallets, Transactions, Bookings],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

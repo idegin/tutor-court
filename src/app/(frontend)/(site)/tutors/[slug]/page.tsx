@@ -1,8 +1,8 @@
 import React from 'react';
-import { TutorHero } from '@/components/tutor/tutor-hero';
-import { TutorAbout } from '@/components/tutor/tutor-about';
-import { TutorBookingSidebar } from '@/components/tutor/tutor-booking-sidebar';
-import { SimilarTutors } from '@/components/tutor/similar-tutors';
+import { TutorHero } from '@/components/tutors/tutor-hero';
+import { TutorAbout } from '@/components/tutors/tutor-about';
+import { TutorBookingSidebar } from '@/components/tutors/tutor-booking-sidebar';
+import { SimilarTutors } from '@/components/tutors/similar-tutors';
 import { HiBeaker, HiCalculator, HiBolt, HiChartBar } from 'react-icons/hi2';
 
 // Mock Data
@@ -16,7 +16,7 @@ const MOCK_TUTOR = {
     imageUrl: "https://i.pravatar.cc/300?img=47",
     coverImageUrl: "https://d1csarkz8obe9u.cloudfront.net/posterpreviews/preschool-tutor-service-banner-design-template-00d3fc803b78ce48f1034ff3b7382dab_screen.jpg?ts=1698451931",
     isVerified: true,
-    responseTimeText: "Response time: Within 2 hours",
+    responseTimeText: "2 hours",
     videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
     description: (
         <>
@@ -101,7 +101,7 @@ export default function TutorDetailsPage() {
                 isVerified={MOCK_TUTOR.isVerified}
             />
 
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12 pt-20">
                 <div className="lg:col-span-2">
                     <TutorAbout
                         description={MOCK_TUTOR.description}
@@ -112,6 +112,9 @@ export default function TutorDetailsPage() {
 
                 <div className="lg:col-span-1">
                     <TutorBookingSidebar
+                        tutorName={MOCK_TUTOR.name}
+                        headline={MOCK_TUTOR.title}
+                        avatarUrl={MOCK_TUTOR.imageUrl}
                         pricePerHour={MOCK_TUTOR.pricePerHour}
                         responseTimeText={MOCK_TUTOR.responseTimeText}
                     />

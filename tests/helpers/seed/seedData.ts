@@ -5,6 +5,31 @@ import { faker } from '@faker-js/faker'
 export async function seedData() {
   const payload = await getPayload({ config: configPromise })
 
+  console.log('Clearing database...')
+  const collections = ['reviews', 'bookings', 'transactions', 'wallets', 'tutor-profiles', 'users', 'subjects'] as const
+  for (const collection of collections) {
+    try {
+      await payload.delete({ collection: collection, where: { id: { exists: true } } })
+    } catch (e) {
+      console.log(`Failed to clear ${collection}`)
+    }
+  }
+
+  console.log('Seeding admin account...')
+  await payload.create({
+    collection: 'users',
+    data: {
+      email: 'admin@tutorcourt.com',
+      password: 'password123',
+      firstName: 'Super',
+      lastName: 'Admin',
+      phoneNumber: '+1234567890',
+      accountType: 'admin',
+      _verified: true,
+    },
+    disableVerificationEmail: true,
+  })
+
   console.log('Seeding subjects...')
   const subjectsData = [
     'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Computer Science', 
@@ -13,41 +38,23 @@ export async function seedData() {
   const subjects = []
 
   for (const subjectName of subjectsData) {
-    const existing = await payload.find({
+    const subject = await payload.create({
       collection: 'subjects',
-      where: { name: { equals: subjectName } },
-      limit: 1,
+      data: { name: subjectName },
     })
-
-    let subjectId
-    if (existing.docs.length > 0) {
-      subjectId = existing.docs[0].id
-    } else {
-      const subject = await payload.create({
-        collection: 'subjects',
-        data: { name: subjectName },
-      })
-      subjectId = subject.id
-    }
-    subjects.push(subjectId)
+    subjects.push(subject.id)
   }
 
   console.log('Seeding users and tutor profiles...')
-  for (let i = 0; i < 10; i++) {
-    const isTutor = faker.datatype.boolean()
+  // Create guaranteed 10 students and 10 tutors to have enough data
+  const createdStudents = []
+  const createdTutors = []
+
+  for (let i = 0; i < 20; i++) {
+    const isTutor = i >= 10
     const firstName = faker.person.firstName()
     const lastName = faker.person.lastName()
-    const email = faker.internet.email({ firstName, lastName })
-
-    const existingUser = await payload.find({
-      collection: 'users',
-      where: { email: { equals: email } },
-      limit: 1,
-    })
-
-    if (existingUser.docs.length > 0) {
-      continue
-    }
+    const email = `${Date.now()}_${faker.internet.email({ firstName, lastName, provider: 'example.com' })}`
 
     const user = await payload.create({
       collection: 'users',
@@ -56,23 +63,24 @@ export async function seedData() {
         password: 'password123',
         firstName,
         lastName,
+        phoneNumber: faker.phone.number(),
         accountType: isTutor ? 'tutor' : 'student',
+        _verified: true,
       },
       disableVerificationEmail: true,
     })
 
     if (isTutor) {
+      createdTutors.push(user)
       const existingProfile = await payload.find({
         collection: 'tutor-profiles',
         where: { user: { equals: user.id } },
         limit: 1
       })
       
-      // Pick 1-3 random subjects
-      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
-      
+      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })                                                                     
       const profileData = {
-        user: user.id,
+        headline: faker.person.jobTitle(),
         bio: faker.person.bio(),
         yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
         mode: faker.helpers.arrayElement(['online', 'hybrid']),
@@ -85,7 +93,10 @@ export async function seedData() {
       if (existingProfile.docs.length === 0) {
         await payload.create({
           collection: 'tutor-profiles',
-          data: profileData,
+          data: {
+            user: user.id,
+            ...profileData
+          },
         })
       } else {
         await payload.update({
@@ -94,9 +105,11 @@ export async function seedData() {
           data: profileData,
         })
       }
+    } else {
+      createdStudents.push(user)
     }
     
-    const wallet = await payload.create({
+    await payload.create({
       collection: 'wallets',
       data: {
         user: user.id,
@@ -117,6 +130,56 @@ export async function seedData() {
             status: faker.helpers.arrayElement(['paid', 'pending']),
           },
        })
+    }
+  }
+
+  console.log('Seeding reviews and bookings...')
+  const allTutors = await payload.find({ collection: 'tutor-profiles', limit: 100 })                                                                  
+  const allSubjects = await payload.find({ collection: 'subjects', limit: 100 })                                                                    
+  
+  for (const tutor of allTutors.docs) {
+    // Generate bookings
+    for (let i = 0; i < faker.number.int({ min: 1, max: 5 }); i++) {
+       const student = faker.helpers.arrayElement(createdStudents)
+
+       const startDate = faker.date.recent()
+       const endDate = faker.date.future()
+
+       await payload.create({
+         collection: 'bookings',
+         data: {
+           tutor: tutor.id,
+           student: student.id,
+           status: faker.helpers.arrayElement(['pending', 'confirmed', 'completed', 'cancelled']),
+           date: startDate.toISOString(),
+           endDate: endDate.toISOString(),
+           hoursPerDay: faker.number.int({ min: 1, max: 4 }),
+           daysOfWeek: faker.helpers.arrayElements(['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], { min: 1, max: 3 }),
+           subjects: [
+             { subject: faker.helpers.arrayElement(allSubjects.docs).name }
+           ],
+           price: faker.number.int({ min: 5000, max: 200000 }),
+           message: faker.lorem.sentences(2)
+         }
+       })
+    }
+
+    // Generate reviews
+    const numReviews = faker.number.int({ min: 2, max: 8 })
+    
+    for (let i = 0; i < numReviews; i++) {
+      const student = faker.helpers.arrayElement(createdStudents)
+      const rating = faker.number.int({ min: 3, max: 5 })
+
+      await payload.create({
+        collection: 'reviews',
+        data: {
+          review: faker.lorem.paragraph(),
+          rating,
+          user: student.id,
+          tutor: tutor.id
+        }
+      })
     }
   }
 

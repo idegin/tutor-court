@@ -1,15 +1,65 @@
 import type { CollectionConfig } from 'payload'
 
+const generateUniqueSlug = async (payload: any, baseSlug: string, count = 0): Promise<string> => {
+  const customId = Math.random().toString(36).substring(2, 7);
+  const newSlug = count === 0 ? baseSlug : `${baseSlug}-${customId}`;
+  
+  const existingProfiles = await payload.find({
+    collection: 'tutor-profiles',
+    where: {
+      slug: {
+        equals: newSlug,
+      },
+    },
+  });
+
+  if (existingProfiles.totalDocs > 0) {
+    return generateUniqueSlug(payload, baseSlug, count + 1);
+  }
+
+  return newSlug;
+};
+
 export const TutorProfiles: CollectionConfig = {
   slug: 'tutor-profiles',
   admin: {
-    useAsTitle: 'id',
-    defaultColumns: ['user', 'isApproved'],
+    useAsTitle: 'slug',
+    defaultColumns: ['user', 'slug', 'isApproved'],
   },
   access: {
     read: () => true,
   },
+  hooks: {
+    beforeValidate: [
+      async ({ data, req, operation }) => {
+        if (operation === 'create' || (operation === 'update' && !data?.slug)) {
+          if (!data?.slug && data?.user) {
+            const user = await req.payload.findByID({
+              collection: 'users',
+              id: data.user,
+            });
+            
+            if (user && user.firstName && user.lastName) {
+              const baseSlug = `${user.firstName}-${user.lastName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+              data.slug = await generateUniqueSlug(req.payload, baseSlug);
+            }
+          }
+        }
+        return data;
+      }
+    ]
+  },
   fields: [
+    {
+      name: 'slug',
+      type: 'text',
+      unique: true,
+      required: true,
+      admin: {
+        description: 'Auto-generated unique slug for the tutor profile.',
+        readOnly: true,
+      },
+    },
     {
       name: 'user',
       type: 'relationship',
@@ -36,11 +86,26 @@ export const TutorProfiles: CollectionConfig = {
       },
     },
     {
+      name: 'totalReviews',
+      type: 'number',
+      defaultValue: 0,
+      admin: {
+        description: 'Total number of reviews received by this tutor.',
+      },
+    },
+    {
       name: 'onboardingCompleted',
       type: 'checkbox',
       defaultValue: false,
       admin: {
         description: 'Whether the tutor has completed the onboarding flow.',
+      },
+    },
+    {
+      name: 'headline',
+      type: 'text',
+      admin: {
+        description: 'A short headline or tagline for the tutor profile.',
       },
     },
     {

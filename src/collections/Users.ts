@@ -82,6 +82,7 @@ export const Users: CollectionConfig = {
       name: 'accountType',
       type: 'select',
       options: [
+        { label: 'Admin', value: 'admin' },
         { label: 'Tutor', value: 'tutor' },
         { label: 'Parent', value: 'parent' },
         { label: 'Student', value: 'student' },

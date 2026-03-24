@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { HiListBullet, HiSquares2X2 } from 'react-icons/hi2';
 import { SearchFilters } from '@/components/search/search-filters';
-import { TutorCard, TutorCardProps } from '@/components/tutor/tutor-card';
+import { TutorCard, TutorCardProps } from '@/components/tutors/tutor-card';
 
 const dummyTutors: TutorCardProps[] = [
     {

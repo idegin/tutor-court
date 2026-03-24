@@ -27,14 +27,14 @@ export function TutorHero({
         <div className="w-full relative bg-background">
             <div className="md:h-[300px] h-[200px] w-full relative rounded-bl-[2rem] rounded-br-[2rem] overflow-hidden">
                 <img
-                    src={coverImageUrl}
+                    src={'/banner.png'}
                     alt="Cover"
                     className="w-full h-full object-cover"
                 />
             </div>
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-[-80px] md:mt-[-100px] relative z-10">
-                <div className="bg-card rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 border-[3px] border-foreground">
+                {/* <div className="bg-card rounded-[2rem] p-6 md:p-8 flex flex-col md:flex-row items-center md:items-end gap-6 border-[3px] border-foreground">
                     <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-[2rem] border-[3px] border-foreground overflow-hidden bg-primary shrink-0">
                         <img
                             src={imageUrl}
@@ -73,7 +73,7 @@ export function TutorHero({
                             </button>
                         </div>
                     </div>
-                </div>
+                </div> */}
             </div>
         </div>
     );

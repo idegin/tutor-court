@@ -24,7 +24,7 @@ export function SiteHero() {
                         and excel with TutorCourt's editorial experience.
                     </p>
 
-                    <div className="bg-card rounded-full p-2 md:p-3 border-2 border-foreground flex flex-col md:flex-row items-center w-full max-w-4xl relative z-10">
+                    <div className="bg-card rounded-full px-2 py-0 border-2 border-foreground flex flex-col md:flex-row items-center w-full max-w-4xl relative z-10">
                         {/* Subject */}
                         <div className="flex-1 w-full md:w-auto px-6 py-3 cursor-pointer group">
                             <div className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase mb-1">Subject</div>

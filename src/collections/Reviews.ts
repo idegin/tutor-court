@@ -1,4 +1,40 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionAfterChangeHook, CollectionAfterDeleteHook } from 'payload'
+
+const updateTutorRating: CollectionAfterChangeHook | CollectionAfterDeleteHook = async ({
+  doc,
+  req,
+}) => {
+  if (!doc?.tutor) return
+
+  const tutorId = typeof doc.tutor === 'object' ? doc.tutor.id : doc.tutor
+
+  try {
+    const reviews = await req.payload.find({
+      collection: 'reviews',
+      where: { tutor: { equals: tutorId } },
+      limit: 1000,
+      req,
+    })
+
+    const totalReviews = reviews.totalDocs
+    const averageRating =
+      totalReviews > 0
+        ? reviews.docs.reduce((acc, r) => acc + (r.rating || 0), 0) / totalReviews
+        : 0
+
+    await req.payload.update({
+      collection: 'tutor-profiles',
+      id: tutorId,
+      data: {
+        totalReviews,
+        rating: Math.round(averageRating * 10) / 10,
+      },
+      req,
+    })
+  } catch (error) {
+    req.payload.logger.error(`Failed to update ratings for tutor: ${tutorId}`)
+  }
+}
 
 export const Reviews: CollectionConfig = {
   slug: 'reviews',
@@ -8,6 +44,10 @@ export const Reviews: CollectionConfig = {
   },
   access: {
     read: () => true,
+  },
+  hooks: {
+    afterChange: [updateTutorRating],
+    afterDelete: [updateTutorRating],
   },
   fields: [
     {

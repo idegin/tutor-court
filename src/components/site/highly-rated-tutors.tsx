@@ -1,7 +1,67 @@
 import React from 'react';
 import { HiStar, HiChevronRight } from 'react-icons/hi2';
+import Link from 'next/link';
+import { getPayload } from 'payload';
+import configPromise from '@payload-config';
+import { unstable_cache } from 'next/cache';
 
-export function HighlyRatedTutors() {
+const getHighlyRatedTutors = unstable_cache(
+    async () => {
+        const payload = await getPayload({ config: configPromise });
+        const { docs: tutors } = await payload.find({
+            collection: 'tutor-profiles',
+            where: {
+                isApproved: { equals: true },
+            },
+            sort: '-rating',
+            limit: 30,
+            depth: 2,
+        });
+        return tutors;
+    },
+    ['highly-rated-tutors'],
+    { revalidate: 86400 } // 24 hours
+);
+
+function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+const getName = (user: any) => {
+    if (!user) return 'Tutor';
+    return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Tutor';
+};
+
+const getAvatar = (user: any) => {
+    if (user?.avatar?.url) return user.avatar.url;
+    return "/user-placeholder.png";
+};
+
+const getRating = (tutor: any) => (tutor.rating || 0).toFixed(1);
+const getReviews = (tutor: any) => tutor.totalReviews || 0;
+const getHourlyRate = (tutor: any) => (tutor.hourlyRate || 0).toLocaleString();
+
+export async function HighlyRatedTutors() {
+    const tutors = await getHighlyRatedTutors();
+
+    if (!tutors || tutors.length <= 3) {
+        return null;
+    }
+
+    const shuffledTutors = shuffleArray(tutors).slice(0, 3);
+    const [mainTutor, smallTutor1, smallTutor2] = shuffledTutors;
+
+    const mainNameParts = getName(mainTutor.user).split(' ');
+    const mainNameFirst = mainNameParts[0] || '';
+    const mainNameRest = mainNameParts.slice(1).join(' ');
+
+    const mainTags = (mainTutor.subjects as any[] || []).slice(0, 2).map((s: any) => s?.name || s);
+
     return (
         <section className="py-24 px-4 md:px-8 bg-background">
             <div className="container mx-auto max-w-7xl">
@@ -23,46 +83,55 @@ export function HighlyRatedTutors() {
                             <div className="relative w-full aspect-[4/5] max-w-[320px] mx-auto group">
                                 <div className="absolute inset-0 bg-secondary rounded-[2.5rem] border-2 border-foreground overflow-hidden">
                                     <img
-                                        src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600"
-                                        alt="Dr. Chioma Adebayo"
+                                        src={getAvatar(mainTutor.user)}
+                                        alt={getName(mainTutor.user)}
                                         className="w-full h-full object-cover opacity-90"
                                     />
                                 </div>
                                 {/* Rating Badge */}
                                 <div className="absolute bottom-6 left-[-10px] md:left-[-15px] bg-card border-2 border-foreground rounded-full px-5 py-2.5 flex items-center gap-1.5 z-10">
                                     <HiStar className="w-4 h-4 text-tutor-red-500" />
-                                    <span className="text-sm font-bold text-card-foreground">4.9 <span className="text-sm font-semibold text-foreground">(240 reviews)</span></span>
+                                    <span className="text-sm font-bold text-card-foreground">{getRating(mainTutor)} <span className="text-sm font-semibold text-foreground">({getReviews(mainTutor)} reviews)</span></span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Content Side */}
                         <div className="w-full md:w-7/12 flex flex-col justify-center">
-                            <div className="flex flex-wrap items-center gap-3 mb-4">
-                                <span className="px-3 py-1.5 bg-primary text-foreground text-[10px] font-bold tracking-wider uppercase rounded-full">
-                                    Physics Specialist
-                                </span>
-                                <span className="px-3 py-1.5 bg-tutor-purple-200 text-foreground text-[10px] font-bold tracking-wider uppercase rounded-full">
-                                    PhD Holder
-                                </span>
-                            </div>
+                            {mainTags.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-3 mb-4">
+                                    {mainTags[0] && (
+                                        <span className="px-3 py-1.5 bg-primary text-foreground text-[10px] font-bold tracking-wider uppercase rounded-full">
+                                            {mainTags[0]}
+                                        </span>
+                                    )}
+                                    {mainTags[1] && (
+                                        <span className="px-3 py-1.5 bg-tutor-purple-200 text-foreground text-[10px] font-bold tracking-wider uppercase rounded-full">
+                                            {mainTags[1]}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
 
                             <h3 className="text-4xl md:text-5xl font-black text-card-foreground leading-tight mb-4">
-                                Dr. Chioma <br />Adebayo
+                                {mainNameFirst} {mainNameRest && <br />}{mainNameRest}
                             </h3>
 
                             <p className="text-muted-foreground font-medium leading-relaxed mb-8">
-                                Expert in Quantum Mechanics and Advanced Calculus. Over 10 years of experience helping students bridge the gap between theory and application.
+                                {mainTutor.bio || mainTutor.headline}
                             </p>
 
                             <div className="mt-auto">
                                 <p className="text-sm font-bold text-muted-foreground/60 mb-1">Hourly Rate</p>
                                 <div className="text-3xl font-black text-card-foreground mb-6 flex items-baseline">
-                                    ₦12,500<span className="text-base font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
+                                    ₦{getHourlyRate(mainTutor)}<span className="text-base font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
                                 </div>
-                                <button className="bg-foreground hover:bg-foreground/90 text-background font-bold py-4 px-8 rounded-[1.2rem] w-full md:w-auto transition-colors">
-                                    Book a Free Consultation
-                                </button>
+                                <Link
+                                    href={`/tutors/${mainTutor.slug}`}
+                                    className="inline-flex items-center gap-2 bg-foreground text-background px-6 py-3 rounded-full font-bold hover:bg-tutor-red-500 transition-colors"
+                                >
+                                    Book Now <HiChevronRight className="w-5 h-5 stroke-[3]" />
+                                </Link>
                             </div>
                         </div>
                     </div>
@@ -73,66 +142,66 @@ export function HighlyRatedTutors() {
                         {/* Small Card 1 */}
                         <div className="bg-card rounded-[2rem] border-2 border-foreground p-6 md:p-8 flex flex-col h-full">
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 bg-[#F6DFA9] border-2 border-foreground rounded-[1.2rem] overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                <div className="w-16 h-16 bg-tutor-purple-100 border-2 border-foreground rounded-[1.2rem] overflow-hidden flex-shrink-0 flex items-center justify-center">
                                     <img
-                                        src="https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&q=80&w=150"
-                                        alt="David Okoro"
+                                        src={getAvatar(smallTutor1.user)}
+                                        alt={getName(smallTutor1.user)}
                                         className="w-full h-full object-cover opacity-90"
                                     />
                                 </div>
                                 <div>
-                                    <h4 className="text-xl font-black text-card-foreground leading-none mb-1">David Okoro</h4>
+                                    <h4 className="text-xl font-black text-card-foreground leading-none mb-1">{getName(smallTutor1.user)}</h4>
                                     <div className="flex items-center gap-1 mt-1.5">
                                         <HiStar className="w-3.5 h-3.5 text-tutor-red-500" />
-                                        <span className="text-xs font-bold text-card-foreground">4.8 <span className="text-foreground font-semibold">(112 reviews)</span></span>
+                                        <span className="text-xs font-bold text-card-foreground">{getRating(smallTutor1)} <span className="text-foreground font-semibold">({getReviews(smallTutor1)} reviews)</span></span>
                                     </div>
                                 </div>
                             </div>
 
                             <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow">
-                                Creative Writing & Literature. I focus on developing a student's unique voice through intensive analysis.
+                                {smallTutor1.headline || smallTutor1.bio || "Patient and experienced tutor dedicated to student success."}
                             </p>
 
                             <div className="flex items-baseline justify-between mt-auto">
                                 <div className="text-xl font-black text-card-foreground flex items-baseline">
-                                    ₦6,000<span className="text-sm font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
+                                    ₦{getHourlyRate(smallTutor1)}<span className="text-sm font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
                                 </div>
-                                <button className="flex items-center gap-1 text-sm font-black text-card-foreground hover:text-primary transition-colors">
+                                <Link href={`/tutors/${smallTutor1.slug}`} className="flex items-center gap-1 text-sm font-black text-card-foreground hover:text-primary transition-colors">
                                     Profile <HiChevronRight className="w-4 h-4 stroke-[3]" />
-                                </button>
+                                </Link>
                             </div>
                         </div>
 
                         {/* Small Card 2 */}
                         <div className="bg-tutor-purple-50 rounded-[2rem] border-2 border-foreground p-6 md:p-8 flex flex-col h-full">
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 bg-[#eebf99] border-2 border-foreground rounded-[1.2rem] overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                <div className="w-16 h-16 bg-tutor-red-100 border-2 border-foreground rounded-[1.2rem] overflow-hidden flex-shrink-0 flex items-center justify-center">
                                     <img
-                                        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150"
-                                        alt="Fatima Bello"
+                                        src={getAvatar(smallTutor2.user)}
+                                        alt={getName(smallTutor2.user)}
                                         className="w-full h-full object-cover opacity-90"
                                     />
                                 </div>
                                 <div>
-                                    <h4 className="text-xl font-black text-card-foreground leading-none mb-1">Fatima Bello</h4>
+                                    <h4 className="text-xl font-black text-card-foreground leading-none mb-1">{getName(smallTutor2.user)}</h4>
                                     <div className="flex items-center gap-1 mt-1.5">
                                         <HiStar className="w-3.5 h-3.5 text-tutor-red-500" />
-                                        <span className="text-xs font-bold text-card-foreground">5.0 <span className="text-foreground font-semibold">(89 reviews)</span></span>
+                                        <span className="text-xs font-bold text-card-foreground">{getRating(smallTutor2)} <span className="text-foreground font-semibold">({getReviews(smallTutor2)} reviews)</span></span>
                                     </div>
                                 </div>
                             </div>
 
                             <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow">
-                                Mathematics and Statistics. Simplified approach to complex equations for WAEC/JAMB prep.
+                                {smallTutor2.headline || smallTutor2.bio || "Helping students master complex topics with personalized guidance."}
                             </p>
 
                             <div className="flex items-baseline justify-between mt-auto">
                                 <div className="text-xl font-black text-card-foreground flex items-baseline">
-                                    ₦8,500<span className="text-sm font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
+                                    ₦{getHourlyRate(smallTutor2)}<span className="text-sm font-semibold text-muted-foreground/60 ml-0.5">/hr</span>
                                 </div>
-                                <button className="flex items-center gap-1 text-sm font-black text-card-foreground hover:text-primary transition-colors">
+                                <Link href={`/tutors/${smallTutor2.slug}`} className="flex items-center gap-1 text-sm font-black text-card-foreground hover:text-primary transition-colors">
                                     Profile <HiChevronRight className="w-4 h-4 stroke-[3]" />
-                                </button>
+                                </Link>
                             </div>
                         </div>
 
@@ -142,3 +211,4 @@ export function HighlyRatedTutors() {
         </section>
     );
 }
+

@@ -74,6 +74,7 @@ export interface Config {
     reviews: Review;
     wallets: Wallet;
     transactions: Transaction;
+    bookings: Booking;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -88,6 +89,7 @@ export interface Config {
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
+    bookings: BookingsSelect<false> | BookingsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -135,7 +137,7 @@ export interface User {
   id: string;
   firstName: string;
   lastName: string;
-  accountType: 'tutor' | 'parent' | 'student';
+  accountType: 'admin' | 'tutor' | 'parent' | 'student';
   phoneNumber: string;
   country?: string | null;
   timezone?: string | null;
@@ -196,6 +198,10 @@ export interface Media {
  */
 export interface TutorProfile {
   id: string;
+  /**
+   * Auto-generated unique slug for the tutor profile.
+   */
+  slug: string;
   user: string | User;
   /**
    * Check to approve this tutor profile.
@@ -206,9 +212,17 @@ export interface TutorProfile {
    */
   rating?: number | null;
   /**
+   * Total number of reviews received by this tutor.
+   */
+  totalReviews?: number | null;
+  /**
    * Whether the tutor has completed the onboarding flow.
    */
   onboardingCompleted?: boolean | null;
+  /**
+   * A short headline or tagline for the tutor profile.
+   */
+  headline?: string | null;
   bio?: string | null;
   yearsOfExperience?: number | null;
   mode?: ('online' | 'hybrid') | null;
@@ -292,6 +306,40 @@ export interface Transaction {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bookings".
+ */
+export interface Booking {
+  id: string;
+  tutor: string | TutorProfile;
+  student: string | User;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  /**
+   * Start date of the engagement
+   */
+  date: string;
+  /**
+   * End date of the engagement
+   */
+  endDate: string;
+  hoursPerDay: number;
+  daysOfWeek: ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[];
+  subjects: {
+    subject: string;
+    id?: string | null;
+  }[];
+  /**
+   * Total price for this booking
+   */
+  price: number;
+  /**
+   * Message from the student to the tutor
+   */
+  message?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -341,6 +389,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'transactions';
         value: string | Transaction;
+      } | null)
+    | ({
+        relationTo: 'bookings';
+        value: string | Booking;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -452,10 +504,13 @@ export interface MediaSelect<T extends boolean = true> {
  * via the `definition` "tutor-profiles_select".
  */
 export interface TutorProfilesSelect<T extends boolean = true> {
+  slug?: T;
   user?: T;
   isApproved?: T;
   rating?: T;
+  totalReviews?: T;
   onboardingCompleted?: T;
+  headline?: T;
   bio?: T;
   yearsOfExperience?: T;
   mode?: T;
@@ -512,6 +567,29 @@ export interface TransactionsSelect<T extends boolean = true> {
   amount?: T;
   currency?: T;
   status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bookings_select".
+ */
+export interface BookingsSelect<T extends boolean = true> {
+  tutor?: T;
+  student?: T;
+  status?: T;
+  date?: T;
+  endDate?: T;
+  hoursPerDay?: T;
+  daysOfWeek?: T;
+  subjects?:
+    | T
+    | {
+        subject?: T;
+        id?: T;
+      };
+  price?: T;
+  message?: T;
   updatedAt?: T;
   createdAt?: T;
 }
