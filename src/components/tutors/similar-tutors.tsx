@@ -1,12 +1,21 @@
 import React from 'react';
 import { TutorCardCompact, TutorCardCompactProps } from './tutor-card-compact';
 import Link from 'next/link';
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    CarouselNext,
+    CarouselPrevious,
+} from "@/components/ui/carousel";
 
 export interface SimilarTutorsProps {
     tutors: TutorCardCompactProps[];
 }
 
 export function SimilarTutors({ tutors }: SimilarTutorsProps) {
+    if (!tutors || tutors.length === 0) return null;
+
     return (
         <section className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -22,10 +31,26 @@ export function SimilarTutors({ tutors }: SimilarTutorsProps) {
                 </Link>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {tutors.map((tutor) => (
-                    <TutorCardCompact key={tutor.id} {...tutor} />
-                ))}
+            <div className="mt-4 relative">
+                <Carousel
+                    opts={{
+                        align: "start",
+                        loop: true,
+                    }}
+                    className="w-full"
+                >
+                    <CarouselContent className="-ml-4">
+                        {tutors.map((tutor) => (
+                            <CarouselItem key={tutor.id} className="pl-4 md:basis-1/2 lg:basis-1/3 xl:basis-1/4">
+                                <TutorCardCompact {...tutor} />
+                            </CarouselItem>
+                        ))}
+                    </CarouselContent>
+                    <div className="hidden sm:block">
+                        <CarouselPrevious className="-left-14" />
+                        <CarouselNext className="-right-14" />
+                    </div>
+                </Carousel>
             </div>
         </section>
     );

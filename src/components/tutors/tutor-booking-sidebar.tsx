@@ -50,7 +50,9 @@ export function TutorBookingSidebar({
 
                 <div>
                     <div className="flex items-baseline gap-1 mb-2">
-                        <span className="text-4xl font-black text-foreground">₦{pricePerHour.toLocaleString()}</span>
+                        <span className="text-4xl font-black text-foreground">
+                            {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(pricePerHour)}
+                        </span>
                         <span className="text-xl font-bold text-muted-foreground">/hr</span>
                     </div>
                     <div className="flex flex-col gap-2 mt-4">

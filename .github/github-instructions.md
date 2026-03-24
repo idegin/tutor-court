@@ -8,6 +8,7 @@
 7. Always use server side data fetching.
 8. Make sure the UI is very beautiful. Don't add shadows or gradients.
 9. Don't use bash commands to update files, update them directly. Don't use bash commands to update files, update them directly. Don't use bash commands to update files, update them directly.
+10. Check what we have installed before installing any new dependencies.
 
 
 

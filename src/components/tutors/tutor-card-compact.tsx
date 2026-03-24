@@ -38,7 +38,7 @@ export function TutorCardCompact({ id, name, title, rating, priceText, imageUrl 
             </div>
 
             <Link
-                href={`/tutor/${id}`}
+                href={`/tutors/${id}`}
                 className="w-full mt-2 text-center bg-tutor-purple-50 hover:bg-tutor-purple-100 text-tutor-purple-800 font-black py-3 px-4 rounded-xl border-[3px] border-foreground transition-colors"
             >
                 View Profile

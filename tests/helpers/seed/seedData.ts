@@ -81,7 +81,7 @@ export async function seedData() {
       const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })                                                                     
       const profileData = {
         headline: faker.person.jobTitle(),
-        bio: faker.person.bio(),
+        bio: faker.lorem.paragraphs(5, '\n\n'),
         yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
         mode: faker.helpers.arrayElement(['online', 'hybrid']),
         subjects: tutorSubjects,
