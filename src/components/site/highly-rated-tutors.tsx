@@ -5,23 +5,19 @@ import { getPayload } from 'payload';
 import configPromise from '@payload-config';
 import { unstable_cache } from 'next/cache';
 
-const getHighlyRatedTutors = unstable_cache(
-    async () => {
-        const payload = await getPayload({ config: configPromise });
-        const { docs: tutors } = await payload.find({
-            collection: 'tutor-profiles',
-            where: {
-                isApproved: { equals: true },
-            },
-            sort: '-rating',
-            limit: 30,
-            depth: 2,
-        });
-        return tutors;
-    },
-    ['highly-rated-tutors'],
-    { revalidate: 86400 } // 24 hours
-);
+const getHighlyRatedTutors = async () => {
+    const payload = await getPayload({ config: configPromise });
+    const { docs: tutors } = await payload.find({
+        collection: 'tutor-profiles',
+        where: {
+            isApproved: { equals: true },
+        },
+        sort: '-rating',
+        limit: 30,
+        depth: 2,
+    });
+    return tutors;
+};
 
 function shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
@@ -117,7 +113,7 @@ export async function HighlyRatedTutors() {
                                 {mainNameFirst} {mainNameRest && <br />}{mainNameRest}
                             </h3>
 
-                            <p className="text-muted-foreground font-medium leading-relaxed mb-8">
+                            <p className="text-muted-foreground font-medium leading-relaxed mb-8 line-clamp-6">
                                 {mainTutor.bio || mainTutor.headline}
                             </p>
 
@@ -158,8 +154,8 @@ export async function HighlyRatedTutors() {
                                 </div>
                             </div>
 
-                            <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow">
-                                {smallTutor1.headline || smallTutor1.bio || "Patient and experienced tutor dedicated to student success."}
+                            <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow line-clamp-4 overflow-hidden text-ellipsis">
+                                {smallTutor1.bio || smallTutor1.headline || "Patient and experienced tutor dedicated to student success."}
                             </p>
 
                             <div className="flex items-baseline justify-between mt-auto">
@@ -191,8 +187,8 @@ export async function HighlyRatedTutors() {
                                 </div>
                             </div>
 
-                            <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow">
-                                {smallTutor2.headline || smallTutor2.bio || "Helping students master complex topics with personalized guidance."}
+                            <p className="text-sm text-muted-foreground font-medium leading-relaxed mb-6 flex-grow line-clamp-4 overflow-hidden text-ellipsis">
+                                {smallTutor2.bio || smallTutor2.headline || "Helping students master complex topics with personalized guidance."}
                             </p>
 
                             <div className="flex items-baseline justify-between mt-auto">

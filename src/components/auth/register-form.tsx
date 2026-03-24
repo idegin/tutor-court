@@ -69,7 +69,7 @@ export function RegisterForm({
                                 onChange={(event) => onChange('firstName', event.target.value)}
                                 aria-invalid={Boolean(errors?.firstName)}
                                 placeholder="Jane"
-                                className="bg-transparent pl-11 h-12 rounded-xl text-base border-border/80 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                                className="bg-transparent pl-11 h-12 rounded-xl text-base"
                             />
                         </div>
                         <FieldError>{errors?.firstName}</FieldError>
@@ -92,7 +92,7 @@ export function RegisterForm({
                                 onChange={(event) => onChange('lastName', event.target.value)}
                                 aria-invalid={Boolean(errors?.lastName)}
                                 placeholder="Doe"
-                                className="bg-transparent pl-11 h-12 rounded-xl text-base border-border/80 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                                className="bg-transparent pl-11 h-12 rounded-xl text-base"
                             />
                         </div>
                         <FieldError>{errors?.lastName}</FieldError>
@@ -119,7 +119,7 @@ export function RegisterForm({
                             onChange={(event) => onChange('email', event.target.value)}
                             aria-invalid={Boolean(errors?.email)}
                             placeholder="jane.doe@example.com"
-                            className="bg-transparent pl-11 h-12 rounded-xl text-base border-border/80 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                            className="bg-transparent pl-11 h-12 rounded-xl text-base"
                         />
                     </div>
                     <FieldError>{errors?.email}</FieldError>
@@ -130,7 +130,7 @@ export function RegisterForm({
                 <FieldLabel htmlFor="register-phone" className="font-bold text-foreground">Phone Number</FieldLabel>
                 <FieldContent>
                     <div className="relative">
-                        <div className={`flex items-center h-12 w-full rounded-xl border bg-transparent px-3 py-2 text-base ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${errors?.phoneNumber ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive' : 'border-border/80 focus-within:ring-2 focus-within:ring-primary/50'}`}>
+                        <div className={`flex items-center h-12 w-full rounded-xl border bg-transparent px-3 py-2 text-base ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${errors?.phoneNumber ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive' : 'border-2 border-foreground'}`}>
                             <PhoneInput
                                 id="register-phone"
                                 name="phoneNumber"
@@ -166,7 +166,7 @@ export function RegisterForm({
                             onChange={(event) => onChange('password', event.target.value)}
                             aria-invalid={Boolean(errors?.password)}
                             placeholder="Min. 8 characters"
-                            className="bg-transparent pl-11 pr-11 h-12 rounded-xl text-base border-border/80 outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/50"
+                            className="bg-transparent pl-11 h-12 rounded-xl text-base"
                         />
                         <button
                             type="button"

@@ -5,8 +5,6 @@ import {
     Carousel,
     CarouselContent,
     CarouselItem,
-    CarouselNext,
-    CarouselPrevious,
 } from "@/components/ui/carousel";
 
 export interface SimilarTutorsProps {
@@ -47,8 +45,6 @@ export function SimilarTutors({ tutors }: SimilarTutorsProps) {
                         ))}
                     </CarouselContent>
                     <div className="hidden sm:block">
-                        <CarouselPrevious className="-left-14" />
-                        <CarouselNext className="-right-14" />
                     </div>
                 </Carousel>
             </div>

@@ -1,42 +1,155 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { HiXMark, HiCheck, HiCheckCircle } from 'react-icons/hi2';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { Field, FieldContent, FieldError, FieldLabel } from '../ui/field';
 
 export interface BookingModalProps {
     isOpen: boolean;
     onClose: () => void;
+    tutorId: string;
     tutorName: string;
     pricePerHour: number;
     offeredSubjects?: string[];
+    onSuccess?: () => void;
 }
 
-export function BookingModal({ isOpen, onClose, tutorName, pricePerHour, offeredSubjects = [] }: BookingModalProps) {
+interface BookingValues {
+    subjects: string[];
+    message: string;
+    startDate: string;
+    endDate: string;
+    hoursPerDay: number;
+    daysOfWeek: string[];
+}
+
+type BookingErrors = Partial<Record<keyof BookingValues | 'form', string>>;
+
+const DAYS_OF_WEEK = [
+    { label: 'Mon', value: 'monday' },
+    { label: 'Tue', value: 'tuesday' },
+    { label: 'Wed', value: 'wednesday' },
+    { label: 'Thu', value: 'thursday' },
+    { label: 'Fri', value: 'friday' },
+    { label: 'Sat', value: 'saturday' },
+    { label: 'Sun', value: 'sunday' },
+];
+
+export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], onSuccess }: BookingModalProps) {
     const [step, setStep] = useState(1);
-    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!isOpen) return null;
+    const [values, setValues] = useState<BookingValues>({
+        subjects: [],
+        message: '',
+        startDate: '',
+        endDate: '',
+        hoursPerDay: 1,
+        daysOfWeek: [],
+    });
 
-    const handleNext = () => setStep(step + 1);
+    const [errors, setErrors] = useState<BookingErrors>({});
+
+    const handleValueChange = (field: keyof BookingValues, val: any) => {
+        setValues(prev => ({ ...prev, [field]: val }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: undefined }));
+        }
+    };
+
+    const validateStep1 = (): boolean => {
+        const newErrors: BookingErrors = {};
+        if (values.subjects.length === 0) newErrors.subjects = 'Please select at least one subject.';
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const validateStep2 = (): boolean => {
+        const newErrors: BookingErrors = {};
+        if (!values.startDate) newErrors.startDate = 'Start date is required.';
+        if (!values.endDate) newErrors.endDate = 'End date is required.';
+        else if (new Date(values.endDate) < new Date(values.startDate)) newErrors.endDate = 'End date cannot be before start date.';
+
+        if (values.hoursPerDay < 1 || values.hoursPerDay > 10) newErrors.hoursPerDay = 'Hours per day must be between 1 and 10.';
+        if (values.daysOfWeek.length === 0) newErrors.daysOfWeek = 'Please select at least one day.';
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleNext = () => {
+        if (step === 1 && !validateStep1()) return;
+        if (step === 2 && !validateStep2()) return;
+        setStep(step + 1);
+    };
+
     const handlePrev = () => setStep(step - 1);
+
+    const estimatedTotal = useMemo(() => {
+        if (!values.startDate || !values.endDate) return 0;
+        const start = new Date(values.startDate);
+        const end = new Date(values.endDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+        const daysDiff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        const weeks = Math.max(1, Math.ceil(daysDiff / 7));
+        const estimatedHours = weeks * values.daysOfWeek.length * values.hoursPerDay;
+
+        return estimatedHours * pricePerHour;
+    }, [values, pricePerHour]);
+
+    const estimatedHours = useMemo(() => {
+        if (!values.startDate || !values.endDate) return 0;
+        const start = new Date(values.startDate);
+        const end = new Date(values.endDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+
+        const daysDiff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        const weeks = Math.max(1, Math.ceil(daysDiff / 7));
+        return weeks * values.daysOfWeek.length * values.hoursPerDay;
+    }, [values]);
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
-        // Simulate API call
-        setTimeout(() => {
+        setErrors({});
+
+        try {
+            const res = await fetch('/api/private/bookings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tutorId,
+                    ...values
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setErrors({ form: data.error || 'Failed to submit booking' });
+                setIsSubmitting(false);
+                return;
+            }
+
             setIsSubmitting(false);
-            setStep(4); // Move to success step
-        }, 1000);
+            setStep(4);
+            if (onSuccess) onSuccess();
+        } catch (error: any) {
+            setErrors({ form: error?.message || 'An error occurred' });
+            setIsSubmitting(false);
+        }
     };
+
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 backdrop-blur-sm p-4">
             <div className="w-full max-w-lg bg-background border-[3px] border-foreground rounded-[2rem] overflow-hidden flex flex-col max-h-[90vh]">
                 {step < 4 ? (
-                    <div className="flex items-center justify-between p-6 border-b-2 border-foreground bg-tutor-purple">
+                    <div className="flex items-center justify-between p-6 border-b-2 border-foreground bg-tutor-purple-50">
                         <h2 className="text-2xl font-black text-foreground">Book {tutorName.split(' ')[0]}</h2>
                         <button onClick={onClose} className="p-1 hover:bg-foreground hover:text-background rounded transition-colors text-foreground">
                             <HiXMark className="w-6 h-6" />
@@ -55,40 +168,54 @@ export function BookingModal({ isOpen, onClose, tutorName, pricePerHour, offered
                     {step === 1 && (
                         <div className="flex flex-col gap-6 animate-in slide-in-from-right-4 fade-in duration-300">
                             <h3 className="text-xl font-black text-foreground">Engagement Details</h3>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-bold text-foreground">Subjects / Topics <span className="text-muted-foreground font-normal">(Select multiple)</span></label>
-                                <div className="flex flex-wrap gap-2 mt-1">
-                                    {offeredSubjects.map((subject) => {
-                                        const isSelected = selectedSubjects.includes(subject);
-                                        return (
-                                            <button
-                                                key={subject}
-                                                type="button"
-                                                onClick={() => {
-                                                    if (isSelected) {
-                                                        setSelectedSubjects(prev => prev.filter(s => s !== subject));
-                                                    } else {
-                                                        setSelectedSubjects(prev => [...prev, subject]);
-                                                    }
-                                                }}
-                                                className={cn(
-                                                    "px-3 py-1.5 rounded-full border-[2px] text-sm font-bold transition-all flex items-center gap-1.5",
-                                                    isSelected
-                                                        ? "border-foreground bg-tutor-purple-500 text-foreground"
-                                                        : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
-                                                )}
-                                            >
-                                                {isSelected && <HiCheck className="w-4 h-4 text-foreground" />}
-                                                {subject}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-bold text-foreground">Message to Tutor</label>
-                                <Textarea placeholder="Share your learning goals..." rows={4} className="w-full p-4 text-sm font-bold transition-all" />
-                            </div>
+
+                            <Field data-invalid={Boolean(errors.subjects)} className="gap-2">
+                                <FieldLabel className="font-bold text-foreground">
+                                    Subjects / Topics <span className="text-muted-foreground font-normal ml-1">(Select multiple)</span>
+                                </FieldLabel>
+                                <FieldContent>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {offeredSubjects.map((subject) => {
+                                            const isSelected = values.subjects.includes(subject);
+                                            return (
+                                                <button
+                                                    key={subject}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newSubjects = isSelected
+                                                            ? values.subjects.filter(s => s !== subject)
+                                                            : [...values.subjects, subject];
+                                                        handleValueChange('subjects', newSubjects);
+                                                    }}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded-full border-[2px] text-sm font-bold transition-all flex items-center gap-1.5",
+                                                        isSelected
+                                                            ? "border-foreground bg-tutor-purple-100 text-tutor-purple-800"
+                                                            : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
+                                                    )}
+                                                >
+                                                    {isSelected && <HiCheck className="w-4 h-4 text-tutor-purple-800" />}
+                                                    {subject}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.subjects}</FieldError>
+                                </FieldContent>
+                            </Field>
+
+                            <Field className="gap-2">
+                                <FieldLabel className="font-bold text-foreground">Message to Tutor</FieldLabel>
+                                <FieldContent>
+                                    <Textarea
+                                        placeholder="Share your learning goals..."
+                                        rows={4}
+                                        className="w-full p-4 text-sm font-bold transition-all rounded-xl"
+                                        value={values.message}
+                                        onChange={(e) => handleValueChange('message', e.target.value)}
+                                    />
+                                </FieldContent>
+                            </Field>
                         </div>
                     )}
 
@@ -97,37 +224,93 @@ export function BookingModal({ isOpen, onClose, tutorName, pricePerHour, offered
                             <h3 className="text-xl font-black text-foreground">Schedule</h3>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-bold text-foreground">Start Date</label>
-                                    <Input type="date" className="w-full p-3 text-sm font-bold" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-sm font-bold text-foreground">End Date</label>
-                                    <Input type="date" className="w-full p-3 text-sm font-bold" />
-                                </div>
+                                <Field data-invalid={Boolean(errors.startDate)} className="gap-2">
+                                    <FieldLabel className="font-bold text-foreground">Start Date</FieldLabel>
+                                    <FieldContent>
+                                        <Input
+                                            type="date"
+                                            className="w-full p-3 text-sm font-bold h-12 rounded-xl"
+                                            value={values.startDate}
+                                            onChange={(e) => handleValueChange('startDate', e.target.value)}
+                                            min={new Date().toISOString().split('T')[0]}
+                                        />
+                                        <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.startDate}</FieldError>
+                                    </FieldContent>
+                                </Field>
+                                <Field data-invalid={Boolean(errors.endDate)} className="gap-2">
+                                    <FieldLabel className="font-bold text-foreground">End Date</FieldLabel>
+                                    <FieldContent>
+                                        <Input
+                                            type="date"
+                                            className="w-full p-3 text-sm font-bold h-12 rounded-xl"
+                                            value={values.endDate}
+                                            onChange={(e) => handleValueChange('endDate', e.target.value)}
+                                            min={values.startDate || new Date().toISOString().split('T')[0]}
+                                        />
+                                        <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.endDate}</FieldError>
+                                    </FieldContent>
+                                </Field>
                             </div>
 
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-bold text-foreground">Hours per Day</label>
-                                <Input type="number" min="1" max="10" defaultValue="1" className="w-full p-3 text-sm font-bold" />
-                            </div>
+                            <Field data-invalid={Boolean(errors.hoursPerDay)} className="gap-2">
+                                <FieldLabel className="font-bold text-foreground">Hours per Day</FieldLabel>
+                                <FieldContent>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="10"
+                                        className="w-full p-3 text-sm font-bold h-12 rounded-xl"
+                                        value={values.hoursPerDay}
+                                        onChange={(e) => handleValueChange('hoursPerDay', parseInt(e.target.value) || 0)}
+                                    />
+                                    <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.hoursPerDay}</FieldError>
+                                </FieldContent>
+                            </Field>
 
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-bold text-foreground">Days of the Week</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-                                        <button key={day} className="px-4 py-2 rounded-lg border-2 border-foreground text-sm font-bold hover:bg-tutor-orange-400 transition-colors">
-                                            {day}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <Field data-invalid={Boolean(errors.daysOfWeek)} className="gap-2">
+                                <FieldLabel className="font-bold text-foreground">Days of the Week</FieldLabel>
+                                <FieldContent>
+                                    <div className="flex flex-wrap gap-2">
+                                        {DAYS_OF_WEEK.map(day => {
+                                            const isSelected = values.daysOfWeek.includes(day.value);
+                                            return (
+                                                <button
+                                                    key={day.value}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newDays = isSelected
+                                                            ? values.daysOfWeek.filter(d => d !== day.value)
+                                                            : [...values.daysOfWeek, day.value];
+                                                        handleValueChange('daysOfWeek', newDays);
+                                                    }}
+                                                    className={cn(
+                                                        "px-4 py-2 rounded-lg border-2 text-sm font-bold transition-colors",
+                                                        isSelected
+                                                            ? "bg-foreground text-background border-foreground"
+                                                            : "bg-background text-muted-foreground border-border hover:border-foreground"
+                                                    )}
+                                                >
+                                                    {day.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.daysOfWeek}</FieldError>
+                                </FieldContent>
+                            </Field>
                         </div>
                     )}
 
                     {step === 3 && (
                         <div className="flex flex-col gap-6 animate-in slide-in-from-right-4 fade-in duration-300">
                             <h3 className="text-xl font-black text-foreground">Summary</h3>
+
+                            {errors.form && (
+                                <div className="p-4 bg-red-50 text-red-600 rounded-xl border-2 border-red-200 font-semibold text-sm">
+                                    {errors.form}
+                                </div>
+                            )}
+
                             <div className="bg-muted p-6 rounded-xl border-[3px] border-foreground flex flex-col gap-4">
                                 <div className="flex justify-between items-center text-sm font-bold">
                                     <span className="text-muted-foreground">Rate</span>
@@ -135,12 +318,12 @@ export function BookingModal({ isOpen, onClose, tutorName, pricePerHour, offered
                                 </div>
                                 <div className="flex justify-between items-center text-sm font-bold">
                                     <span className="text-muted-foreground">Estimated Hours</span>
-                                    <span className="text-foreground">12 hrs</span>
+                                    <span className="text-foreground">{estimatedHours} hrs</span>
                                 </div>
                                 <div className="h-[2px] bg-foreground/20 w-full my-2"></div>
                                 <div className="flex justify-between items-center text-lg font-black">
                                     <span className="text-foreground">Total Estimate</span>
-                                    <span className="text-foreground">₦{(pricePerHour * 12).toLocaleString()}</span>
+                                    <span className="text-foreground">₦{estimatedTotal.toLocaleString()}</span>
                                 </div>
                             </div>
                             <p className="text-xs font-bold text-muted-foreground text-center">
@@ -167,17 +350,17 @@ export function BookingModal({ isOpen, onClose, tutorName, pricePerHour, offered
                     {step < 4 ? (
                         <>
                             {step > 1 ? (
-                                <Button onClick={handlePrev} className="px-6 py-4 rounded-xl border-[3px] border-foreground font-black text-foreground bg-secondary/20 hover:bg-muted transition-colors">
+                                <Button onClick={handlePrev} disabled={isSubmitting} className="px-6 py-4 rounded-xl border-[3px] border-foreground font-black text-foreground bg-secondary/20 hover:bg-muted transition-colors">
                                     Back
                                 </Button>
                             ) : (
-                                <div className="w-[88px]"></div> // Spacer
+                                <div className="w-[88px]"></div>
                             )}
 
                             <Button
                                 onClick={step < 3 ? handleNext : handleSubmit}
                                 disabled={isSubmitting}
-                                className="flex-1 px-6 py-4 rounded-xl border-3 border-foreground text-foreground font-black transition-colors text-lg"
+                                className="flex-1 px-6 py-4 rounded-xl border-[3px] border-foreground bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black transition-colors text-lg"
                             >
                                 {isSubmitting ? 'Sending Request...' : (step < 3 ? 'Continue' : 'Submit Request')}
                             </Button>

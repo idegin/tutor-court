@@ -1,0 +1,104 @@
+import { NextResponse } from 'next/server';
+import { getPayload } from 'payload';
+import config from '@payload-config';
+import { getServerSideUser } from '@/lib/auth';
+import { z } from 'zod';
+import { differenceInBusinessDays, differenceInDays } from 'date-fns';
+import { getBaseEmailLayout } from '@/lib/email-template';
+
+const bookingSchema = z.object({
+  tutorId: z.string(),
+  startDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid startDate" }),
+  endDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid endDate" }),
+  hoursPerDay: z.number().min(1).max(10),
+  daysOfWeek: z.array(z.string()).min(1),
+  subjects: z.array(z.string()).min(1),
+  message: z.string().optional(),
+});
+
+export async function POST(req: Request) {
+    try {
+        const { user } = await getServerSideUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await req.json();
+        const parsed = bookingSchema.parse(body);
+
+        const payload = await getPayload({ config });
+
+        // Get tutor profile to get the standard hourly rate
+        const tutorProfile = await payload.findByID({
+            collection: 'tutor-profiles',
+            id: parsed.tutorId,
+        });
+
+        if (!tutorProfile) {
+            return NextResponse.json({ error: 'Tutor not found' }, { status: 404 });
+        }
+
+        // Extremely simple calculation: (approximate days * hours per day) * hourlyRate
+        // Assuming ~4 weeks in a month or estimating active days
+        const start = new Date(parsed.startDate);
+        const end = new Date(parsed.endDate);
+        const daysDiff = Math.max(1, differenceInDays(end, start));
+        
+        // Rough estimate of how many of the selected days fall into that timeframe
+        const weeks = Math.max(1, Math.ceil(daysDiff / 7));
+        const estimatedTotalHours = weeks * parsed.daysOfWeek.length * parsed.hoursPerDay;
+        const totalPrice = estimatedTotalHours * (tutorProfile.hourlyRate || 0);
+
+        // Subject structure formatting
+        const subjectsFormatted = parsed.subjects.map(sub => ({ subject: sub }));
+
+        type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+
+        // Create booking in Payload
+        const booking = await payload.create({
+            collection: 'bookings',
+            data: {
+                student: user.id,
+                tutor: tutorProfile.id,
+                date: start.toISOString(),
+                endDate: end.toISOString(),
+                hoursPerDay: parsed.hoursPerDay,
+                daysOfWeek: parsed.daysOfWeek as DayOfWeek[],
+                subjects: subjectsFormatted,
+                message: parsed.message || '',
+                price: totalPrice,
+                status: 'pending',
+            }
+        });
+
+        // Email the tutor
+        let tutorEmail = '';
+        if (typeof tutorProfile.user === 'object' && tutorProfile.user?.email) {
+            tutorEmail = tutorProfile.user.email;
+        } else if (typeof tutorProfile.user === 'string') {
+            const tutorUser = await payload.findByID({ collection: 'users', id: tutorProfile.user });
+            tutorEmail = tutorUser?.email || '';
+        }
+
+        if (tutorEmail) {
+            const htmlContent = `
+              <p class="text">Hi there,</p>
+              <p class="text">You have received a new booking request from ${user.firstName} ${user.lastName}.</p>
+              <p class="text">They are requesting ${parsed.hoursPerDay} hours per day for ${parsed.subjects.join(', ')}.</p>
+              ${parsed.message ? `<p class="text">Message: "${parsed.message}"</p>` : ''}
+              <div class="btn-container">
+                <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/dashboard/bookings" class="btn">View Booking</a>
+              </div>
+            `;
+            await payload.sendEmail({
+                to: tutorEmail,
+                subject: 'New Booking Request - TutorCourt',
+                html: getBaseEmailLayout('New Booking Request', htmlContent),
+            });
+        }
+
+        return NextResponse.json({ success: true, booking });
+    } catch (error: any) {
+        return NextResponse.json({ error: error?.message || 'Error creating booking' }, { status: 500 });
+    }
+}

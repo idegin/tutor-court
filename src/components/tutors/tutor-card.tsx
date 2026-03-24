@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 export interface TutorCardProps {
     id: string;
+    slug?: string;
     name: string;
     pricePerHour: number;
     rating: number;
@@ -17,6 +18,7 @@ export interface TutorCardProps {
 
 export function TutorCard({
     id,
+    slug,
     name,
     pricePerHour,
     rating,
@@ -80,10 +82,10 @@ export function TutorCard({
                 </div>
 
                 <div className={`flex gap-4 mt-auto ${isGrid ? 'flex-col' : 'flex-col sm:flex-row'}`}>
-                    <Link href={`/tutors/${id}`} className={`flex-1 text-center bg-tutor-red-500 hover:bg-tutor-red-600 text-white font-black py-3 px-6 rounded-xl border-[3px] border-foreground transition-colors`}>
+                    <Link href={`/tutors/${slug || id}`} className={`flex-1 text-center bg-tutor-red-500 hover:bg-tutor-red-600 text-white font-black py-3 px-6 rounded-xl border-[3px] border-foreground transition-colors`}>
                         Book Now
                     </Link>
-                    <Link href={`/tutors/${id}`} className={`flex-1 text-center bg-card hover:bg-muted text-foreground font-black py-3 px-6 rounded-xl border-[3px] border-foreground transition-colors`}>
+                    <Link href={`/tutors/${slug || id}`} className={`flex-1 text-center bg-card hover:bg-muted text-foreground font-black py-3 px-6 rounded-xl border-[3px] border-foreground transition-colors`}>
                         View Profile
                     </Link>
                 </div>

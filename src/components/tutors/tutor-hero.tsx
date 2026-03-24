@@ -17,7 +17,7 @@ export function TutorHero({
 }: TutorHeroProps) {
     return (
         <div className="w-full relative bg-background">
-            <div className="md:h-[300px] h-[200px] w-full relative rounded-bl-[2rem] rounded-br-[2rem] overflow-hidden">
+            <div className="md:h-[200px] h-[200px] w-full relative rounded-bl-[2rem] rounded-br-[2rem] overflow-hidden">
                 <img
                     src={'/banner.png'}
                     alt="Cover"

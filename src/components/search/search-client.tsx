@@ -44,8 +44,14 @@ const dummyTutors: TutorCardProps[] = [
     }
 ];
 
-export function SearchClient() {
+export interface SearchClientProps {
+    tutors?: TutorCardProps[];
+}
+
+export function SearchClient({ tutors = [] }: SearchClientProps) {
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+    const displayTutors = tutors.length > 0 ? tutors : dummyTutors;
 
     return (
         <div className="container mx-auto max-w-7xl relative z-10 flex flex-col md:flex-row gap-8">
@@ -79,7 +85,7 @@ export function SearchClient() {
 
                 {/* Tutor List / Grid */}
                 <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'flex flex-col gap-6'}>
-                    {dummyTutors.map(tutor => (
+                    {displayTutors.map(tutor => (
                         <TutorCard key={tutor.id} {...tutor} viewMode={viewMode} />
                     ))}
                 </div>

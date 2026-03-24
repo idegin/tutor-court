@@ -36,7 +36,7 @@ export default buildConfig({
     },
   },
   email: nodemailerAdapter({
-    defaultFromAddress: 'noreply@idegin.com',
+    defaultFromAddress: `${process.env.ZEPTO_MAIL_FROM}`,
     defaultFromName: 'TutorCourt',
     transport,
   }),

@@ -5,23 +5,51 @@ import { TutorBookingSidebar } from '@/components/tutors/tutor-booking-sidebar';
 import { SimilarTutors } from '@/components/tutors/similar-tutors';
 import { HiBeaker, HiCalculator, HiBolt, HiChartBar } from 'react-icons/hi2';
 import { getPayload } from 'payload';
-import config from '@payload-config';
+import configPromise from '@payload-config';
 import { notFound } from 'next/navigation';
+import { getServerSideUser } from '@/lib/auth';
 
-export default async function TutorDetailsPage({ params }: { params: { slug: string } }) {
+export default async function TutorDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
-    const payload = await getPayload({ config });
+    const decodedSlug = decodeURIComponent(slug);
+    const payload = await getPayload({ config: configPromise });
+    const { user: currentUser } = await getServerSideUser();
+
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(decodedSlug);
 
     const { docs } = await payload.find({
         collection: 'tutor-profiles',
-        where: { slug: { equals: slug } },
+        where: isObjectId ? { id: { equals: decodedSlug } } : { slug: { equals: decodedSlug } },
         depth: 2
     });
+
+    console.log(`[TutorDetails] Requested slug: ${decodedSlug} | isObjectId: ${isObjectId} | Docs found: ${docs.length}`);
 
     const tutorProfile = docs[0] as any;
 
     if (!tutorProfile) {
         return notFound();
+    }
+
+    let hasActiveBooking = false;
+    if (currentUser) {
+        const activeBookings = await payload.find({
+            collection: 'bookings',
+            where: {
+                and: [
+                    { student: { equals: currentUser.id } },
+                    { tutor: { equals: tutorProfile.id } },
+                    {
+                        or: [
+                            { status: { equals: 'pending' } },
+                            { status: { equals: 'confirmed' } }
+                        ]
+                    }
+                ]
+            },
+            depth: 0,
+        });
+        hasActiveBooking = activeBookings.totalDocs > 0;
     }
 
     const { docs: similarDocs } = await payload.find({
@@ -63,7 +91,7 @@ export default async function TutorDetailsPage({ params }: { params: { slug: str
     const coverImageUrl = "https://d1csarkz8obe9u.cloudfront.net/posterpreviews/preschool-tutor-service-banner-design-template-00d3fc803b78ce48f1034ff3b7382dab_screen.jpg?ts=1698451931";
 
     const isVerified = tutorProfile.isApproved || false;
-    const responseTimeText = "Usually responds in 2 hours";
+    const responseTimeText = "2 hours";
 
     const description = tutorProfile.bio ? (
         <div className="flex flex-col gap-4">
@@ -103,7 +131,7 @@ export default async function TutorDetailsPage({ params }: { params: { slug: str
             title: doc.headline || 'Professional Tutor',
             rating: doc.rating || 0,
             priceText: `${formatCurrency(doc.hourlyRate || 0)}/hr`,
-            imageUrl: simUser?.avatar?.url || `https://i.pravatar.cc/300?u=${doc.id}`
+            imageUrl: simUser?.avatar?.url || `/user-placeholder.png`
         };
     });
 
@@ -131,11 +159,14 @@ export default async function TutorDetailsPage({ params }: { params: { slug: str
 
                 <div className="lg:col-span-1">
                     <TutorBookingSidebar
+                        tutorId={tutorProfile.id}
                         tutorName={fullName}
                         headline={tutorProfile.headline || 'Professional Tutor'}
                         avatarUrl={avatarUrl}
                         pricePerHour={pricePerHour}
                         responseTimeText={responseTimeText}
+                        offeredSubjects={tutorProfile.subjects?.map((s: any) => s.name) || []}
+                        hasActiveBooking={hasActiveBooking}
                     />
                 </div>
             </div>

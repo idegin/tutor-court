@@ -5,7 +5,10 @@ import { BookingModal } from './booking-modal';
 import { HiCheckBadge } from 'react-icons/hi2';
 import { Button } from '../ui/button';
 
+import Link from 'next/link';
+
 export interface TutorBookingSidebarProps {
+    tutorId: string;
     tutorName: string;
     headline?: string;
     avatarUrl?: string;
@@ -14,9 +17,11 @@ export interface TutorBookingSidebarProps {
     studentsCount?: number;
     offeredSubjects?: string[];
     isVerified?: boolean;
+    hasActiveBooking?: boolean;
 }
 
 export function TutorBookingSidebar({
+    tutorId,
     tutorName,
     headline,
     avatarUrl,
@@ -24,7 +29,8 @@ export function TutorBookingSidebar({
     responseTimeText,
     studentsCount = 0,
     offeredSubjects = ['Mathematics', 'Physics', 'Chemistry'],
-    isVerified = true
+    isVerified = true,
+    hasActiveBooking = false
 }: TutorBookingSidebarProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -69,13 +75,22 @@ export function TutorBookingSidebar({
 
                 <div>
                     <div className="flex flex-col gap-4">
-                        <Button
-                            onClick={() => setIsModalOpen(true)}
-                            className="w-full bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
-                        // className='bg-tutor-red-500 hover:bg-tutor-red-400'
-                        >
-                            Book This Tutor
-                        </Button>
+                        {hasActiveBooking ? (
+                            <Link href="/dashboard/bookings" className="block">
+                                <Button
+                                    className="w-full bg-foreground hover:bg-foreground/90 text-background font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
+                                >
+                                    View Active Booking
+                                </Button>
+                            </Link>
+                        ) : (
+                            <Button
+                                onClick={() => setIsModalOpen(true)}
+                                className="w-full bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
+                            >
+                                Book This Tutor
+                            </Button>
+                        )}
                     </div>
 
                     <p className="text-center text-xs font-bold text-muted-foreground mt-4">
@@ -87,9 +102,11 @@ export function TutorBookingSidebar({
             <BookingModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
+                tutorId={tutorId}
                 tutorName={tutorName}
                 pricePerHour={pricePerHour}
                 offeredSubjects={offeredSubjects}
+                onSuccess={() => window.location.reload()}
             />
         </>
     );
