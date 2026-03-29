@@ -327,7 +327,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                                 </div>
                             </div>
                             <p className="text-xs font-bold text-muted-foreground text-center">
-                                You won't be charged yet. The tutor needs to confirm the booking first.
+                                You won&apos;t be charged yet. The tutor needs to confirm the booking first.
                             </p>
                         </div>
                     )}
@@ -340,7 +340,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                             <h3 className="text-3xl font-black text-foreground">Request Sent!</h3>
                             <p className="text-sm font-bold text-muted-foreground max-w-sm">
                                 Your booking request has been successfully sent to <span className="text-foreground">{tutorName}</span>.
-                                We'll notify you once they accept.
+                                We&apos;ll notify you once they accept.
                             </p>
                         </div>
                     )}

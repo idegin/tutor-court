@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function TutorBookingsPage() {
     return (
-        <div className="flex h-full min-h-[80vh] w-full flex-col bg-background p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
+        <div className="flex h-full min-h-[80vh] w-full flex-col p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
             <TutorBookingsTable />
         </div>
     );

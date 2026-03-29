@@ -14,8 +14,8 @@ import {
     validateLogin,
 } from '@/components/auth'
 
-const NAV_LINKS = [
- 
+const NAV_LINKS: any[] = [
+
 ]
 
 const INITIAL_VALUES: LoginValues = {

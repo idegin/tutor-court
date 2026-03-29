@@ -7,7 +7,7 @@ export const Wallets: CollectionConfig = {
   },
   access: {
     read: ({ req: { user } }) => {
-      if (user?.role === 'admin') return true
+      if (user?.accountType === 'admin') return true
       return { user: { equals: user?.id } }
     },
   },

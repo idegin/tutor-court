@@ -39,5 +39,8 @@
   },
   "[css]": {
     "editor.defaultFormatter": "vscode.css-language-features"
+  },
+  "chat.tools.terminal.autoApprove": {
+    "npx tsc": true
   }
 }

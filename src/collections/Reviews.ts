@@ -1,9 +1,10 @@
-import type { CollectionConfig, CollectionAfterChangeHook, CollectionAfterDeleteHook } from 'payload'
+import type {
+  CollectionConfig,
+  CollectionAfterChangeHook,
+  CollectionAfterDeleteHook,
+} from 'payload'
 
-const updateTutorRating: CollectionAfterChangeHook | CollectionAfterDeleteHook = async ({
-  doc,
-  req,
-}) => {
+const updateTutorRating = async ({ doc, req }: { doc: any; req: any }) => {
   if (!doc?.tutor) return
 
   const tutorId = typeof doc.tutor === 'object' ? doc.tutor.id : doc.tutor
@@ -19,7 +20,7 @@ const updateTutorRating: CollectionAfterChangeHook | CollectionAfterDeleteHook =
     const totalReviews = reviews.totalDocs
     const averageRating =
       totalReviews > 0
-        ? reviews.docs.reduce((acc, r) => acc + (r.rating || 0), 0) / totalReviews
+        ? reviews.docs.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / totalReviews
         : 0
 
     await req.payload.update({
@@ -46,8 +47,8 @@ export const Reviews: CollectionConfig = {
     read: () => true,
   },
   hooks: {
-    afterChange: [updateTutorRating],
-    afterDelete: [updateTutorRating],
+    afterChange: [updateTutorRating as CollectionAfterChangeHook],
+    afterDelete: [updateTutorRating as CollectionAfterDeleteHook],
   },
   fields: [
     {
@@ -75,6 +76,11 @@ export const Reviews: CollectionConfig = {
       relationTo: 'tutor-profiles',
       required: true,
       hasMany: false,
+    },
+    {
+      name: 'tutorResponse',
+      type: 'textarea',
+      required: false,
     },
   ],
   timestamps: true,

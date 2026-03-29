@@ -21,7 +21,7 @@ export function WelcomeStep({ onNext }: WelcomeStepProps) {
             </h1>
 
             <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-                We're excited to have you join our community of elite educators. This onboarding process will take about 5 minutes to set up your profile and classroom preferences.
+                We&apos;re excited to have you join our community of elite educators. This onboarding process will take about 5 minutes to set up your profile and classroom preferences.
             </p>
 
             <ul className="space-y-4 mb-10">

@@ -50,7 +50,7 @@ export function SuccessStep({ onContinueClick }: SuccessStepProps) {
                     Your profile has been submitted successfully. We will review and approve your profile within <b>2 business days</b>.
                 </p>
                 <p className="mt-3 max-w-md text-base leading-relaxed text-muted-foreground">
-                    In the meantime, you can go ahead to your dashboard, create classes, and even host them. Your profile just won't be publicly displayed in the directory until it is approved.
+                    In the meantime, you can go ahead to your dashboard, create classes, and even host them. Your profile just won&apos;t be publicly displayed in the directory until it is approved.
                 </p>
             </div>
 

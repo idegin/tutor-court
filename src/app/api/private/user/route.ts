@@ -19,16 +19,16 @@ export async function PATCH(request: Request) {
     const photo = formData.get('photo') as File | null
 
     const payload = await getPayload({ config })
-    
+
     let avatarId = user.avatar
     if (photo && photo instanceof File && photo.size > 0) {
       const arrayBuffer = await photo.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
-      
+
       const media = await payload.create({
         collection: 'media',
         data: {
-          alt: 'Avatar'
+          alt: 'Avatar',
         },
         file: {
           data: buffer,
@@ -73,7 +73,7 @@ export async function PATCH(request: Request) {
           data: {
             user: user.id,
             isApproved: false,
-          },
+          } as any,
         })
       }
     }

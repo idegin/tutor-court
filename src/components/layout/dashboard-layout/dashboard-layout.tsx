@@ -82,7 +82,7 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
                     {user && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="relative flex items-center gap-2 h-auto px-2 py-1.5 rounded-full hover:bg-muted">
+                                <Button variant="ghost" className="border-0 relative flex items-center gap-2 h-auto px-2 py-1.5 rounded-full hover:bg-muted">
                                     <Avatar className="h-8 w-8 rounded-full border border-border">
                                         <AvatarImage src={typeof user.avatar === 'object' && user.avatar?.url ? user.avatar.url : undefined} alt={user.firstName || "User"} />
                                         <AvatarFallback className="bg-muted text-muted-foreground">{initials}</AvatarFallback>

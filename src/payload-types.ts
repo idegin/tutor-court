@@ -274,6 +274,7 @@ export interface Review {
   rating: number;
   user: string | User;
   tutor: string | TutorProfile;
+  tutorResponse?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -542,6 +543,7 @@ export interface ReviewsSelect<T extends boolean = true> {
   rating?: T;
   user?: T;
   tutor?: T;
+  tutorResponse?: T;
   updatedAt?: T;
   createdAt?: T;
 }

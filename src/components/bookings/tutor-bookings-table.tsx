@@ -51,7 +51,7 @@ const data = [
         user: {
             name: "Olivia Chen",
             email: "olivia.c@example.com",
-            avatar: "https://i.pravatar.cc/150?u=olivia",
+            avatar: "/user-placeholder.png",
             intro: "Year 12 Science student prepping for University.",
         },
         startDate: new Date("2024-04-15"),
@@ -66,7 +66,7 @@ const data = [
         user: {
             name: "Marcus Johnson",
             email: "marcus.j@example.com",
-            avatar: "https://i.pravatar.cc/150?u=marcus",
+            avatar: "/user-placeholder.png",
             intro: "Booking for my son Leo in Year 10.",
         },
         startDate: new Date("2024-04-18"),
@@ -81,7 +81,7 @@ const data = [
         user: {
             name: "Sarah Williams",
             email: "sarah.w@example.com",
-            avatar: "https://i.pravatar.cc/150?u=sarah",
+            avatar: "/user-placeholder.png",
             intro: "Daughter preparing for grammar school entry.",
         },
         startDate: new Date("2024-03-01"),
@@ -96,7 +96,7 @@ const data = [
         user: {
             name: "David Kim",
             email: "david.k@example.com",
-            avatar: "https://i.pravatar.cc/150?u=david",
+            avatar: "/user-placeholder.png",
             intro: "Undergrad struggling with Quantum Mechanics.",
         },
         startDate: new Date("2024-05-02"),
@@ -111,7 +111,7 @@ const data = [
         user: {
             name: "Emma Watson",
             email: "emma.w@example.com",
-            avatar: "https://i.pravatar.cc/150?u=emma",
+            avatar: "/user-placeholder.png",
             intro: "Need brushing up on spoken French before exams.",
         },
         startDate: new Date("2023-11-10"),
@@ -183,7 +183,7 @@ export function TutorBookingsTable() {
                 </div>
             </div>
 
-            <Card className="shadow-none border border-border rounded-xl overflow-hidden bg-card flex-1">
+            <Card className="shadow-none border border-border rounded-xl overflow-hidden bg-card flex-1 py-0">
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-muted/50 hover:bg-muted/50">
@@ -271,7 +271,7 @@ export function TutorBookingsTable() {
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
+                                                    <Button variant="ghost" className="border-0 h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted">
                                                         <span className="sr-only">Open menu</span>
                                                         <MoreHorizontal className="h-4 w-4" />
                                                     </Button>

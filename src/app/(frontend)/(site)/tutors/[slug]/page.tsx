@@ -8,6 +8,7 @@ import { getPayload } from 'payload';
 import configPromise from '@payload-config';
 import { notFound } from 'next/navigation';
 import { getServerSideUser } from '@/lib/auth';
+import { TutorReviews } from '@/components/tutors/tutor-reviews';
 
 export default async function TutorDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
@@ -83,7 +84,7 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
 
     // Fallback Mock Data for missing properties
     const rating = tutorProfile.rating || 0;
-    const reviews = tutorProfile.totalReviews || 0;
+    const totalReviews = tutorProfile.totalReviews || 0;
     const pricePerHour = tutorProfile.hourlyRate || 0;
 
     const avatarUrl = user?.avatar?.url || "/user-placeholder.png";
@@ -135,13 +136,35 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
         };
     });
 
+    // Fetch Tutor Reviews
+    const { docs: reviewDocs } = await payload.find({
+        collection: 'reviews',
+        where: { tutor: { equals: tutorProfile.id } },
+        depth: 2,
+        limit: 100,
+        sort: '-createdAt'
+    });
+
+    const reviews = reviewDocs.map((doc: any) => ({
+        id: doc.id,
+        rating: doc.rating,
+        review: doc.review,
+        createdAt: doc.createdAt,
+        tutorResponse: doc.tutorResponse,
+        user: {
+            firstName: doc.user?.firstName,
+            lastName: doc.user?.lastName,
+            avatarUrl: doc.user?.avatar?.url || null
+        }
+    }));
+
     return (
         <div className="w-full bg-background min-h-screen pb-24">
             <TutorHero
                 name={fullName}
                 title={tutorProfile.headline || 'Professional Tutor'}
                 rating={rating}
-                reviews={reviews}
+                reviews={totalReviews}
                 pricePerHour={pricePerHour}
                 imageUrl={avatarUrl}
                 coverImageUrl={coverImageUrl}
@@ -149,11 +172,17 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
             />
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12 pt-20">
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 flex flex-col gap-12">
                     <TutorAbout
                         description={description}
                         subjects={subjects}
                         videoUrl={''} // No video string in schema yet
+                    />
+
+                    <TutorReviews
+                        reviews={reviews}
+                        overallRating={rating}
+                        totalReviews={reviews.length}
                     />
                 </div>
 

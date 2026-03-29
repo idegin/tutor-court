@@ -69,7 +69,7 @@ export function SiteHeader() {
                     {user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost">
+                                <Button variant="ghost" className='border-none'>
                                     <Avatar className="h-8 w-8 rounded-full border-2 border-foreground">
                                         <AvatarImage src={typeof user.avatar === 'object' && user.avatar?.url ? user.avatar.url : undefined} alt={user.firstName || "User"} />
                                         <AvatarFallback className="bg-tutor-purple text-foreground font-bold">{initials}</AvatarFallback>

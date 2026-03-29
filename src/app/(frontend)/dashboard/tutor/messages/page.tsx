@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const currentUser: ChatUser = {
     id: 'user-1',
     name: 'Sarah Tutor',
-    avatar: 'https://i.pravatar.cc/150?u=sarah',
+    avatar: '/user-placeholder.png',
     status: 'online',
     role: 'tutor'
 };
@@ -22,7 +22,7 @@ const mockConversations: Conversation[] = [
         id: 'conv-1',
         type: 'direct',
         participants: [
-            { id: 'parent-1', name: 'John Doe', avatar: 'https://i.pravatar.cc/150?u=john', status: 'online', role: 'parent' }
+            { id: 'parent-1', name: 'John Doe', avatar: '/user-placeholder.png', status: 'online', role: 'parent' }
         ],
         lastMessage: {
             id: 'msg-1',
@@ -39,7 +39,7 @@ const mockConversations: Conversation[] = [
         id: 'conv-2',
         type: 'direct',
         participants: [
-            { id: 'parent-2', name: 'Emily Smith', avatar: 'https://i.pravatar.cc/150?u=emily', status: 'offline', role: 'parent' }
+            { id: 'parent-2', name: 'Emily Smith', avatar: '/user-placeholder.png', status: 'offline', role: 'parent' }
         ],
         lastMessage: {
             id: 'msg-2',
@@ -57,9 +57,9 @@ const mockConversations: Conversation[] = [
         type: 'group',
         name: 'Math Exam Prep Group',
         participants: [
-            { id: 'student-1', name: 'Alex Johnson', avatar: 'https://i.pravatar.cc/150?u=alex', status: 'online', role: 'student' },
-            { id: 'student-2', name: 'Bella Swift', avatar: 'https://i.pravatar.cc/150?u=bella', status: 'away', role: 'student' },
-            { id: 'student-3', name: 'Chris Lee', avatar: '', status: 'offline', role: 'student' }
+            { id: 'student-1', name: 'Alex Johnson', avatar: '/user-placeholder.png', status: 'online', role: 'student' },
+            { id: 'student-2', name: 'Bella Swift', avatar: '/user-placeholder.png', status: 'away', role: 'student' },
+            { id: 'student-3', name: 'Chris Lee', avatar: '/user-placeholder.png', status: 'offline', role: 'student' }
         ],
         lastMessage: {
             id: 'msg-4',
@@ -77,7 +77,7 @@ const mockConversations: Conversation[] = [
         type: 'channel',
         name: 'Announcements',
         participants: [
-            { id: 'admin-1', name: 'Admin', avatar: '', status: 'online', role: 'admin' }
+            { id: 'admin-1', name: 'Admin', avatar: '/user-placeholder.png', status: 'online', role: 'admin' }
         ],
         lastMessage: {
             id: 'msg-5',
@@ -94,7 +94,7 @@ const mockConversations: Conversation[] = [
         id: 'conv-3',
         type: 'direct',
         participants: [
-            { id: 'parent-3', name: 'Michael Johnson', avatar: '', status: 'offline', role: 'parent' }
+            { id: 'parent-3', name: 'Michael Johnson', avatar: '/user-placeholder.png', status: 'offline', role: 'parent' }
         ],
         lastMessage: {
             id: 'msg-3',
@@ -213,7 +213,7 @@ const mockMessages: Record<string, Message[]> = {
 export default function TutorMessagesPage() {
     return (
         <div className="flex h-[calc(100vh-64px)] w-full flex-col">
-            <ChatLayout 
+            <ChatLayout
                 currentUser={currentUser}
                 initialConversations={mockConversations}
                 initialMessages={mockMessages}

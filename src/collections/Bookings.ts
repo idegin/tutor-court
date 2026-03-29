@@ -8,14 +8,11 @@ export const Bookings: CollectionConfig = {
   },
   access: {
     read: ({ req: { user } }) => {
-      if (!user) return false;
-      if (user?.roles?.includes('admin')) return true;
+      if (!user) return false
+      if (user?.accountType === 'admin') return true
       return {
-        or: [
-          { student: { equals: user?.id } },
-          { 'tutor.user': { equals: user?.id } }
-        ]
-      }
+        or: [{ student: { equals: user?.id } }, { 'tutor.user': { equals: user?.id } }],
+      } as any
     },
   },
   fields: [
@@ -99,8 +96,8 @@ export const Bookings: CollectionConfig = {
           name: 'subject',
           type: 'text',
           required: true,
-        }
-      ]
+        },
+      ],
     },
     {
       name: 'price',

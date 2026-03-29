@@ -18,3 +18,19 @@ TutorCourt is a tutor search engine. TutorCourt is a platform designed for onlin
 # Copilot Chat
 #codebase #web #search  short answer, browse the web if needed, use shadcn components. Just do whatever you feel is best. The UI should be very beautiful with no gradient and shadows. NOTE: update the files directly, don't use the terminal to update the files. Make sure what you are implementing is production ready. Don't use hardcoded colors, use the colors in the global.css file ex bg-primary bg-tutor-purple-500 bg-foreground text-tutor-red-500 border-foreground and other colors and variants in the global.css.
 
+
+# Calendar and booking
+## Parent
+- How many weeks. For start and end duration.
+- How many hours per day
+- The days they want the session ()
+- Then they select an hour for each day that the class will hold Ex 2:30PM
+
+# Billing
+- Coins
+- Wallet
+- Quota
+
+# Tracking
+- Process => Assessments
+- 

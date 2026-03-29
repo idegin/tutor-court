@@ -18,9 +18,9 @@ export const Users: CollectionConfig = {
           <div class="btn-container">
             <a href="${url}" class="btn">Verify My Email</a>
           </div>
-        `;
+        `
         return getBaseEmailLayout('Verify Your Email', content)
-      }
+      },
     },
     forgotPassword: {
       generateEmailHTML: (args) => {
@@ -32,10 +32,10 @@ export const Users: CollectionConfig = {
           <div class="btn-container">
             <a href="${url}" class="btn">Reset Password</a>
           </div>
-        `;
+        `
         return getBaseEmailLayout('Reset Your Password', content)
-      }
-    }
+      },
+    },
   },
   access: {
     create: () => true, // Allow public signup
@@ -50,7 +50,7 @@ export const Users: CollectionConfig = {
           data.password = data.password.trim()
         }
         return data
-      }
+      },
     ],
     afterChange: [
       async ({ doc, operation, req }) => {
@@ -60,7 +60,7 @@ export const Users: CollectionConfig = {
             data: {
               user: doc.id,
               isApproved: false,
-            },
+            } as any,
             req,
           })
         }

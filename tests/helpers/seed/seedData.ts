@@ -6,7 +6,15 @@ export async function seedData() {
   const payload = await getPayload({ config: configPromise })
 
   console.log('Clearing database...')
-  const collections = ['reviews', 'bookings', 'transactions', 'wallets', 'tutor-profiles', 'users', 'subjects'] as const
+  const collections = [
+    'reviews',
+    'bookings',
+    'transactions',
+    'wallets',
+    'tutor-profiles',
+    'users',
+    'subjects',
+  ] as const
   for (const collection of collections) {
     try {
       await payload.delete({ collection: collection, where: { id: { exists: true } } })
@@ -32,8 +40,16 @@ export async function seedData() {
 
   console.log('Seeding subjects...')
   const subjectsData = [
-    'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Computer Science', 
-    'English', 'History', 'Geography', 'Economics', 'Art'
+    'Mathematics',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Computer Science',
+    'English',
+    'History',
+    'Geography',
+    'Economics',
+    'Art',
   ]
   const subjects = []
 
@@ -75,10 +91,10 @@ export async function seedData() {
       const existingProfile = await payload.find({
         collection: 'tutor-profiles',
         where: { user: { equals: user.id } },
-        limit: 1
+        limit: 1,
       })
-      
-      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })                                                                     
+
+      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
       const profileData = {
         headline: faker.person.jobTitle(),
         bio: faker.lorem.paragraphs(5, '\n\n'),
@@ -91,24 +107,26 @@ export async function seedData() {
       }
 
       if (existingProfile.docs.length === 0) {
+        // @ts-ignore
         await payload.create({
           collection: 'tutor-profiles',
           data: {
             user: user.id,
-            ...profileData
-          },
+            ...profileData,
+          } as any,
         })
       } else {
+        // @ts-ignore
         await payload.update({
           collection: 'tutor-profiles',
           id: existingProfile.docs[0].id,
-          data: profileData,
+          data: profileData as any,
         })
       }
     } else {
       createdStudents.push(user)
     }
-    
+
     await payload.create({
       collection: 'wallets',
       data: {
@@ -117,56 +135,57 @@ export async function seedData() {
         balance: faker.number.int({ min: 100, max: 5000 }),
       },
     })
-    
+
     for (let j = 0; j < 3; j++) {
-       await payload.create({
-          collection: 'transactions',
-          data: {
-            sender: user.id,
-            receiver: user.id,
-            tutor: isTutor ? user.id : null,
-            amount: faker.number.int({ min: 10, max: 500 }),
-            currency: isTutor ? 'usd' : 'ngn',
-            status: faker.helpers.arrayElement(['paid', 'pending']),
-          },
-       })
+      await payload.create({
+        collection: 'transactions',
+        data: {
+          sender: user.id,
+          receiver: user.id,
+          tutor: isTutor ? user.id : null,
+          amount: faker.number.int({ min: 10, max: 500 }),
+          currency: isTutor ? 'usd' : 'ngn',
+          status: faker.helpers.arrayElement(['paid', 'pending']),
+        },
+      })
     }
   }
 
   console.log('Seeding reviews and bookings...')
-  const allTutors = await payload.find({ collection: 'tutor-profiles', limit: 100 })                                                                  
-  const allSubjects = await payload.find({ collection: 'subjects', limit: 100 })                                                                    
-  
+  const allTutors = await payload.find({ collection: 'tutor-profiles', limit: 100 })
+  const allSubjects = await payload.find({ collection: 'subjects', limit: 100 })
+
   for (const tutor of allTutors.docs) {
     // Generate bookings
     for (let i = 0; i < faker.number.int({ min: 1, max: 5 }); i++) {
-       const student = faker.helpers.arrayElement(createdStudents)
+      const student = faker.helpers.arrayElement(createdStudents)
 
-       const startDate = faker.date.recent()
-       const endDate = faker.date.future()
+      const startDate = faker.date.recent()
+      const endDate = faker.date.future()
 
-       await payload.create({
-         collection: 'bookings',
-         data: {
-           tutor: tutor.id,
-           student: student.id,
-           status: faker.helpers.arrayElement(['pending', 'confirmed', 'completed', 'cancelled']),
-           date: startDate.toISOString(),
-           endDate: endDate.toISOString(),
-           hoursPerDay: faker.number.int({ min: 1, max: 4 }),
-           daysOfWeek: faker.helpers.arrayElements(['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], { min: 1, max: 3 }),
-           subjects: [
-             { subject: faker.helpers.arrayElement(allSubjects.docs).name }
-           ],
-           price: faker.number.int({ min: 5000, max: 200000 }),
-           message: faker.lorem.sentences(2)
-         }
-       })
+      await payload.create({
+        collection: 'bookings',
+        data: {
+          tutor: tutor.id,
+          student: student.id,
+          status: faker.helpers.arrayElement(['pending', 'confirmed', 'completed', 'cancelled']),
+          date: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          hoursPerDay: faker.number.int({ min: 1, max: 4 }),
+          daysOfWeek: faker.helpers.arrayElements(
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            { min: 1, max: 3 },
+          ),
+          subjects: [{ subject: faker.helpers.arrayElement(allSubjects.docs).name }],
+          price: faker.number.int({ min: 5000, max: 200000 }),
+          message: faker.lorem.sentences(2),
+        },
+      })
     }
 
     // Generate reviews
     const numReviews = faker.number.int({ min: 2, max: 8 })
-    
+
     for (let i = 0; i < numReviews; i++) {
       const student = faker.helpers.arrayElement(createdStudents)
       const rating = faker.number.int({ min: 3, max: 5 })
@@ -177,8 +196,8 @@ export async function seedData() {
           review: faker.lorem.paragraph(),
           rating,
           user: student.id,
-          tutor: tutor.id
-        }
+          tutor: tutor.id,
+        },
       })
     }
   }

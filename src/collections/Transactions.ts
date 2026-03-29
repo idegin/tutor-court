@@ -8,14 +8,14 @@ export const Transactions: CollectionConfig = {
   access: {
     read: ({ req: { user } }) => {
       // Basic access control
-      if (user?.role === 'admin') return true
+      if (user?.accountType === 'admin') return true
       return {
         or: [
           { sender: { equals: user?.id } },
           { receiver: { equals: user?.id } },
           { tutor: { equals: user?.id } },
         ],
-      }
+      } as any
     },
   },
   fields: [
