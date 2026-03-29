@@ -46,7 +46,7 @@ export function SiteHeader() {
                             Home
                         </Link>
                         <Link
-                            href="/find-tutors"
+                            href="/search"
                             className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/find-tutors')
                                 ? 'border-b-2 border-foreground text-foreground'
                                 : 'text-muted-foreground hover:text-foreground'
@@ -62,6 +62,24 @@ export function SiteHeader() {
                                 }`}
                         >
                             For Parents
+                        </Link>
+                        <Link
+                            href="/for-tutors"
+                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/for-parents')
+                                ? 'border-b-2 border-foreground text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            For Tutors
+                        </Link>
+                        <Link
+                            href="/subjects"
+                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/for-parents')
+                                ? 'border-b-2 border-foreground text-foreground'
+                                : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            Subjects
                         </Link>
                     </nav>
                 </div>

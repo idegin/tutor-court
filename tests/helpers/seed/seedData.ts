@@ -70,7 +70,18 @@ export async function seedData() {
     const isTutor = i >= 10
     const firstName = faker.person.firstName()
     const lastName = faker.person.lastName()
-    const email = `${Date.now()}_${faker.internet.email({ firstName, lastName, provider: 'example.com' })}`
+
+    let email = `${Date.now()}_${faker.internet.email({ firstName, lastName, provider: 'example.com' })}`
+    let accountType: 'tutor' | 'student' | 'parent' | 'admin' = isTutor ? 'tutor' : 'student'
+
+    // Inject test accounts
+    if (i === 0) {
+      email = 'chukwuemekaifeora@gmail.com'
+      accountType = 'parent'
+    } else if (i === 10) {
+      email = 'ideginmedia@gmail.com'
+      accountType = 'tutor'
+    }
 
     const user = await payload.create({
       collection: 'users',
@@ -80,7 +91,7 @@ export async function seedData() {
         firstName,
         lastName,
         phoneNumber: faker.phone.number(),
-        accountType: isTutor ? 'tutor' : 'student',
+        accountType,
         _verified: true,
       },
       disableVerificationEmail: true,
@@ -100,6 +111,7 @@ export async function seedData() {
         bio: faker.lorem.paragraphs(5, '\n\n'),
         yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
         mode: faker.helpers.arrayElement(['online', 'hybrid']),
+        type: faker.helpers.arrayElements(['one-on-one', 'group'], { min: 1, max: 2 }),
         subjects: tutorSubjects,
         hourlyRate: faker.number.int({ min: 500, max: 50000 }),
         isApproved: true,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
 import { Suspense } from 'react'
@@ -13,6 +13,7 @@ import {
     type LoginValues,
     validateLogin,
 } from '@/components/auth'
+import { useRouter } from 'next13-progressbar'
 
 const NAV_LINKS: any[] = [
 
@@ -50,7 +51,13 @@ function LoginContent() {
         onSettled: () => setIsSubmitting(false),
         onSuccess: (data) => {
             const redirectParam = searchParams.get('redirect')
-            if (redirectParam) {
+            const localRedirect = typeof window !== 'undefined' ? localStorage.getItem('post_login_redirect') : null
+
+            if (localRedirect) {
+                localStorage.removeItem('post_login_redirect')
+                router.push(localRedirect)
+                router.refresh()
+            } else if (redirectParam) {
                 router.push(redirectParam)
                 router.refresh()
             } else {

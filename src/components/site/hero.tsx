@@ -5,6 +5,7 @@ import { HiMagnifyingGlass } from 'react-icons/hi2'
 import { useOptions } from '@/components/providers/options-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next13-progressbar'
 
@@ -133,41 +134,43 @@ export function SiteHero() {
                                     onFocus={() => setIsOpen(true)}
                                     onChange={(event) => handleInputChange(event.target.value)}
                                     placeholder="Search subject, e.g. Mathematics"
-                                    className="h-14 rounded-2xl border-0 bg-none bg-transparent px-5 text-base font-semibold text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/20"
+                                    className="h-14 rounded-2xl border-0 bg-none bg-transparent px-5 text-base font-semibold text-foreground placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-primary/0 focus-visible:ring-0 focus-visible:outline-none"
                                     aria-label="Search subject"
                                 />
 
                                 {isOpen && (
-                                    <div className="absolute top-[calc(100%+0.5rem)] left-0 right-0 rounded-2xl border-2 border-foreground bg-card p-2 max-h-72 overflow-y-auto z-50">
-                                        {filteredSubjects.length === 0 ? (
-                                            <div className="px-3 py-3 text-sm font-medium text-muted-foreground">
-                                                No matching subjects found
-                                            </div>
-                                        ) : (
-                                            <ul className="space-y-1">
-                                                {filteredSubjects.map((subject) => {
-                                                    const isSelected = selectedSubjectId === subject.id
+                                    <div className="absolute top-[calc(100%+0.5rem)] left-0 right-0 z-50">
+                                        <ScrollArea className="w-full rounded-2xl border-2 border-foreground bg-card p-2 h-72 shadow-xl [&_[data-slot=scroll-area-viewport]]:focus-visible:ring-0 [&_[data-slot=scroll-area-viewport]]:focus-visible:outline-none">
+                                            {filteredSubjects.length === 0 ? (
+                                                <div className="px-3 py-3 text-sm font-medium text-muted-foreground">
+                                                    No matching subjects found
+                                                </div>
+                                            ) : (
+                                                <ul className="space-y-1">
+                                                    {filteredSubjects.map((subject) => {
+                                                        const isSelected = selectedSubjectId === subject.id
 
-                                                    return (
-                                                        <li key={subject.id}>
-                                                            <button
-                                                                type="button"
-                                                                onMouseDown={(event) => event.preventDefault()}
-                                                                onClick={() => handleSubjectSelect(subject)}
-                                                                className={cn(
-                                                                    'w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors',
-                                                                    isSelected
-                                                                        ? 'bg-primary text-primary-foreground'
-                                                                        : 'text-foreground hover:bg-muted',
-                                                                )}
-                                                            >
-                                                                {subject.name}
-                                                            </button>
-                                                        </li>
-                                                    )
-                                                })}
-                                            </ul>
-                                        )}
+                                                        return (
+                                                            <li key={subject.id}>
+                                                                <button
+                                                                    type="button"
+                                                                    onMouseDown={(event) => event.preventDefault()}
+                                                                    onClick={() => handleSubjectSelect(subject)}
+                                                                    className={cn(
+                                                                        'w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors',
+                                                                        isSelected
+                                                                            ? 'bg-primary text-primary-foreground'
+                                                                            : 'text-foreground hover:bg-muted',
+                                                                    )}
+                                                                >
+                                                                    {subject.name}
+                                                                </button>
+                                                            </li>
+                                                        )
+                                                    })}
+                                                </ul>
+                                            )}
+                                        </ScrollArea>
                                     </div>
                                 )}
                             </div>

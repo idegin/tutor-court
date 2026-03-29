@@ -6,6 +6,8 @@ import { HiCheckBadge } from 'react-icons/hi2';
 import { Button } from '../ui/button';
 
 import Link from 'next/link';
+import { useAuth } from '../providers/auth-provider';
+import { useRouter, usePathname } from 'next/navigation';
 
 export interface TutorBookingSidebarProps {
     tutorId: string;
@@ -33,6 +35,18 @@ export function TutorBookingSidebar({
     hasActiveBooking = false
 }: TutorBookingSidebarProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const { user } = useAuth();
+    const router = useRouter();
+    const pathname = usePathname();
+
+    const handleBookClick = () => {
+        if (!user) {
+            localStorage.setItem('post_login_redirect', pathname);
+            router.push('/auth/register');
+        } else {
+            setIsModalOpen(true);
+        }
+    };
 
     return (
         <>
@@ -85,7 +99,7 @@ export function TutorBookingSidebar({
                             </Link>
                         ) : (
                             <Button
-                                onClick={() => setIsModalOpen(true)}
+                                onClick={handleBookClick}
                                 className="w-full bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
                             >
                                 Book This Tutor

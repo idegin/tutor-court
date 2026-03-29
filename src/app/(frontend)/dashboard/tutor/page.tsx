@@ -4,29 +4,33 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-    HiOutlineUsers, 
-    HiOutlineCalendarDays, 
-    HiOutlineDocumentCheck, 
+import {
+    HiOutlineUsers,
+    HiOutlineCalendarDays,
+    HiOutlineDocumentCheck,
     HiOutlineCheckBadge,
     HiOutlineBellAlert,
     HiOutlineClock,
     HiOutlinePlay,
     HiOutlineArrowRight,
-    HiOutlineExclamationCircle
+    HiOutlineExclamationCircle,
+    HiOutlineInformationCircle
 } from 'react-icons/hi2';
 import { ScoreChart } from './score-chart';
+import { getServerSideUser } from '@/lib/auth';
 
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table"
 
-export default function TutorOverviewPage() {
+export default async function TutorOverviewPage() {
+    const { tutorProfile } = await getServerSideUser();
+
     return (
         <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto pb-10 p-4 md:p-6 lg:p-8">
             {/* Header */}
@@ -34,6 +38,28 @@ export default function TutorOverviewPage() {
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back, Tutor</h1>
                 <p className="text-muted-foreground mt-1">Here is a summary of your students and upcoming classes.</p>
             </div>
+
+            {/* Profile Completion Banner */}
+            {tutorProfile && !tutorProfile.onboardingCompleted && (
+                <div className="bg-tutor-purple-100 border-2 border-foreground rounded p-6 flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+                    <div className="flex items-start gap-4">
+                        <div className="h-12 w-12 shrink-0 rounded-full border-2 border-foreground bg-white flex items-center justify-center text-tutor-purple-600">
+                            <HiOutlineInformationCircle className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black text-foreground uppercase tracking-tight">Complete Your Tutor Profile</h3>
+                            <p className="text-sm font-medium text-foreground/80 mt-1 max-w-xl">
+                                Your profile is missing some important details. Completing your profile helps students find you and book your classes more easily.
+                            </p>
+                        </div>
+                    </div>
+                    <Button asChild className="shrink-0 bg-tutor-red-500 hover:bg-tutor-red-600 text-white border-2 border-foreground font-bold shadow-none rounded">
+                        <Link href="/tutor-onboarding">
+                            Complete Profile Now
+                        </Link>
+                    </Button>
+                </div>
+            )}
 
             {/* Stats Overview */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -144,7 +170,7 @@ export default function TutorOverviewPage() {
                 <Card className="col-span-1 shadow-none border-border">
                     <CardHeader>
                         <CardTitle className="flex items-center">
-                            <HiOutlineBellAlert className="mr-2 h-5 w-5 text-muted-foreground" /> 
+                            <HiOutlineBellAlert className="mr-2 h-5 w-5 text-muted-foreground" />
                             Action Needed
                         </CardTitle>
                         <CardDescription>Important alerts and notifications</CardDescription>
@@ -275,12 +301,12 @@ export default function TutorOverviewPage() {
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <span className="w-8 text-sm">{student.score}%</span>
-                                                <Progress value={student.score} className="h-1.5 w-[60px]" 
+                                                <Progress value={student.score} className="h-1.5 w-[60px]"
                                                     indicatorClassName={
-                                                        student.score >= 90 ? 'bg-emerald-500' : 
-                                                        student.score >= 80 ? 'bg-blue-500' : 
-                                                        student.score >= 70 ? 'bg-orange-500' : 'bg-red-500'
-                                                    } 
+                                                        student.score >= 90 ? 'bg-emerald-500' :
+                                                            student.score >= 80 ? 'bg-blue-500' :
+                                                                student.score >= 70 ? 'bg-orange-500' : 'bg-red-500'
+                                                    }
                                                 />
                                             </div>
                                         </TableCell>

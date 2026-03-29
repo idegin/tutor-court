@@ -4,6 +4,7 @@ import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
+import { s3Storage } from '@payloadcms/storage-s3'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import nodemailer from 'nodemailer'
 
@@ -50,5 +51,20 @@ export default buildConfig({
     url: process.env.DATABASE_URL || '',
   }),
   sharp,
-  plugins: [],
+  plugins: [
+    s3Storage({
+      collections: {
+        media: true,
+      },
+      bucket: 'tutor-court',
+      config: {
+        credentials: {
+          accessKeyId: process.env.TIGRIS_STORAGE_ACCESS_KEY_ID || '',
+          secretAccessKey: process.env.TIGRIS_STORAGE_SECRET_ACCESS_KEY || '',
+        },
+        region: 'auto',
+        endpoint: 'https://fly.storage.tigris.dev',
+      },
+    }),
+  ],
 })

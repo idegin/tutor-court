@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { HiOutlineBars3, HiXMark, HiOutlineChevronLeft, HiOutlineChevronRight } from 'react-icons/hi2';
 import { useAuth } from '@/components/providers/auth-provider';
+import { InviteParent } from './invite-parent';
 
 export interface NavItem {
     name: string;
@@ -79,6 +80,9 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {user?.accountType === 'tutor' && (
+                        <InviteParent tutorId={String(user.id)} />
+                    )}
                     {user && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
