@@ -14,7 +14,7 @@ export function SettingsContainer({ user, tutorProfile }: SettingsContainerProps
     return (
         <div className="w-full">
             <Tabs defaultValue="profile" className="w-full">
-                {/* Horizontal scrollable bottom border tabs */}
+
                 <div className="w-full overflow-x-auto border-b border-border pb-0 mb-8 hide-scrollbar">
                     <TabsList className="flex h-auto w-max items-center justify-start gap-6 bg-transparent p-0 mb-[-1px]">
                         <TabsTrigger
