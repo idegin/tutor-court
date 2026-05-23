@@ -82,10 +82,65 @@ export const Users: CollectionConfig = {
               user: doc.id,
               currency: 'ngn',
               balance: 0,
-              coinBalance: 0,
+              creditBalance: 0,
             } as any,
             req,
           })
+        }
+
+        // Auto-accept pending class invitations for this user email
+        try {
+          const invitations = await req.payload.find({
+            collection: 'class-invitations',
+            where: {
+              and: [
+                { inviteeEmail: { equals: doc.email } },
+                { status: { equals: 'pending' } },
+              ],
+            },
+            depth: 0,
+            req,
+          })
+
+          for (const invitation of invitations.docs) {
+            const classId = typeof invitation.class === 'object' ? invitation.class?.id : invitation.class
+            if (!classId) continue
+
+            const cls = await req.payload.findByID({
+              collection: 'classes',
+              id: classId,
+              depth: 0,
+              req,
+            })
+
+            if (cls) {
+              const fieldKey = invitation.inviteeType === 'student' ? 'students' : 'parents'
+              const existingIds = (cls[fieldKey] || []).map((u: any) => typeof u === 'object' ? u.id : u)
+              
+              if (!existingIds.includes(doc.id)) {
+                await req.payload.update({
+                  collection: 'classes',
+                  id: classId,
+                  data: {
+                    [fieldKey]: [...existingIds, doc.id],
+                  } as any,
+                  req,
+                })
+              }
+
+              await req.payload.update({
+                collection: 'class-invitations',
+                id: invitation.id,
+                data: {
+                  status: 'accepted',
+                  acceptedBy: doc.id,
+                } as any,
+                req,
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error auto-accepting class invitations in afterChange hook:', error)
         }
       },
     ],
@@ -147,7 +202,8 @@ export const Users: CollectionConfig = {
       type: 'checkbox',
       defaultValue: false,
       admin: {
-        description: 'True for child accounts created by a parent (auto-generated email and password).',
+        description:
+          'True for child accounts created by a parent (auto-generated email and password).',
       },
     },
     {

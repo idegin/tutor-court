@@ -35,7 +35,8 @@ import {
     HiPlus,
     HiOutlineCalendar,
     HiOutlineClock,
-    HiOutlineEllipsisHorizontal
+    HiOutlineEllipsisHorizontal,
+    HiOutlinePencil
 } from "react-icons/hi2";
 import {
     DropdownMenu,
@@ -64,12 +65,11 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
     const [isLoading, setIsLoading] = useState(false);
 
     // Form states
+    const [editingClassId, setEditingClassId] = useState<string | null>(null);
     const [subject, setSubject] = useState('');
     const [description, setDescription] = useState('');
     const [classType, setClassType] = useState('one-on-one');
     const [maxStudents, setMaxStudents] = useState('1');
-    const [inviteeEmail, setInviteeEmail] = useState('');
-    const [inviteeType, setInviteeType] = useState('parent');
     const [startDate, setStartDate] = useState<Date>();
     const [endDate, setEndDate] = useState<Date>();
 
@@ -98,12 +98,11 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
     };
 
     const resetForm = () => {
+        setEditingClassId(null);
         setSubject('');
         setDescription('');
         setClassType('one-on-one');
         setMaxStudents('1');
-        setInviteeEmail('');
-        setInviteeType('parent');
         setStartDate(undefined);
         setEndDate(undefined);
         setScheduleState({
@@ -117,7 +116,52 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
         });
     };
 
-    const handleCreateClass = async (e: React.FormEvent) => {
+    const openEditClass = (cls: any) => {
+        setEditingClassId(cls.id);
+        setSubject(typeof cls.subject === 'object' ? cls.subject.id : cls.subject);
+        setDescription(cls.description || '');
+        setClassType(cls.classType || 'one-on-one');
+        setMaxStudents(String(cls.maxStudents || 1));
+        setStartDate(new Date(cls.startDate));
+        setEndDate(new Date(cls.endDate));
+        
+        // Reset schedule state
+        const newSchedule = {
+            sun: { checked: false, startTime: '09:00', endTime: '10:00' },
+            mon: { checked: false, startTime: '09:00', endTime: '10:00' },
+            tue: { checked: false, startTime: '09:00', endTime: '10:00' },
+            wed: { checked: false, startTime: '09:00', endTime: '10:00' },
+            thu: { checked: false, startTime: '09:00', endTime: '10:00' },
+            fri: { checked: false, startTime: '09:00', endTime: '10:00' },
+            sat: { checked: false, startTime: '09:00', endTime: '10:00' },
+        };
+        
+        if (cls.schedule && Array.isArray(cls.schedule)) {
+            cls.schedule.forEach((s: any) => {
+                const dayIdMap: Record<string, string> = {
+                    sunday: 'sun',
+                    monday: 'mon',
+                    tuesday: 'tue',
+                    wednesday: 'wed',
+                    thursday: 'thu',
+                    friday: 'fri',
+                    saturday: 'sat'
+                };
+                const key = dayIdMap[s.day.toLowerCase()];
+                if (key) {
+                    newSchedule[key as keyof typeof newSchedule] = {
+                        checked: true,
+                        startTime: s.startTime,
+                        endTime: s.endTime
+                    };
+                }
+            });
+        }
+        setScheduleState(newSchedule);
+        setIsOpen(true);
+    };
+
+    const handleSubmitClass = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!subject || !startDate || !endDate) {
             toast.error('Please fill in all required fields.');
@@ -142,8 +186,11 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
 
         setIsLoading(true);
         try {
-            const res = await fetch('/api/tutor/classes', {
-                method: 'POST',
+            const url = editingClassId ? `/api/tutor/classes/${editingClassId}` : '/api/tutor/classes';
+            const method = editingClassId ? 'PATCH' : 'POST';
+            
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     subject,
@@ -153,17 +200,15 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     startDate: startDate.toISOString(),
                     endDate: endDate.toISOString(),
                     schedule,
-                    inviteeEmail: inviteeEmail.trim() || undefined,
-                    inviteeType: inviteeEmail.trim() ? inviteeType : undefined,
                 })
             });
 
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to create class.');
+                throw new Error(data.error || `Failed to ${editingClassId ? 'update' : 'create'} class.`);
             }
 
-            toast.success('Class created successfully!');
+            toast.success(`Class ${editingClassId ? 'updated' : 'created'} successfully!`);
             setIsOpen(false);
             resetForm();
             router.refresh();
@@ -189,20 +234,27 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     <p className="text-muted-foreground mt-1">Manage your active and upcoming classes, schedules, and students.</p>
                 </div>
 
-                <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                    <SheetTrigger asChild>
-                        <Button className="shrink-0 bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-medium rounded-lg cursor-pointer">
-                            <HiPlus className="mr-2 h-4 w-4" /> Create New Class
-                        </Button>
-                    </SheetTrigger>
+                <Sheet open={isOpen} onOpenChange={(open) => {
+                    setIsOpen(open);
+                    if (!open) resetForm();
+                }}>
+                    <Button 
+                        onClick={() => {
+                            resetForm();
+                            setIsOpen(true);
+                        }}
+                        className="shrink-0 bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-medium rounded-lg cursor-pointer"
+                    >
+                        <HiPlus className="mr-2 h-4 w-4" /> Create New Class
+                    </Button>
                     <SheetContent className="overflow-y-auto grid grid-cols-1 w-full sm:max-w-[45rem] [&[data-side=right]]:sm:max-w-[45rem]">
                         <SheetHeader>
-                            <SheetTitle>Create New Class</SheetTitle>
+                            <SheetTitle>{editingClassId ? 'Edit Class' : 'Create New Class'}</SheetTitle>
                             <SheetDescription>
-                                Set up a new class session. Add subject, students, type, and define the weekly schedule.
+                                {editingClassId ? 'Update class details, schedule, and metadata.' : 'Set up a new class session. Add subject, type, and define the weekly schedule.'}
                             </SheetDescription>
                         </SheetHeader>
-                        <form onSubmit={handleCreateClass} className="grid gap-6 py-6 grid-cols-1 px-4">
+                        <form onSubmit={handleSubmitClass} className="grid gap-6 py-6 grid-cols-1 px-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="subject">Subject</Label>
                                 <Select value={subject} onValueChange={setSubject}>
@@ -254,30 +306,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="grid gap-2 md:col-span-2">
-                                    <Label htmlFor="inviteeEmail">Invite Student/Parent by Email (Optional)</Label>
-                                    <Input
-                                        id="inviteeEmail"
-                                        type="email"
-                                        value={inviteeEmail}
-                                        onChange={(e) => setInviteeEmail(e.target.value)}
-                                        placeholder="email@example.com"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>Invitee Role</Label>
-                                    <Select value={inviteeType} onValueChange={setInviteeType} disabled={!inviteeEmail}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select role" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="parent">Parent</SelectItem>
-                                            <SelectItem value="student">Student</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2 flex-col">
@@ -410,7 +439,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                             {cls.classType.replace('-', ' ')}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <TableCell>
                                         {cls.students && cls.students.length > 0 ? (
                                             <div className="flex items-center gap-2">
                                                 <div className="flex -space-x-2 overflow-hidden">
@@ -433,7 +462,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                             <span className="text-xs text-muted-foreground italic">No students yet</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                                    <TableCell className="hidden md:table-cell">
                                         {cls.parents && cls.parents.length > 0 ? (
                                             <span className="text-sm">
                                                 {cls.parents.map((p: any) => `${p.firstName} ${p.lastName}`).join(', ')}
@@ -456,21 +485,36 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size='icon' className="h-8 w-8 p-0 border-0">
-                                                    <span className="sr-only">Open menu</span>
-                                                    <HiOutlineEllipsisHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/tutor/classes/${cls.id}`)}>
-                                                    View details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem>Message students</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="flex items-center justify-end gap-1.5">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => openEditClass(cls)}
+                                                className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border border-border/50"
+                                                title="Edit Class"
+                                            >
+                                                <HiOutlinePencil className="h-4 w-4" />
+                                                <span className="sr-only">Edit Class</span>
+                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size='icon' className="h-8 w-8 p-0 border-0 cursor-pointer">
+                                                        <span className="sr-only">Open menu</span>
+                                                        <HiOutlineEllipsisHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => router.push(`/dashboard/tutor/classes/${cls.id}`)}>
+                                                        View details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => openEditClass(cls)}>
+                                                        Edit details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem>Message students</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))

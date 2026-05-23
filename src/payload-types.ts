@@ -310,7 +310,7 @@ export interface Wallet {
   user: string | User;
   currency: 'ngn' | 'usd';
   balance: number;
-  coinBalance: number;
+  creditBalance: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -745,7 +745,7 @@ export interface WalletsSelect<T extends boolean = true> {
   user?: T;
   currency?: T;
   balance?: T;
-  coinBalance?: T;
+  creditBalance?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -285,15 +285,15 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 border rounded-xl overflow-hidden shadow-sm relative">
+        <div className="flex flex-col h-full bg-background border border-border rounded-xl overflow-hidden shadow-sm relative">
             {/* Top Toolbar */}
-            <div className="bg-white border-b px-4 py-2.5 flex items-center justify-between gap-4 z-10 shrink-0">
+            <div className="bg-background border-b border-border px-4 py-2.5 flex items-center justify-between gap-4 z-10 shrink-0">
                 <div className="flex items-center gap-1.5">
                     <Button
                         size="icon"
                         variant={tool === 'pen' ? 'default' : 'outline'}
                         onClick={() => setTool('pen')}
-                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'pen' ? 'bg-tutor-purple-600 hover:bg-tutor-purple-700' : ''}`}
+                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'pen' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
                         title="Pen Tool"
                     >
                         <HiOutlinePencil className="h-4.5 w-4.5" />
@@ -302,7 +302,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
                         size="icon"
                         variant={tool === 'eraser' ? 'default' : 'outline'}
                         onClick={() => setTool('eraser')}
-                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'eraser' ? 'bg-slate-800 hover:bg-slate-900 text-white' : ''}`}
+                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'eraser' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
                         title="Eraser Tool"
                     >
                         <HiOutlineSparkles className="h-4.5 w-4.5" />
@@ -311,7 +311,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
                         size="icon"
                         variant="outline"
                         onClick={handleClear}
-                        className="h-8 w-8 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 border-red-100 cursor-pointer"
+                        className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 border-destructive/20 cursor-pointer"
                         title="Clear Slide"
                     >
                         <HiOutlineTrash className="h-4.5 w-4.5" />
@@ -320,12 +320,12 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
 
                 {/* Color Palette */}
                 {tool === 'pen' && (
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                    <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
                         {['#000000', '#ea4335', '#0f9d58', '#4285f4', '#ab47bc'].map(c => (
                             <button
                                 key={c}
                                 onClick={() => setColor(c)}
-                                className={`w-6 h-6 rounded-full border border-white/50 cursor-pointer transition-transform ${color === c ? 'scale-115 ring-2 ring-tutor-purple-500' : 'hover:scale-105'}`}
+                                className={`w-6 h-6 rounded-full border border-white/50 cursor-pointer transition-transform ${color === c ? 'scale-115 ring-2 ring-secondary' : 'hover:scale-105'}`}
                                 style={{ backgroundColor: c }}
                             />
                         ))}
@@ -339,11 +339,11 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
                         variant="outline"
                         disabled={currentSlideIndex === 0}
                         onClick={handlePrevSlide}
-                        className="h-8 w-8 rounded-lg cursor-pointer"
+                        className="h-8 w-8 rounded-lg cursor-pointer border-border text-foreground"
                     >
                         <HiOutlineChevronLeft className="h-4 w-4" />
                     </Button>
-                    <span className="text-xs font-semibold px-2 text-slate-700">
+                    <span className="text-xs font-semibold px-2 text-foreground">
                         Slide {slides.length > 0 ? `${currentSlideIndex + 1} / ${slides.length}` : '0 / 0'}
                     </span>
                     <Button
@@ -351,7 +351,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
                         variant="outline"
                         disabled={currentSlideIndex === slides.length - 1}
                         onClick={handleNextSlide}
-                        className="h-8 w-8 rounded-lg cursor-pointer"
+                        className="h-8 w-8 rounded-lg cursor-pointer border-border text-foreground"
                     >
                         <HiOutlineChevronRight className="h-4 w-4" />
                     </Button>
@@ -360,7 +360,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
                             size="icon"
                             variant="outline"
                             onClick={handleAddSlide}
-                            className="h-8 w-8 rounded-lg border-dashed border-tutor-purple-300 hover:bg-tutor-purple-50 text-tutor-purple-600 cursor-pointer"
+                            className="h-8 w-8 rounded-lg border-dashed border-secondary/30 hover:bg-secondary/10 text-secondary cursor-pointer"
                             title="Add Slide"
                         >
                             <HiPlus className="h-4.5 w-4.5" />

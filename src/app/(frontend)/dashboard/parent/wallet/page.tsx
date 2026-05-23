@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { WalletClient } from './wallet-client'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export const metadata = {
   title: 'Wallet | Parent Dashboard',
 }
@@ -30,7 +33,19 @@ export default async function ParentWalletPage() {
     }),
   ])
 
-  const wallet = walletRes.docs[0]
+  let wallet = walletRes.docs[0]
+  if (!wallet) {
+    wallet = await payload.create({
+      collection: 'wallets',
+      data: {
+        user: user!.id,
+        currency: 'ngn',
+        balance: 0,
+        creditBalance: 0,
+      },
+    })
+  }
+
   const transactions = txRes.docs
 
   return (

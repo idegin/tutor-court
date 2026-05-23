@@ -3,7 +3,7 @@ export const COIN_RATE = {
   nairaPerCoin: 1,
   coinsPerHour: 60,
   coinsPerMinute: 1,
-  minimumClassCoins: 60,
+  minimumClassCredits: 60,
 } as const
 
 export const MANAGED_ACCOUNT_DOMAIN = 'tutorcourt.local'
@@ -27,14 +27,14 @@ export function formatNaira(amount: number): string {
   return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
-export function formatCoins(coins: number): string {
-  return `${coins.toLocaleString('en-NG')} ${coins === 1 ? 'coin' : 'coins'}`
+export function formatCredits(credits: number): string {
+  return `${credits.toLocaleString('en-NG')} ${credits === 1 ? 'credit' : 'credits'}`
 }
 
-export function nairaToCoins(naira: number): number {
+export function nairaToCredits(naira: number): number {
   return Math.floor(naira * COIN_RATE.coinsPerNaira)
 }
 
-export function coinsToNaira(coins: number): number {
-  return coins * COIN_RATE.nairaPerCoin
+export function coinsToNaira(credits: number): number {
+  return credits * COIN_RATE.nairaPerCoin
 }

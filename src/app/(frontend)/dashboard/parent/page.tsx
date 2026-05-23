@@ -9,7 +9,7 @@ import {
   HiOutlineArrowRight,
 } from 'react-icons/hi2'
 
-import { formatCoins, formatNaira } from '@/lib/constants'
+import { formatCredits, formatNaira } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 
 export const metadata = {
@@ -45,7 +45,7 @@ export default async function ParentOverviewPage() {
 
   const wallet = walletRes.docs[0]
   const balance = (wallet?.balance as number) || 0
-  const coins = (wallet?.coinBalance as number) || 0
+  const credits = (wallet?.creditBalance as number) || 0
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 lg:px-8">
@@ -70,7 +70,7 @@ export default async function ParentOverviewPage() {
         <StatCard
           label="Wallet balance"
           value={formatNaira(balance)}
-          hint={formatCoins(coins)}
+          hint={formatCredits(credits)}
           icon={<HiOutlineWallet className="h-5 w-5" />}
           href="/dashboard/parent/wallet"
         />

@@ -4,11 +4,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { COIN_RATE } from '@/lib/constants'
 
-export async function POST(
-  request: Request,
-  props: { params: Promise<{ id: string }> }
-) {
-  const params = await props.params;
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
@@ -50,7 +47,7 @@ export async function POST(
 
     if (wallets.docs.length > 0) {
       const wallet = wallets.docs[0]
-      const currentCoinBalance = (wallet.coinBalance as number) || 0
+      const currentCoinBalance = (wallet.creditBalance as number) || 0
       const newCoinBalance = Math.max(0, currentCoinBalance - cost)
 
       // Update wallet
@@ -58,11 +55,11 @@ export async function POST(
         collection: 'wallets',
         id: wallet.id,
         data: {
-          coinBalance: newCoinBalance,
+          creditBalance: newCoinBalance,
         } as any,
       })
 
-      // Create transaction record for coin consumption (NGN value is cost * nairaPerCoin)
+      // Create transaction record for credit consumption (NGN value is cost * nairaPerCoin)
       await payload.create({
         collection: 'transactions',
         data: {

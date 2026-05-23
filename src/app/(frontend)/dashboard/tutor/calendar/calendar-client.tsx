@@ -120,6 +120,8 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
     const [date, setDate] = useState<Date>(new Date());
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isLoadingClassInfo, setIsLoadingClassInfo] = useState(false);
+    const [classInfo, setClassInfo] = useState<any | null>(null);
 
     // Convert string dates back to Date objects
     const events = initialEvents.map(e => ({
@@ -128,9 +130,22 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
         end: new Date(e.end),
     }));
 
-    const handleSelectEvent = (event: any) => {
+    const handleSelectEvent = async (event: any) => {
         setSelectedEvent(event);
         setIsSheetOpen(true);
+        setIsLoadingClassInfo(true);
+        setClassInfo(null);
+        try {
+            const res = await fetch(`/api/classes/${event.classId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setClassInfo(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch class details:', err);
+        } finally {
+            setIsLoadingClassInfo(false);
+        }
     };
 
     return (
@@ -280,7 +295,7 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
 
             {/* Event Summary Sheet */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent className="sm:max-w-md">
+                <SheetContent className="sm:max-w-lg px-4">
                     {selectedEvent && (
                         <div className="space-y-6 pt-4">
                             <SheetHeader>
@@ -328,9 +343,59 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
                                         </div>
                                     </div>
                                 )}
+
+                                {isLoadingClassInfo && (
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse py-2">
+                                        <span className="relative flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tutor-purple-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-tutor-purple-500"></span>
+                                        </span>
+                                        Loading additional class details...
+                                    </div>
+                                )}
+
+                                {classInfo && (
+                                    <div className="space-y-4 border-t pt-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">Class Type</h5>
+                                                <p className="text-sm font-medium text-foreground mt-0.5 capitalize">
+                                                    {classInfo.classType === 'group' ? `Group (Max ${classInfo.maxStudents})` : 'One-on-One'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <h5 className="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">Status</h5>
+                                                <p className="text-sm font-medium text-foreground mt-0.5 capitalize">
+                                                    {classInfo.status}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h5 className="text-xs font-semibold text-muted-foreground font-mono uppercase tracking-wider">Recurrences</h5>
+                                            <div className="text-sm font-medium text-foreground mt-0.5 space-y-1">
+                                                {classInfo.schedule?.map((item: any, idx: number) => (
+                                                    <div key={idx} className="flex items-center gap-1.5 capitalize text-xs">
+                                                        <span className="w-20 font-semibold">{item.day}:</span>
+                                                        <span className="text-muted-foreground">{item.startTime} - {item.endTime}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-4 border-t flex flex-col gap-2">
+                                <Button
+                                    onClick={() => {
+                                        setIsSheetOpen(false);
+                                        router.push(`/classroom/${selectedEvent.classId}`);
+                                    }}
+                                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold cursor-pointer"
+                                >
+                                    Join Live Classroom
+                                </Button>
                                 <Button
                                     onClick={() => {
                                         setIsSheetOpen(false);

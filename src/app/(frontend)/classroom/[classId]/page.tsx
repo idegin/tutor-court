@@ -76,6 +76,7 @@ export default async function ClassroomPage(props: PageProps) {
           title: 'Main Board',
           owner: tutorId,
           class: classId,
+          liveSession: activeSession?.id || undefined,
           isPublic: false,
           shareToken: crypto.randomBytes(16).toString('hex'),
         } as any,

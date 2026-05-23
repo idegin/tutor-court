@@ -4,7 +4,7 @@ export const Wallets: CollectionConfig = {
   slug: 'wallets',
   admin: {
     useAsTitle: 'id',
-    defaultColumns: ['user', 'currency', 'balance', 'coinBalance'],
+    defaultColumns: ['user', 'currency', 'balance', 'creditBalance'],
   },
   access: {
     read: ({ req: { user } }) => {
@@ -43,7 +43,7 @@ export const Wallets: CollectionConfig = {
       defaultValue: 0,
     },
     {
-      name: 'coinBalance',
+      name: 'creditBalance',
       type: 'number',
       required: true,
       defaultValue: 0,

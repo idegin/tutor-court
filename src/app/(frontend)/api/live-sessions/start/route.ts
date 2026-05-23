@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Check tutor coin balance
+    // Check tutor credit balance
     const wallets = await payload.find({
       collection: 'wallets',
       where: { user: { equals: user.id } },
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
     })
 
     const wallet = wallets.docs[0]
-    if (!wallet || (wallet.coinBalance || 0) < 60) {
+    if (!wallet || (wallet.creditBalance || 0) < 60) {
       return NextResponse.json(
-        { error: 'You need at least 60 coins (1 hour) to start a live class.' },
+        { error: 'You need at least 60 credits (1 hour) to start a live class.' },
         { status: 400 },
       )
     }

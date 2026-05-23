@@ -38,16 +38,24 @@ export default async function TutorClassDetailPage(props: PageProps) {
       return redirect('/dashboard/tutor/classes')
     }
 
-    // Fetch whiteboards for this class
-    const whiteboardsRes = await payload.find({
-      collection: 'whiteboards',
-      where: { class: { equals: id } },
-      sort: '-createdAt',
-      limit: 100,
-      depth: 0,
-    })
+    // Fetch whiteboards for this class and subjects
+    const [whiteboardsRes, subjectsRes] = await Promise.all([
+      payload.find({
+        collection: 'whiteboards',
+        where: { class: { equals: id } },
+        sort: '-createdAt',
+        limit: 100,
+        depth: 0,
+      }),
+      payload.find({
+        collection: 'subjects',
+        sort: 'name',
+        limit: 100,
+        depth: 0,
+      }),
+    ])
 
-    return <ClassDetailsClient cls={cls} initialWhiteboards={whiteboardsRes.docs} />
+    return <ClassDetailsClient cls={cls} initialWhiteboards={whiteboardsRes.docs} subjects={subjectsRes.docs} />
   } catch (err) {
     console.error('Error loading class details:', err)
     return notFound()

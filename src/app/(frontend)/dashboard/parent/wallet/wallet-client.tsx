@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { formatCoins, formatNaira, COIN_RATE } from '@/lib/constants'
+import { formatCredits, formatNaira, COIN_RATE } from '@/lib/constants'
 
 type WalletClientProps = {
   initialWallet: any
@@ -40,7 +41,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
   const [isFundingLoading, setIsFundingLoading] = React.useState(false)
 
   const [isBuyingOpen, setIsBuyingOpen] = React.useState(false)
-  const [buyingCoins, setBuyingCoins] = React.useState('')
+  const [buyingCredits, setBuyingCredits] = React.useState('')
   const [isBuyingLoading, setIsBuyingLoading] = React.useState(false)
 
   React.useEffect(() => {
@@ -60,7 +61,8 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
 
   const onFundWallet = async (e: React.FormEvent) => {
     e.preventDefault()
-    const amountVal = parseFloat(fundingAmount)
+    const cleanAmount = fundingAmount.replace(/,/g, '')
+    const amountVal = parseFloat(cleanAmount)
     if (isNaN(amountVal) || amountVal <= 0) {
       toast.error('Please enter a valid amount.')
       return
@@ -93,27 +95,28 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
     }
   }
 
-  const onBuyCoins = async (e: React.FormEvent) => {
+  const onBuyCredits = async (e: React.FormEvent) => {
     e.preventDefault()
-    const coinsVal = parseInt(buyingCoins, 10)
+    const cleanCredits = buyingCredits.replace(/,/g, '')
+    const coinsVal = parseInt(cleanCredits, 10)
     if (isNaN(coinsVal) || coinsVal <= 0) {
-      toast.error('Please enter a valid number of coins.')
+      toast.error('Please enter a valid number of credits.')
       return
     }
 
     const cost = coinsVal * COIN_RATE.nairaPerCoin
     const currentBalance = wallet?.balance || 0
     if (currentBalance < cost) {
-      toast.error(`Insufficient balance. You need ₦${cost} but only have ₦${currentBalance}.`)
+      toast.error(`Insufficient balance. You need ₦${cost.toLocaleString()} but only have ₦${currentBalance.toLocaleString()}.`)
       return
     }
 
     setIsBuyingLoading(true)
     try {
-      const res = await fetch('/api/payments/buy-coins', {
+      const res = await fetch('/api/payments/buy-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coins: coinsVal }),
+        body: JSON.stringify({ credits: coinsVal }),
       })
 
       const data = await res.json()
@@ -121,20 +124,20 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
         throw new Error(data.error || 'Purchase failed')
       }
 
-      toast.success(`Successfully bought ${formatCoins(coinsVal)}!`)
+      toast.success(`Successfully bought ${formatCredits(coinsVal)}!`)
       setIsBuyingOpen(false)
-      setBuyingCoins('')
+      setBuyingCredits('')
 
       router.refresh()
     } catch (err: any) {
-      toast.error(err.message || 'Could not purchase coins.')
+      toast.error(err.message || 'Could not purchase credits.')
     } finally {
       setIsBuyingLoading(false)
     }
   }
 
   const balance = wallet?.balance || 0
-  const coins = wallet?.coinBalance || 0
+  const credits = wallet?.creditBalance || 0
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 lg:px-8">
@@ -142,7 +145,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Wallet</h1>
           <p className="text-sm text-muted-foreground">
-            Fund your wallet to pay tutors and buy coins for live classes.
+            Fund your wallet to pay tutors and buy credits for live classes.
           </p>
         </div>
         <Button
@@ -176,15 +179,15 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
               size="sm"
               className="rounded-full"
             >
-              Buy coins
+              Buy credits
             </Button>
           </div>
           <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Coin balance
           </p>
-          <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCoins(coins)}</p>
+          <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCredits(credits)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            1 coin = ₦{COIN_RATE.nairaPerCoin} · {COIN_RATE.coinsPerHour} coins / hour live class
+            1 credit = ₦{COIN_RATE.nairaPerCoin} · {COIN_RATE.coinsPerHour} credits / hour live class
           </p>
         </div>
       </div>
@@ -258,20 +261,13 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="fundingAmount">Amount (₦)</Label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">₦</span>
-                  <Input
-                    id="fundingAmount"
-                    type="number"
-                    min="100"
-                    step="any"
-                    value={fundingAmount}
-                    onChange={(e) => setFundingAmount(e.target.value)}
-                    placeholder="5,000"
-                    className="pl-7"
-                    required
-                  />
-                </div>
+                <CurrencyInput
+                  id="fundingAmount"
+                  value={fundingAmount}
+                  onValueChange={(val) => setFundingAmount(val)}
+                  placeholder="5,000"
+                  required
+                />
                 <p className="text-xs text-muted-foreground">Minimum deposit is ₦100.</p>
               </div>
             </div>
@@ -296,31 +292,30 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
         </DialogContent>
       </Dialog>
 
-      {/* Buy Coins Modal */}
+      {/* Buy Credits Modal */}
       <Dialog open={isBuyingOpen} onOpenChange={setIsBuyingOpen}>
         <DialogContent className="max-w-md">
-          <form onSubmit={onBuyCoins}>
+          <form onSubmit={onBuyCredits}>
             <DialogHeader>
-              <DialogTitle>Buy Coins</DialogTitle>
+              <DialogTitle>Buy Credits</DialogTitle>
               <DialogDescription>
-                Convert your wallet funds into coins. Coins are used to access live classes and AI features.
+                Convert your wallet funds into credits. Credits are used to access live classes and AI features.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="buyingCoins">Number of Coins</Label>
-                <Input
-                  id="buyingCoins"
-                  type="number"
-                  min="1"
-                  value={buyingCoins}
-                  onChange={(e) => setBuyingCoins(e.target.value)}
+                <Label htmlFor="buyingCredits">Number of Credits</Label>
+                <CurrencyInput
+                  id="buyingCredits"
+                  value={buyingCredits}
+                  onValueChange={(val) => setBuyingCredits(val)}
+                  prefix=""
                   placeholder="60"
                   required
                 />
-                {buyingCoins && (
+                {buyingCredits && (
                   <p className="text-sm font-medium text-emerald-600">
-                    Cost: {formatNaira(parseInt(buyingCoins, 10) * COIN_RATE.nairaPerCoin)}
+                    Cost: {formatNaira(parseInt(buyingCredits.replace(/,/g, ''), 10) * COIN_RATE.nairaPerCoin)}
                   </p>
                 )}
               </div>

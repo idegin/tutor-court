@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { TutorWalletClient } from './wallet-client'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export const metadata = {
   title: 'Wallet | Tutor Dashboard',
 }
@@ -30,7 +33,19 @@ export default async function TutorWalletPage() {
     }),
   ])
 
-  const wallet = walletRes.docs[0]
+  let wallet = walletRes.docs[0]
+  if (!wallet) {
+    wallet = await payload.create({
+      collection: 'wallets',
+      data: {
+        user: user!.id,
+        currency: 'ngn',
+        balance: 0,
+        creditBalance: 0,
+      },
+    })
+  }
+
   const transactions = txRes.docs
 
   return (

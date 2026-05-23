@@ -145,7 +145,7 @@ export async function seedData() {
         user: user.id,
         currency: isTutor ? 'usd' : 'ngn',
         balance: faker.number.int({ min: 100, max: 5000 }),
-        coinBalance: 0,
+        creditBalance: 0,
       } as any,
     })
 
