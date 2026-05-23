@@ -14,9 +14,20 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { HiOutlineBars3, HiXMark, HiOutlineChevronLeft, HiOutlineChevronRight } from 'react-icons/hi2';
+import {
+    HiOutlineBars3,
+    HiXMark,
+    HiOutlineChevronLeft,
+    HiOutlineChevronRight,
+    HiOutlineSparkles,
+} from 'react-icons/hi2';
 import { useAuth } from '@/components/providers/auth-provider';
-import { InviteParent } from './invite-parent';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+
 
 export interface NavItem {
     name: string;
@@ -37,6 +48,24 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
     const { user } = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
     const [isCollapsed, setIsCollapsed] = React.useState(false);
+    const [coinBalance, setCoinBalance] = React.useState<number | null>(null);
+
+    const fetchCoins = React.useCallback(() => {
+        if (user && user.accountType === 'tutor') {
+            fetch(`/api/wallets?where[user][equals]=${user.id}&limit=1`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data?.docs?.[0]) {
+                        setCoinBalance(data.docs[0].coinBalance || 0);
+                    }
+                })
+                .catch(err => console.error("Error fetching wallet coins:", err));
+        }
+    }, [user]);
+
+    React.useEffect(() => {
+        fetchCoins();
+    }, [fetchCoins, pathname]);
 
     const handleLogout = async () => {
         await fetch('/api/users/logout', { method: 'POST' });
@@ -80,8 +109,39 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {user?.accountType === 'tutor' && (
-                        <InviteParent tutorId={String(user.id)} />
+                    {user && user.accountType === 'tutor' && (
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="rounded-full flex items-center gap-1.5 px-3 py-1 text-sm border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 font-medium cursor-pointer"
+                                >
+                                    <HiOutlineSparkles className="h-4 w-4" />
+                                    <span>{coinBalance !== null ? `${coinBalance} Coins` : 'Coins'}</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-64 p-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-semibold text-amber-800 flex items-center gap-1">
+                                        <HiOutlineSparkles className="h-4 w-4" />
+                                        Your Coin Balance
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Coins are used to run live classroom sessions and AI features.
+                                    </p>
+                                    <div className="border-t my-2 pt-2 flex items-center justify-between">
+                                        <span className="text-sm font-medium">Coins:</span>
+                                        <span className="text-sm font-bold text-gray-900">{coinBalance ?? 0}</span>
+                                    </div>
+                                    <Button
+                                        onClick={() => router.push('/dashboard/tutor/wallet')}
+                                        className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white rounded-full text-xs py-1.5 h-auto cursor-pointer"
+                                    >
+                                        Buy More Coins
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     )}
                     {user && (
                         <DropdownMenu>

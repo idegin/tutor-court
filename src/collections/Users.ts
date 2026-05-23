@@ -54,12 +54,35 @@ export const Users: CollectionConfig = {
     ],
     afterChange: [
       async ({ doc, operation, req }) => {
-        if (operation === 'create' && doc.accountType === 'tutor') {
+        if (operation !== 'create') return
+
+        if (doc.accountType === 'tutor') {
           await req.payload.create({
             collection: 'tutor-profiles',
             data: {
               user: doc.id,
               isApproved: false,
+            } as any,
+            req,
+          })
+        }
+
+        const { totalDocs } = await req.payload.find({
+          collection: 'wallets',
+          where: { user: { equals: doc.id } },
+          limit: 1,
+          depth: 0,
+          req,
+        })
+
+        if (totalDocs === 0) {
+          await req.payload.create({
+            collection: 'wallets',
+            data: {
+              user: doc.id,
+              currency: 'ngn',
+              balance: 0,
+              coinBalance: 0,
             } as any,
             req,
           })
@@ -109,6 +132,28 @@ export const Users: CollectionConfig = {
       name: 'avatar',
       type: 'upload',
       relationTo: 'media',
+    },
+    {
+      name: 'parent',
+      type: 'relationship',
+      relationTo: 'users',
+      hasMany: false,
+      admin: {
+        description: 'For child/student accounts created by a parent.',
+      },
+    },
+    {
+      name: 'isManagedAccount',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'True for child accounts created by a parent (auto-generated email and password).',
+      },
+    },
+    {
+      name: 'hasCompletedOnboarding',
+      type: 'checkbox',
+      defaultValue: false,
     },
   ],
 }

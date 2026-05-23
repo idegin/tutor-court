@@ -15,7 +15,9 @@ import {
     HiOutlineChatBubbleLeftRight,
     HiChatBubbleLeftRight,
     HiOutlineClipboardDocumentList,
-    HiClipboardDocumentList
+    HiClipboardDocumentList,
+    HiOutlineUsers,
+    HiUsers
 } from 'react-icons/hi2';
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout';
 
@@ -25,6 +27,12 @@ const tutorNavItems = [
         href: '/dashboard/tutor',
         icon: HiOutlineHome,
         activeIcon: HiHome,
+    },
+    {
+        name: 'Classes',
+        href: '/dashboard/tutor/classes',
+        icon: HiOutlineUsers,
+        activeIcon: HiUsers,
     },
     {
         name: 'Messages',

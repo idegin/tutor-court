@@ -5,9 +5,16 @@ import { Calendar, dateFnsLocalizer, EventProps, ToolbarProps } from 'react-big-
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { HiOutlineChevronLeft, HiOutlineChevronRight } from 'react-icons/hi2';
-
-import { faker } from '@faker-js/faker';
+import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineClock, HiOutlineUsers, HiOutlineCalendar, HiOutlineDocumentText } from 'react-icons/hi2';
+import { useRouter } from 'next/navigation';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 const locales = {
     'en-US': enUS,
@@ -19,36 +26,6 @@ const localizer = dateFnsLocalizer({
     startOfWeek,
     getDay,
     locales,
-});
-
-// Mock Events
-const mockEvents = Array.from({ length: 60 }).map((_, i) => {
-    // Generate dates around the current month
-    const isFuture = faker.datatype.boolean();
-    const dateOffset = faker.number.int({ min: -15, max: 15 });
-    const baseDate = new Date();
-    baseDate.setDate(baseDate.getDate() + dateOffset);
-
-    // Random start hour (8 AM to 6 PM)
-    const startHour = faker.number.int({ min: 8, max: 18 });
-    const startMinute = faker.helpers.arrayElement([0, 30]);
-    const durationHours = faker.helpers.arrayElement([1, 1.5, 2]);
-
-    const start = new Date(baseDate);
-    start.setHours(startHour, startMinute, 0, 0);
-
-    const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
-
-    const subject = faker.helpers.arrayElement(['Algebra', 'Physics', 'Geometry', 'Chemistry', 'Biology', 'History', 'English Literature', 'Calculus', 'SAT Prep', 'Essay Writing']);
-
-    return {
-        id: i + 1,
-        title: `${subject} with ${faker.person.firstName()}`,
-        start,
-        end,
-        student: faker.person.fullName(),
-        status: faker.helpers.arrayElement(['confirmed', 'pending', 'completed']),
-    };
 });
 
 // Custom Toolbar
@@ -70,20 +47,20 @@ const CustomToolbar = (toolbar: ToolbarProps) => {
             <div className="flex items-center gap-2">
                 <button
                     onClick={goToCurrent}
-                    className="px-4 py-2 text-sm font-medium border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground"
+                    className="px-4 py-2 text-sm font-medium border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground cursor-pointer"
                 >
                     Today
                 </button>
                 <div className="flex items-center ml-2 space-x-1">
                     <button
                         onClick={goToBack}
-                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center"
+                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
                     >
                         <HiOutlineChevronLeft className="w-4 h-4" />
                     </button>
                     <button
                         onClick={goToNext}
-                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center"
+                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
                     >
                         <HiOutlineChevronRight className="w-4 h-4" />
                     </button>
@@ -97,7 +74,7 @@ const CustomToolbar = (toolbar: ToolbarProps) => {
                     <button
                         key={view}
                         onClick={() => toolbar.onView(view)}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-md capitalize transition-colors ${toolbar.view === view
+                        className={`px-4 py-1.5 text-sm font-medium rounded-md capitalize transition-colors cursor-pointer ${toolbar.view === view
                             ? 'bg-background border border-border/60 text-foreground'
                             : 'text-muted-foreground hover:text-foreground'
                             }`}
@@ -133,12 +110,31 @@ const CustomEvent = ({ event }: EventProps<any>) => {
     );
 };
 
-export default function CalendarClient() {
+interface CalendarClientProps {
+    initialEvents: any[];
+}
+
+export default function CalendarClient({ initialEvents }: CalendarClientProps) {
+    const router = useRouter();
     const [view, setView] = useState<any>('week');
     const [date, setDate] = useState<Date>(new Date());
+    const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+    // Convert string dates back to Date objects
+    const events = initialEvents.map(e => ({
+        ...e,
+        start: new Date(e.start),
+        end: new Date(e.end),
+    }));
+
+    const handleSelectEvent = (event: any) => {
+        setSelectedEvent(event);
+        setIsSheetOpen(true);
+    };
 
     return (
-        <div className="h-full bg-card overflow-hidden flex flex-col">
+        <div className="h-full bg-card overflow-hidden flex flex-col p-4 md:p-6 lg:p-8">
             <style>
                 {`
             .rbc-calendar {
@@ -182,7 +178,7 @@ export default function CalendarClient() {
               border-bottom: 1px solid var(--border) !important;
             }
             .rbc-day-slot .rbc-time-slot {
-              border-top: 1px dashed var(--border) / 0.5) !important;
+              border-top: 1px dashed var(--border) !important;
             }
             .rbc-time-gutter {
               border-right: 1px solid var(--border) !important;
@@ -207,9 +203,8 @@ export default function CalendarClient() {
               z-index: 4;
             }
             
-            /* Beautiful "Today" indication without shadow/gradients */
             .rbc-today {
-              background-color: var(--primary) / 0.03 !important;
+              background-color: hsla(var(--primary), 0.03) !important;
             }
             .rbc-month-view .rbc-today .rbc-date-cell {
               position: relative;
@@ -234,11 +229,11 @@ export default function CalendarClient() {
               border-bottom: 2px solid var(--primary) !important;
               color: var(--primary);
               font-weight: 800;
-              background-color: var(--primary) / 0.05;
+              background-color: hsla(var(--primary), 0.05);
             }
 
             .rbc-off-range-bg {
-              background-color: var(--muted) / 0.2) !important;
+              background-color: hsla(var(--muted), 0.2) !important;
             }
             .rbc-label {
                padding: 4px;
@@ -255,25 +250,26 @@ export default function CalendarClient() {
                font-weight: 600;
             }
             .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
-              border-top: 1px solid var(--border) !important;
-              padding: 12px;
-              color: var(--foreground);
-              font-size: 0.9rem;
+               border-top: 1px solid var(--border) !important;
+               padding: 12px;
+               color: var(--foreground);
+               font-size: 0.9rem;
             }
-              .rbc-event-label {
-                    color: var(--foreground) !important;
-              }
+            .rbc-event-label {
+               color: var(--foreground) !important;
+            }
           `}
             </style>
             <Calendar
                 localizer={localizer}
-                events={mockEvents}
+                events={events}
                 startAccessor="start"
                 endAccessor="end"
                 view={view}
                 date={date}
                 onView={(v) => setView(v)}
                 onNavigate={(d) => setDate(d)}
+                onSelectEvent={handleSelectEvent}
                 components={{
                     toolbar: CustomToolbar,
                     event: CustomEvent,
@@ -281,6 +277,81 @@ export default function CalendarClient() {
                 showMultiDayTimes
                 dayLayoutAlgorithm="no-overlap"
             />
+
+            {/* Event Summary Sheet */}
+            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetContent className="sm:max-w-md">
+                    {selectedEvent && (
+                        <div className="space-y-6 pt-4">
+                            <SheetHeader>
+                                <SheetTitle className="text-xl font-bold">{selectedEvent.title}</SheetTitle>
+                                <SheetDescription className="text-sm font-medium text-amber-700">
+                                    Subject: {selectedEvent.subject}
+                                </SheetDescription>
+                            </SheetHeader>
+
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <HiOutlineCalendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                    <div>
+                                        <h5 className="text-xs font-semibold text-muted-foreground">Date</h5>
+                                        <p className="text-sm font-medium text-foreground mt-0.5">
+                                            {format(selectedEvent.start, 'EEEE, MMMM d, yyyy')}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3">
+                                    <HiOutlineClock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                    <div>
+                                        <h5 className="text-xs font-semibold text-muted-foreground">Time</h5>
+                                        <p className="text-sm font-medium text-foreground mt-0.5">
+                                            {format(selectedEvent.start, 'h:mm a')} - {format(selectedEvent.end, 'h:mm a')}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3">
+                                    <HiOutlineUsers className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                    <div>
+                                        <h5 className="text-xs font-semibold text-muted-foreground">Student(s)</h5>
+                                        <p className="text-sm font-medium text-foreground mt-0.5">{selectedEvent.student}</p>
+                                    </div>
+                                </div>
+
+                                {selectedEvent.description && (
+                                    <div className="flex items-start gap-3">
+                                        <HiOutlineDocumentText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                        <div>
+                                            <h5 className="text-xs font-semibold text-muted-foreground">Description</h5>
+                                            <p className="text-sm text-foreground mt-0.5">{selectedEvent.description}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-4 border-t flex flex-col gap-2">
+                                <Button
+                                    onClick={() => {
+                                        setIsSheetOpen(false);
+                                        router.push(`/dashboard/tutor/classes/${selectedEvent.classId}`);
+                                    }}
+                                    className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-semibold cursor-pointer"
+                                >
+                                    Open Class Details
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsSheetOpen(false)}
+                                    className="w-full cursor-pointer"
+                                >
+                                    Close
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

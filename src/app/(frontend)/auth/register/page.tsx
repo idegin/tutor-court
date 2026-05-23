@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
 
@@ -45,13 +45,27 @@ const INITIAL_VALUES: RegisterValues = {
     agreeToTerms: false,
 }
 
-export default function RegisterPage() {
+function RegisterContent() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const emailParam = searchParams.get('email')
+    const roleParam = searchParams.get('role')
+
     const [step, setStep] = React.useState<1 | 2>(1)
     const [selectedTypeId, setSelectedTypeId] = React.useState<string | undefined>(undefined)
     const [values, setValues] = React.useState<RegisterValues>(INITIAL_VALUES)
     const [errors, setErrors] = React.useState<ReturnType<typeof validateRegister>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
+
+    React.useEffect(() => {
+        if (emailParam) {
+            setValues(prev => ({ ...prev, email: emailParam }))
+        }
+        if (roleParam && ['tutor', 'parent', 'student'].includes(roleParam)) {
+            setSelectedTypeId(roleParam)
+            setStep(2)
+        }
+    }, [emailParam, roleParam])
 
     const mutation = useMutation({
         mutationFn: async (vars: any) => {
@@ -173,5 +187,17 @@ export default function RegisterPage() {
                 </div>
             )}
         </AuthLayout>
+    )
+}
+
+export default function RegisterPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tutor-purple-600" />
+            </div>
+        }>
+            <RegisterContent />
+        </React.Suspense>
     )
 }

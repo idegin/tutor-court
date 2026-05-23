@@ -3,11 +3,11 @@ import { Conversation, ChatUser } from './chat-types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-    HiOutlinePhone, 
-    HiOutlineVideoCamera, 
-    HiOutlineUserCircle, 
-    HiOutlineBell, 
+import {
+    HiOutlinePhone,
+    HiOutlineVideoCamera,
+    HiOutlineUserCircle,
+    HiOutlineBell,
     HiOutlineBellSlash,
     HiOutlinePhoto,
     HiOutlineDocumentText,
@@ -34,7 +34,7 @@ export function ChatInfo({ conversation, currentUser, onClose, isLoading }: Chat
                         <HiOutlineXMark className="h-5 w-5" />
                     </Button>
                 </div>
-                
+
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 flex flex-col items-center">
                     <div className="flex flex-col items-center gap-3 w-full">
                         <Skeleton className="h-24 w-24 rounded-full" />
@@ -46,7 +46,7 @@ export function ChatInfo({ conversation, currentUser, onClose, isLoading }: Chat
                             <Skeleton className="h-10 w-10 rounded-full" />
                         </div>
                     </div>
-                    
+
                     <div className="w-full space-y-4">
                         <Skeleton className="h-12 w-full rounded-md" />
                         <Skeleton className="h-12 w-full rounded-md" />
@@ -84,7 +84,7 @@ export function ChatInfo({ conversation, currentUser, onClose, isLoading }: Chat
                             {title?.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                     </Avatar>
-                    
+
                     <h3 className="text-lg font-bold tracking-tight text-center truncate w-full">{title}</h3>
                     <p className="text-sm text-muted-foreground mt-1 capitalize">{subtitle}</p>
 
@@ -111,9 +111,9 @@ export function ChatInfo({ conversation, currentUser, onClose, isLoading }: Chat
                 </div>
 
                 {/* Shared Content */}
-                <div className="p-4 space-y-1">
+                <div className="p-4 space-y-1 grid grid-cold-1">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-2">Shared Content</h4>
-                    
+
                     <Button variant="ghost" className="w-full justify-between h-12 font-normal rounded-md shadow-none px-2 hover:bg-muted/50">
                         <div className="flex items-center gap-3">
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
@@ -157,7 +157,7 @@ export function ChatInfo({ conversation, currentUser, onClose, isLoading }: Chat
                 {/* Actions */}
                 <div className="p-4 mt-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-2">Privacy & Support</h4>
-                    
+
                     <Button variant="ghost" className="w-full justify-start h-12 font-normal rounded-md shadow-none px-2 text-destructive hover:text-destructive hover:bg-destructive/10">
                         <HiOutlineNoSymbol className="h-5 w-5 mr-3" />
                         <span className="text-sm">Block User</span>

@@ -16,6 +16,13 @@ import { Reviews } from './collections/Reviews'
 import { Wallets } from './collections/Wallets'
 import { Transactions } from './collections/Transactions'
 import { Bookings } from './collections/Bookings'
+import { Students } from './collections/Students'
+import { Classes } from './collections/Classes'
+import { ClassInvitations } from './collections/ClassInvitations'
+import { Whiteboards } from './collections/Whiteboards'
+import { WhiteboardSlides } from './collections/WhiteboardSlides'
+import { LiveSessions } from './collections/LiveSessions'
+import { Attendance } from './collections/Attendance'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -41,7 +48,23 @@ export default buildConfig({
     defaultFromName: 'TutorCourt',
     transport,
   }),
-  collections: [Users, Media, TutorProfiles, Subjects, Reviews, Wallets, Transactions, Bookings],
+  collections: [
+    Users,
+    Media,
+    TutorProfiles,
+    Subjects,
+    Reviews,
+    Wallets,
+    Transactions,
+    Bookings,
+    Students,
+    Classes,
+    ClassInvitations,
+    Whiteboards,
+    WhiteboardSlides,
+    LiveSessions,
+    Attendance,
+  ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

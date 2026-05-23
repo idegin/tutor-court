@@ -75,6 +75,13 @@ export interface Config {
     wallets: Wallet;
     transactions: Transaction;
     bookings: Booking;
+    students: Student;
+    classes: Class;
+    'class-invitations': ClassInvitation;
+    whiteboards: Whiteboard;
+    'whiteboard-slides': WhiteboardSlide;
+    'live-sessions': LiveSession;
+    attendance: Attendance;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -90,6 +97,13 @@ export interface Config {
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
     bookings: BookingsSelect<false> | BookingsSelect<true>;
+    students: StudentsSelect<false> | StudentsSelect<true>;
+    classes: ClassesSelect<false> | ClassesSelect<true>;
+    'class-invitations': ClassInvitationsSelect<false> | ClassInvitationsSelect<true>;
+    whiteboards: WhiteboardsSelect<false> | WhiteboardsSelect<true>;
+    'whiteboard-slides': WhiteboardSlidesSelect<false> | WhiteboardSlidesSelect<true>;
+    'live-sessions': LiveSessionsSelect<false> | LiveSessionsSelect<true>;
+    attendance: AttendanceSelect<false> | AttendanceSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -142,6 +156,15 @@ export interface User {
   country?: string | null;
   timezone?: string | null;
   avatar?: (string | null) | Media;
+  /**
+   * For child/student accounts created by a parent.
+   */
+  parent?: (string | null) | User;
+  /**
+   * True for child accounts created by a parent (auto-generated email and password).
+   */
+  isManagedAccount?: boolean | null;
+  hasCompletedOnboarding?: boolean | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -285,8 +308,9 @@ export interface Review {
 export interface Wallet {
   id: string;
   user: string | User;
-  currency: 'usd' | 'ngn';
+  currency: 'ngn' | 'usd';
   balance: number;
+  coinBalance: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -336,6 +360,141 @@ export interface Booking {
    * Message from the student to the tutor
    */
   message?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "students".
+ */
+export interface Student {
+  id: string;
+  user: string | User;
+  parent: string | User;
+  firstName: string;
+  lastName: string;
+  generatedEmail: string;
+  generatedPassword: string;
+  gradeLevel?: string | null;
+  notes?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "classes".
+ */
+export interface Class {
+  id: string;
+  tutor: string | User;
+  title?: string | null;
+  subject: string | Subject;
+  description?: string | null;
+  classType: 'one-on-one' | 'group';
+  maxStudents?: number | null;
+  startDate: string;
+  endDate: string;
+  schedule: {
+    day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+    startTime: string;
+    endTime: string;
+    id?: string | null;
+  }[];
+  students?: (string | User)[] | null;
+  parents?: (string | User)[] | null;
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  whiteboard?: (string | null) | Whiteboard;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "whiteboards".
+ */
+export interface Whiteboard {
+  id: string;
+  title: string;
+  owner: string | User;
+  class?: (string | null) | Class;
+  liveSession?: (string | null) | LiveSession;
+  shareToken?: string | null;
+  isPublic?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-sessions".
+ */
+export interface LiveSession {
+  id: string;
+  class: string | Class;
+  tutor: string | User;
+  roomId: string;
+  scheduledFor?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  status: 'scheduled' | 'waiting' | 'live' | 'ended' | 'cancelled';
+  attendees?: (string | User)[] | null;
+  coinsConsumed?: number | null;
+  durationMinutes?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "class-invitations".
+ */
+export interface ClassInvitation {
+  id: string;
+  class: string | Class;
+  inviter: string | User;
+  inviteeEmail: string;
+  inviteeType: 'parent' | 'student';
+  token: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  acceptedBy?: (string | null) | User;
+  expiresAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "whiteboard-slides".
+ */
+export interface WhiteboardSlide {
+  id: string;
+  whiteboard: string | Whiteboard;
+  order: number;
+  title?: string | null;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  thumbnail?: (string | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attendance".
+ */
+export interface Attendance {
+  id: string;
+  liveSession: string | LiveSession;
+  class: string | Class;
+  student: string | User;
+  parent?: (string | null) | User;
+  tutor?: (string | null) | User;
+  joinedAt: string;
+  leftAt?: string | null;
+  durationMinutes?: number | null;
+  status: 'present' | 'late' | 'left-early' | 'absent';
   updatedAt: string;
   createdAt: string;
 }
@@ -394,6 +553,34 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bookings';
         value: string | Booking;
+      } | null)
+    | ({
+        relationTo: 'students';
+        value: string | Student;
+      } | null)
+    | ({
+        relationTo: 'classes';
+        value: string | Class;
+      } | null)
+    | ({
+        relationTo: 'class-invitations';
+        value: string | ClassInvitation;
+      } | null)
+    | ({
+        relationTo: 'whiteboards';
+        value: string | Whiteboard;
+      } | null)
+    | ({
+        relationTo: 'whiteboard-slides';
+        value: string | WhiteboardSlide;
+      } | null)
+    | ({
+        relationTo: 'live-sessions';
+        value: string | LiveSession;
+      } | null)
+    | ({
+        relationTo: 'attendance';
+        value: string | Attendance;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -449,6 +636,9 @@ export interface UsersSelect<T extends boolean = true> {
   country?: T;
   timezone?: T;
   avatar?: T;
+  parent?: T;
+  isManagedAccount?: T;
+  hasCompletedOnboarding?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -555,6 +745,7 @@ export interface WalletsSelect<T extends boolean = true> {
   user?: T;
   currency?: T;
   balance?: T;
+  coinBalance?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -592,6 +783,128 @@ export interface BookingsSelect<T extends boolean = true> {
       };
   price?: T;
   message?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "students_select".
+ */
+export interface StudentsSelect<T extends boolean = true> {
+  user?: T;
+  parent?: T;
+  firstName?: T;
+  lastName?: T;
+  generatedEmail?: T;
+  generatedPassword?: T;
+  gradeLevel?: T;
+  notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "classes_select".
+ */
+export interface ClassesSelect<T extends boolean = true> {
+  tutor?: T;
+  title?: T;
+  subject?: T;
+  description?: T;
+  classType?: T;
+  maxStudents?: T;
+  startDate?: T;
+  endDate?: T;
+  schedule?:
+    | T
+    | {
+        day?: T;
+        startTime?: T;
+        endTime?: T;
+        id?: T;
+      };
+  students?: T;
+  parents?: T;
+  status?: T;
+  whiteboard?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "class-invitations_select".
+ */
+export interface ClassInvitationsSelect<T extends boolean = true> {
+  class?: T;
+  inviter?: T;
+  inviteeEmail?: T;
+  inviteeType?: T;
+  token?: T;
+  status?: T;
+  acceptedBy?: T;
+  expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "whiteboards_select".
+ */
+export interface WhiteboardsSelect<T extends boolean = true> {
+  title?: T;
+  owner?: T;
+  class?: T;
+  liveSession?: T;
+  shareToken?: T;
+  isPublic?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "whiteboard-slides_select".
+ */
+export interface WhiteboardSlidesSelect<T extends boolean = true> {
+  whiteboard?: T;
+  order?: T;
+  title?: T;
+  data?: T;
+  thumbnail?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-sessions_select".
+ */
+export interface LiveSessionsSelect<T extends boolean = true> {
+  class?: T;
+  tutor?: T;
+  roomId?: T;
+  scheduledFor?: T;
+  startedAt?: T;
+  endedAt?: T;
+  status?: T;
+  attendees?: T;
+  coinsConsumed?: T;
+  durationMinutes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "attendance_select".
+ */
+export interface AttendanceSelect<T extends boolean = true> {
+  liveSession?: T;
+  class?: T;
+  student?: T;
+  parent?: T;
+  tutor?: T;
+  joinedAt?: T;
+  leftAt?: T;
+  durationMinutes?: T;
+  status?: T;
   updatedAt?: T;
   createdAt?: T;
 }
