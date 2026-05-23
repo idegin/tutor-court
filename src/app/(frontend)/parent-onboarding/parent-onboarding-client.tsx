@@ -12,6 +12,7 @@ import {
   HiOutlineDocumentDuplicate,
   HiOutlineEye,
   HiOutlineEyeSlash,
+  HiOutlineEnvelopeOpen,
 } from 'react-icons/hi2'
 
 import { Button } from '@/components/ui/button'
@@ -36,22 +37,56 @@ type Child = {
   gradeLevel: string | null
 }
 
+type Invitation = {
+  id: string
+  className: string
+  classId: string
+  tutorName: string
+}
+
 type Props = {
   parentName: string
   initialChildren: Child[]
+  initialInvitations: Invitation[]
 }
 
-export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
+export function ParentOnboardingClient({ parentName, initialChildren, initialInvitations }: Props) {
   const router = useRouter()
   const [children, setChildren] = React.useState<Child[]>(initialChildren)
+  const [invitations, setInvitations] = React.useState<Invitation[]>(initialInvitations)
+
+  // Child form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
   const [gradeLevel, setGradeLevel] = React.useState('')
   const [notes, setNotes] = React.useState('')
+
+  // Password Options
+  const [passwordMode, setPasswordMode] = React.useState<'auto' | 'custom'>('auto')
+  const [customPassword, setCustomPassword] = React.useState('')
+
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [isFinishing, setIsFinishing] = React.useState(false)
   const [credentialModalChild, setCredentialModalChild] = React.useState<Child | null>(null)
   const [revealedIds, setRevealedIds] = React.useState<Record<string, boolean>>({})
+
+  const onAcceptInvitation = async (invitationId: string) => {
+    try {
+      const res = await fetch('/api/parent/invitations/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Could not accept invitation.')
+      }
+      setInvitations((prev) => prev.filter((inv) => inv.id !== invitationId))
+      toast.success('Invitation accepted successfully!')
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
 
   const onAddChild = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,6 +94,12 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
       toast.error('Please enter both first and last names.')
       return
     }
+
+    if (passwordMode === 'custom' && (!customPassword || customPassword.length < 6)) {
+      toast.error('Custom password must be at least 6 characters.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const res = await fetch('/api/parent/students', {
@@ -69,6 +110,8 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
           lastName: lastName.trim(),
           gradeLevel: gradeLevel.trim() || undefined,
           notes: notes.trim() || undefined,
+          passwordMode,
+          customPassword: passwordMode === 'custom' ? customPassword : undefined,
         }),
       })
       if (!res.ok) {
@@ -90,6 +133,8 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
       setLastName('')
       setGradeLevel('')
       setNotes('')
+      setPasswordMode('auto')
+      setCustomPassword('')
       toast.success(`${newChild.firstName} added successfully.`)
     } catch (err: any) {
       toast.error(err.message)
@@ -136,7 +181,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4 md:px-6">
           <Image src="/logo.png" alt="TutorCourt" width={32} height={32} className="rounded-lg" />
           <span className="text-lg font-black tracking-tight">TutorCourt</span>
-          <span className="ml-3 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
+          <span className="ml-3 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground animate-pulse">
             Parent setup
           </span>
         </div>
@@ -144,13 +189,46 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
 
       <main className="mx-auto max-w-5xl px-4 py-10 md:px-6 md:py-14">
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-tutor-purple-600">Welcome, {parentName.split(' ')[0]}</p>
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Let's add your children</h1>
+          <p className="text-sm font-semibold text-secondary">Welcome, {parentName.split(' ')[0]}</p>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Complete your registration</h1>
           <p className="max-w-2xl text-muted-foreground">
-            Create a learning account for each child. We will generate a login they can use to join classes and view assignments.
-            Save the credentials shown after each child is added — you will not see the password in plain text again.
+            Accept invitations from tutors and create login accounts for your children. Save the credentials shown after each child is added so they can log in.
           </p>
         </div>
+
+        {/* Invitations Panel */}
+        {invitations.length > 0 && (
+          <section className="mt-8 rounded-xl border bg-card p-6 md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
+                <HiOutlineEnvelopeOpen className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Tutor Invitations</h2>
+                <p className="text-sm text-muted-foreground">
+                  You have pending invites to join tutor classes. Accept them to link your account.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {invitations.map((inv) => (
+                <div key={inv.id} className="flex flex-col justify-between p-4 border rounded-xl bg-background shadow-sm">
+                  <div>
+                    <h3 className="font-bold text-foreground text-sm">{inv.className}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Invited by: {inv.tutorName}</p>
+                  </div>
+                  <Button
+                    onClick={() => onAcceptInvitation(inv.id)}
+                    className="mt-4 w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs h-8 cursor-pointer font-semibold"
+                  >
+                    Accept Invite
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
           <section className="lg:col-span-3">
@@ -159,13 +237,13 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
               className="rounded-xl border bg-card p-6 md:p-8"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-tutor-purple-50 text-tutor-purple-600">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                   <HiOutlineUserPlus className="h-5 w-5" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold">Add a child</h2>
                   <p className="text-sm text-muted-foreground">
-                    Their login will be generated automatically.
+                    Their login email will be generated automatically.
                   </p>
                 </div>
               </div>
@@ -202,6 +280,46 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                   />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
+                  <Label>Student password option</Label>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-1">
+                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                      <input
+                        type="radio"
+                        name="passwordMode"
+                        checked={passwordMode === 'auto'}
+                        onChange={() => setPasswordMode('auto')}
+                        className="h-4 w-4 accent-secondary cursor-pointer"
+                      />
+                      Auto-generate secure password
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                      <input
+                        type="radio"
+                        name="passwordMode"
+                        checked={passwordMode === 'custom'}
+                        onChange={() => setPasswordMode('custom')}
+                        className="h-4 w-4 accent-secondary cursor-pointer"
+                      />
+                      Choose custom password
+                    </label>
+                  </div>
+                </div>
+
+                {passwordMode === 'custom' && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="customPassword">Custom password (min 6 characters)</Label>
+                    <Input
+                      id="customPassword"
+                      type="text"
+                      value={customPassword}
+                      onChange={(e) => setCustomPassword(e.target.value)}
+                      placeholder="Enter child's password"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="notes">Notes (optional)</Label>
                   <Textarea
                     id="notes"
@@ -220,7 +338,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  className="bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+                  className="bg-secondary text-secondary-foreground hover:bg-secondary/90 cursor-pointer font-semibold"
                 >
                   {isSubmitting ? 'Adding…' : 'Add child'}
                 </Button>
@@ -231,7 +349,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
           <aside className="lg:col-span-2">
             <div className="rounded-xl border bg-card p-6 md:p-8">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                   <HiOutlineUsers className="h-5 w-5" />
                 </div>
                 <div>
@@ -271,7 +389,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                             <button
                               type="button"
                               onClick={() => copy(child.generatedEmail, 'Email')}
-                              className="shrink-0 text-muted-foreground hover:text-foreground"
+                              className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
                               aria-label="Copy email"
                             >
                               <HiOutlineDocumentDuplicate className="h-4 w-4" />
@@ -285,7 +403,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                               <button
                                 type="button"
                                 onClick={() => togglePassword(child.id)}
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground cursor-pointer"
                                 aria-label={revealed ? 'Hide password' : 'Show password'}
                               >
                                 {revealed ? (
@@ -297,7 +415,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                               <button
                                 type="button"
                                 onClick={() => copy(child.generatedPassword, 'Password')}
-                                className="text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground cursor-pointer"
                                 aria-label="Copy password"
                               >
                                 <HiOutlineDocumentDuplicate className="h-4 w-4" />
@@ -321,7 +439,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
           <Button
             onClick={onFinish}
             disabled={isFinishing || children.length === 0}
-            className="bg-foreground text-background hover:bg-foreground/90"
+            className="bg-foreground text-background hover:bg-foreground/90 font-semibold cursor-pointer"
           >
             {isFinishing ? 'Finishing…' : 'Go to my dashboard'}
             <HiOutlineCheck className="ml-2 h-4 w-4" />
@@ -352,7 +470,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                   <button
                     type="button"
                     onClick={() => copy(credentialModalChild.generatedEmail, 'Email')}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
                   >
                     <HiOutlineDocumentDuplicate className="h-4 w-4" />
                   </button>
@@ -367,7 +485,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
                     onClick={() =>
                       copy(credentialModalChild.generatedPassword, 'Password')
                     }
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    className="shrink-0 text-muted-foreground hover:text-foreground cursor-pointer"
                   >
                     <HiOutlineDocumentDuplicate className="h-4 w-4" />
                   </button>
@@ -378,7 +496,7 @@ export function ParentOnboardingClient({ parentName, initialChildren }: Props) {
           <DialogFooter>
             <Button
               onClick={() => setCredentialModalChild(null)}
-              className="bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/90 cursor-pointer font-semibold"
             >
               I've saved them
             </Button>

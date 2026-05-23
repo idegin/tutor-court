@@ -137,6 +137,27 @@ export const Users: CollectionConfig = {
                 } as any,
                 req,
               })
+
+              const tutor = cls.tutor
+              const tutorEmail = typeof tutor === 'object' ? tutor?.email : null
+              const tutorName = typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
+
+              if (tutorEmail) {
+                const inviteeName = `${doc.firstName} ${doc.lastName}`
+                const emailContent = `
+                  <p class="text">Hi ${tutorName},</p>
+                  <p class="text">Great news! <strong>${inviteeName}</strong> has registered and accepted your invite to join the class <strong>"${cls.title}"</strong> as a <strong>${invitation.inviteeType}</strong>.</p>
+                  <div class="btn-container">
+                    <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
+                  </div>
+                `
+                const emailHtml = getBaseEmailLayout('Class Invitation Accepted', emailContent)
+                req.payload.sendEmail({
+                  to: tutorEmail,
+                  subject: `${inviteeName} Accepted Your Invite to ${cls.title}`,
+                  html: emailHtml,
+                }).catch(err => console.error('Error sending acceptance email to tutor:', err))
+              }
             }
           }
         } catch (error) {

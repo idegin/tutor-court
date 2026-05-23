@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { ClassroomClient } from './classroom-client'
+import { generateVideoSdkToken } from '@/lib/videosdk'
 
 interface PageProps {
   params: Promise<{ classId: string }>
@@ -102,6 +103,7 @@ export default async function ClassroomPage(props: PageProps) {
         currentUser={user}
         initialSession={activeSession}
         initialWhiteboards={whiteboards}
+        videoSdkToken={generateVideoSdkToken()}
       />
     )
   } catch (err) {

@@ -2,6 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { generateVideoSdkToken } from '@/lib/videosdk'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -43,9 +44,9 @@ export async function POST(request: Request) {
 
     // Try to call VideoSDK to create a room if configured
     let roomId = `room-${classId}-${Date.now()}`
-    const token = process.env.NEXT_PUBLIC_VIDEOSDK_TOKEN
+    const token = generateVideoSdkToken()
 
-    if (token && token !== 'videosdk_token_placeholder') {
+    if (token) {
       try {
         const videoSdkRes = await fetch('https://api.videosdk.live/v2/rooms', {
           method: 'POST',

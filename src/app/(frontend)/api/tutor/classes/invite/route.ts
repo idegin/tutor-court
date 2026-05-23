@@ -90,6 +90,10 @@ export async function POST(request: Request) {
           <a href="${serverUrl}/dashboard/${inviteUser.accountType}" class="btn">Go to Dashboard</a>
         </div>
       `
+      const emailHtml = getBaseEmailLayout(
+        `Added to Class: ${classDoc.title || 'Live Class'}`,
+        emailContent
+      )
       payload.sendEmail({
         to: trimmedEmail,
         subject: `Added to Class: ${classDoc.title || 'Live Class'}`,
@@ -142,6 +146,10 @@ export async function POST(request: Request) {
           <a href="${signupUrl}" class="btn font-semibold">Join Class</a>
         </div>
       `
+      const emailHtml = getBaseEmailLayout(
+        `Class Invitation: ${classDoc.title || 'Live Class'}`,
+        emailContent
+      )
       payload.sendEmail({
         to: trimmedEmail,
         subject: `Class Invitation: ${classDoc.title || 'Live Class'}`,

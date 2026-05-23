@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   const lastName = (body?.lastName || '').toString().trim()
   const gradeLevel = (body?.gradeLevel || '').toString().trim() || undefined
   const notes = (body?.notes || '').toString().trim() || undefined
+  const passwordMode = body?.passwordMode || 'auto'
+  const customPassword = (body?.customPassword || '').toString().trim()
 
   if (!firstName || !lastName) {
     return NextResponse.json(
@@ -34,8 +36,15 @@ export async function POST(request: Request) {
     )
   }
 
+  if (passwordMode === 'custom' && (!customPassword || customPassword.length < 6)) {
+    return NextResponse.json(
+      { error: 'Custom password must be at least 6 characters.' },
+      { status: 400 },
+    )
+  }
+
   const generatedEmail = await generateManagedEmail(payload, firstName, lastName)
-  const generatedPassword = generateManagedPassword(12)
+  const generatedPassword = passwordMode === 'custom' ? customPassword : generateManagedPassword(12)
 
   const childUser = await payload.create({
     collection: 'users',

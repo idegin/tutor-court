@@ -22,6 +22,30 @@ export default async function ParentOnboardingPage() {
     limit: 50,
   })
 
+  const invitesResult = await payload.find({
+    collection: 'class-invitations',
+    where: {
+      and: [
+        { inviteeEmail: { equals: user!.email } },
+        { status: { equals: 'pending' } },
+        { inviteeType: { equals: 'parent' } },
+      ],
+    },
+    depth: 2,
+    limit: 50,
+  })
+
+  const initialInvitations = invitesResult.docs.map((inv) => {
+    const classDoc = inv.class as any
+    const inviterDoc = inv.inviter as any
+    return {
+      id: String(inv.id),
+      className: classDoc?.title || 'Unknown Class',
+      classId: String(classDoc?.id || ''),
+      tutorName: inviterDoc ? `${inviterDoc.firstName} ${inviterDoc.lastName}` : 'Tutor',
+    }
+  })
+
   return (
     <ParentOnboardingClient
       parentName={`${user!.firstName} ${user!.lastName}`}
@@ -33,6 +57,7 @@ export default async function ParentOnboardingPage() {
         generatedPassword: d.generatedPassword as string,
         gradeLevel: (d.gradeLevel as string) || null,
       }))}
+      initialInvitations={initialInvitations}
     />
   )
 }
