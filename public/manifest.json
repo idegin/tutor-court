@@ -1,0 +1,25 @@
+{
+  "name": "TutorCourt",
+  "short_name": "TutorCourt",
+  "description": "TutorCourt - Your Trusted Online Tutoring Marketplace",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#7ab62c",
+  "background_color": "#f5fbea",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo-main.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["education"]
+}

@@ -14,9 +14,19 @@ const lato = Lato({
   variable: '--font-sans',
 })
 
+export const viewport = {
+  themeColor: '#7ab62c',
+}
+
 export const metadata = {
   description: 'TutorCourt is an online tutoring marketplace that connects students with qualified tutors for personalized learning experiences.',
   title: 'TutorCourt - Your Trusted Online Tutoring Marketplace',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'TutorCourt',
+  },
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {

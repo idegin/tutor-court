@@ -67,10 +67,23 @@ export default async function ClassroomPage(props: PageProps) {
       depth: 0,
     })
 
-    let whiteboards = whiteboardsRes.docs
+    const whiteboardsWithSlides: any[] = []
+    for (const wb of whiteboardsRes.docs) {
+      const slidesRes = await payload.find({
+        collection: 'whiteboard-slides',
+        where: { whiteboard: { equals: wb.id } },
+        sort: 'order',
+        limit: 100,
+        depth: 0,
+      })
+      whiteboardsWithSlides.push({
+        ...wb,
+        slides: slidesRes.docs,
+      })
+    }
 
     // If no whiteboards exist, create a default one
-    if (whiteboards.length === 0) {
+    if (whiteboardsWithSlides.length === 0) {
       const newWb = await payload.create({
         collection: 'whiteboards',
         data: {
@@ -84,7 +97,7 @@ export default async function ClassroomPage(props: PageProps) {
       })
 
       // Create slide 1
-      await payload.create({
+      const defaultSlide = await payload.create({
         collection: 'whiteboard-slides',
         data: {
           whiteboard: newWb.id,
@@ -94,7 +107,10 @@ export default async function ClassroomPage(props: PageProps) {
         } as any,
       })
 
-      whiteboards = [newWb]
+      whiteboardsWithSlides.push({
+        ...newWb,
+        slides: [defaultSlide],
+      })
     }
 
     return (
@@ -102,7 +118,7 @@ export default async function ClassroomPage(props: PageProps) {
         cls={cls}
         currentUser={user}
         initialSession={activeSession}
-        initialWhiteboards={whiteboards}
+        initialWhiteboards={whiteboardsWithSlides}
         videoSdkToken={generateVideoSdkToken()}
       />
     )

@@ -131,11 +131,6 @@ export function LoginForm({
                 </Button>
             </div>
 
-            {errors?.form ? <p className="text-sm text-destructive">{errors.form}</p> : null}
-            {hasError ? (
-                <FieldDescription>Please fix the highlighted fields before submitting.</FieldDescription>
-            ) : null}
-
             <p className="text-center text-sm text-muted-foreground pt-4">
                 Don't have an account?{' '}
                 <button type="button" className="font-bold text-primary hover:underline ml-1" onClick={onCreateAccountClick}>

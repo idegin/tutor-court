@@ -44,6 +44,9 @@ importers:
       '@tanstack/react-query-devtools':
         specifier: ^5.91.3
         version: 5.91.3(@tanstack/react-query@5.91.2(react@19.2.1))(react@19.2.1)
+      '@videosdk.live/react-sdk':
+        specifier: ^0.10.0
+        version: 0.10.0(react@19.2.1)(scheduler@0.27.0)
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -3118,6 +3121,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@videosdk.live/js-sdk@0.8.1':
+    resolution: {integrity: sha512-kznpVUlCxQaC9VJ1Xv2LFOU/BwoFH1UDVaBcffC246kpSBeKdohKYfZu28toIe2lRynuyu72xdLAOEgOB4Y8lg==}
+
+  '@videosdk.live/react-sdk@0.10.0':
+    resolution: {integrity: sha512-/Z4tT2xp1uIPwRraTFYY0whCAQkiOJ7Oxha/qj524wIyehN8iYbSkDzuymyFdEZi1dk81epXtfeOfFvzL1HCZw==}
+    peerDependencies:
+      react: ^16.13.1 || ^17 || ^18 || ^19
+
   '@vitejs/plugin-react@4.5.2':
     resolution: {integrity: sha512-QNVT3/Lxx99nMQWJWF7K4N6apUEuT0KlZA3mx/mVaoGj3smm/8rc8ezz15J1pcbcjDK0V15rpHetVfya08r76Q==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -5492,6 +5503,9 @@ packages:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
 
+  proxy-compare@3.0.1:
+    resolution: {integrity: sha512-V9plBAt3qjMlS1+nC8771KNf6oJ12gExvaxnNzN/9yVRLdTv/lc+oJlnSzrdYDAvBfTStPCoiaCOTmTs0adv7Q==}
+
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
 
@@ -5666,6 +5680,12 @@ packages:
       react: ^16 || ^17.0.1 || ^18 || ^19
       react-dom: ^16 || ^17.0.1 || ^18 || ^19
       react-select: ^5.9.0
+
+  react-tracked@2.0.1:
+    resolution: {integrity: sha512-qjbmtkO2IcW+rB2cFskRWDTjKs/w9poxvNnduacjQA04LWxOoLy9J8WfIEq1ahifQ/tVJQECrQPBm+UEzKRDtg==}
+    peerDependencies:
+      react: '>=18.0.0'
+      scheduler: '>=0.19.0'
 
   react-transition-group@4.4.5:
     resolution: {integrity: sha512-pZcd1MCJoiKiBR2NRxeCRg13uCXbydPnmB4EOeRrY7480qNWO8IIgQG6zlDkm6uRMsURXPuKq0GWtiM59a5Q6g==}
@@ -9970,6 +9990,17 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.11.1':
     optional: true
 
+  '@videosdk.live/js-sdk@0.8.1': {}
+
+  '@videosdk.live/react-sdk@0.10.0(react@19.2.1)(scheduler@0.27.0)':
+    dependencies:
+      '@videosdk.live/js-sdk': 0.8.1
+      events: 3.3.0
+      react: 19.2.1
+      react-tracked: 2.0.1(react@19.2.1)(scheduler@0.27.0)
+    transitivePeerDependencies:
+      - scheduler
+
   '@vitejs/plugin-react@4.5.2(vite@7.3.1(@types/node@22.19.9)(jiti@2.6.1)(lightningcss@1.32.0)(sass@1.77.4)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.29.0
@@ -12617,6 +12648,8 @@ snapshots:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
 
+  proxy-compare@3.0.1: {}
+
   pump@3.0.4:
     dependencies:
       end-of-stream: 1.4.5
@@ -12880,6 +12913,13 @@ snapshots:
       react-select: 5.10.2(@types/react@19.2.9)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       spacetime: 7.12.0
       timezone-soft: 1.5.2
+
+  react-tracked@2.0.1(react@19.2.1)(scheduler@0.27.0):
+    dependencies:
+      proxy-compare: 3.0.1
+      react: 19.2.1
+      scheduler: 0.27.0
+      use-context-selector: 2.0.0(react@19.2.1)(scheduler@0.27.0)
 
   react-transition-group@4.4.5(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
     dependencies:
@@ -13716,6 +13756,11 @@ snapshots:
     dependencies:
       react: 19.2.1
       scheduler: 0.25.0
+
+  use-context-selector@2.0.0(react@19.2.1)(scheduler@0.27.0):
+    dependencies:
+      react: 19.2.1
+      scheduler: 0.27.0
 
   use-isomorphic-layout-effect@1.2.1(@types/react@19.2.9)(react@19.2.1):
     dependencies:

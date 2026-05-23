@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { getBaseEmailLayout } from '../lib/email-template'
+import { sendEmail } from '../lib/email-service'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -152,11 +153,11 @@ export const Users: CollectionConfig = {
                   </div>
                 `
                 const emailHtml = getBaseEmailLayout('Class Invitation Accepted', emailContent)
-                req.payload.sendEmail({
+                sendEmail({
                   to: tutorEmail,
                   subject: `${inviteeName} Accepted Your Invite to ${cls.title}`,
                   html: emailHtml,
-                }).catch(err => console.error('Error sending acceptance email to tutor:', err))
+                }).catch(err => console.error('[Users hook] Error sending acceptance email to tutor:', err))
               }
             }
           }

@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { getBaseEmailLayout } from '@/lib/email-template'
+import { sendEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -108,11 +109,12 @@ export async function POST(request: Request) {
         <a href="${signupUrl}" class="btn font-semibold">Join Class</a>
       </div>
     `
-    payload.sendEmail({
+    const emailHtml = getBaseEmailLayout(`Resent Class Invitation: ${classObj.title}`, emailContent)
+    sendEmail({
       to: updatedInvite.inviteeEmail,
       subject: `Resent Class Invitation: ${classObj.title}`,
       html: emailHtml,
-    }).catch(err => console.error('Error sending email to invited user:', err))
+    }).catch(err => console.error('[resend-invite] Error sending email:', err))
 
     return NextResponse.json({ success: true, invitation: updatedInvite })
   } catch (error: any) {

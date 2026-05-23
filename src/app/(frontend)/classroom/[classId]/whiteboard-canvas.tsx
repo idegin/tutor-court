@@ -26,15 +26,18 @@ interface Line {
 interface WhiteboardCanvasProps {
     whiteboardId: string;
     isTutor: boolean;
+    initialSlides?: any[];
 }
 
-export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProps) {
+export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: WhiteboardCanvasProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const [slides, setSlides] = useState<any[]>([]);
+    const [slides, setSlides] = useState<any[]>(initialSlides || []);
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-    const [lines, setLines] = useState<Line[]>([]);
+    const [lines, setLines] = useState<Line[]>(
+        initialSlides && initialSlides.length > 0 ? initialSlides[0].data?.lines || [] : []
+    );
     const [isDrawing, setIsDrawing] = useState(false);
 
     // Tools
@@ -44,8 +47,14 @@ export function WhiteboardCanvas({ whiteboardId, isTutor }: WhiteboardCanvasProp
 
     // Fetch slides on mount/whiteboardId change
     useEffect(() => {
-        fetchSlides();
-    }, [whiteboardId]);
+        if (initialSlides && initialSlides.length > 0) {
+            setSlides(initialSlides);
+            setCurrentSlideIndex(0);
+            setLines(initialSlides[0].data?.lines || []);
+        } else {
+            fetchSlides();
+        }
+    }, [whiteboardId, initialSlides]);
 
     // Draw lines whenever lines state or canvas size changes
     useEffect(() => {

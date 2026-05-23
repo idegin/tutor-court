@@ -124,7 +124,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
         setMaxStudents(String(cls.maxStudents || 1));
         setStartDate(new Date(cls.startDate));
         setEndDate(new Date(cls.endDate));
-        
+
         // Reset schedule state
         const newSchedule = {
             sun: { checked: false, startTime: '09:00', endTime: '10:00' },
@@ -135,7 +135,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             fri: { checked: false, startTime: '09:00', endTime: '10:00' },
             sat: { checked: false, startTime: '09:00', endTime: '10:00' },
         };
-        
+
         if (cls.schedule && Array.isArray(cls.schedule)) {
             cls.schedule.forEach((s: any) => {
                 const dayIdMap: Record<string, string> = {
@@ -188,7 +188,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
         try {
             const url = editingClassId ? `/api/tutor/classes/${editingClassId}` : '/api/tutor/classes';
             const method = editingClassId ? 'PATCH' : 'POST';
-            
+
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -238,7 +238,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     setIsOpen(open);
                     if (!open) resetForm();
                 }}>
-                    <Button 
+                    <Button
                         onClick={() => {
                             resetForm();
                             setIsOpen(true);
@@ -511,7 +511,8 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                     <DropdownMenuItem onClick={() => openEditClass(cls)}>
                                                         Edit details
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem>Message students</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>

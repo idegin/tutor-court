@@ -5,6 +5,8 @@ import config from '@payload-config'
 
 import { generateManagedEmail, generateManagedPassword } from '@/lib/managed-account'
 import { getBaseEmailLayout } from '@/lib/email-template'
+import { sendEmail } from '@/lib/email-service'
+import { createNotification } from '@/lib/notification-service'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -30,10 +32,7 @@ export async function POST(request: Request) {
   const customPassword = (body?.customPassword || '').toString().trim()
 
   if (!firstName || !lastName) {
-    return NextResponse.json(
-      { error: 'First name and last name are required.' },
-      { status: 400 },
-    )
+    return NextResponse.json({ error: 'First name and last name are required.' }, { status: 400 })
   }
 
   if (passwordMode === 'custom' && (!customPassword || customPassword.length < 6)) {
@@ -107,9 +106,7 @@ export async function POST(request: Request) {
         currentStudents.push(childUser.id)
       }
 
-      const currentParents = (cls.parents || []).map((p: any) =>
-        typeof p === 'object' ? p.id : p,
-      )
+      const currentParents = (cls.parents || []).map((p: any) => (typeof p === 'object' ? p.id : p))
       if (!currentParents.includes(user.id)) {
         currentParents.push(user.id)
       }
@@ -133,6 +130,7 @@ export async function POST(request: Request) {
       })
 
       const tutor = cls.tutor
+      const tutorId = typeof tutor === 'object' ? (tutor as any)?.id : tutor
       const tutorEmail = typeof tutor === 'object' ? tutor?.email : null
       const tutorName =
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
@@ -147,10 +145,22 @@ export async function POST(request: Request) {
           </div>
         `
         const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)
-        await payload.sendEmail({
+        await sendEmail({
           to: tutorEmail,
           subject: `New Student: ${firstName} ${lastName} Joined ${cls.title}`,
           html: emailHtml,
+        })
+      }
+
+      if (tutorId) {
+        await createNotification({
+          recipientId: String(tutorId),
+          type: 'student_added_to_class',
+          title: 'Child Added to Your Class',
+          message: `${user.firstName} ${user.lastName} added their child ${firstName} ${lastName} to "${cls.title}" during onboarding.`,
+          link: `/dashboard/tutor/classes/${classId}`,
+          relatedCollection: 'classes',
+          relatedId: classId,
         })
       }
     }
@@ -166,9 +176,7 @@ export async function POST(request: Request) {
   })
 
   for (const cls of directClasses.docs) {
-    const currentStudents = (cls.students || []).map((s: any) =>
-      typeof s === 'object' ? s.id : s,
-    )
+    const currentStudents = (cls.students || []).map((s: any) => (typeof s === 'object' ? s.id : s))
     if (!currentStudents.includes(childUser.id)) {
       currentStudents.push(childUser.id)
 
@@ -181,6 +189,7 @@ export async function POST(request: Request) {
       })
 
       const tutor = cls.tutor
+      const tutorId = typeof tutor === 'object' ? (tutor as any)?.id : tutor
       const tutorEmail = typeof tutor === 'object' ? tutor?.email : null
       const tutorName =
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
@@ -195,10 +204,22 @@ export async function POST(request: Request) {
           </div>
         `
         const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)
-        await payload.sendEmail({
+        await sendEmail({
           to: tutorEmail,
           subject: `New Student: ${firstName} ${lastName} Joined ${cls.title}`,
           html: emailHtml,
+        })
+      }
+
+      if (tutorId) {
+        await createNotification({
+          recipientId: String(tutorId),
+          type: 'student_added_to_class',
+          title: 'Child Added to Your Class',
+          message: `${user.firstName} ${user.lastName} added their child ${firstName} ${lastName} to "${cls.title}".`,
+          link: `/dashboard/tutor/classes/${cls.id}`,
+          relatedCollection: 'classes',
+          relatedId: cls.id,
         })
       }
     }

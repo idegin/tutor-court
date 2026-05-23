@@ -77,6 +77,16 @@ export const LiveSessions: CollectionConfig = {
       hasMany: true,
     },
     {
+      name: 'showWhiteboard',
+      type: 'checkbox',
+      defaultValue: false,
+    },
+    {
+      name: 'activeWhiteboard',
+      type: 'relationship',
+      relationTo: 'whiteboards',
+    },
+    {
       name: 'coinsConsumed',
       type: 'number',
       defaultValue: 0,

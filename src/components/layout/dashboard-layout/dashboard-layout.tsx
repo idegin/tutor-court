@@ -143,6 +143,10 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
                             </PopoverContent>
                         </Popover>
                     )}
+                    {/* Divider */}
+                    {user && user.accountType === 'tutor' && (
+                        <div className="h-6 w-px bg-border" />
+                    )}
                     {user && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>

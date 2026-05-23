@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import * as React from 'react'
+import { toast } from 'sonner'
 
 import {
     AccountTypeSelection,
@@ -115,7 +116,7 @@ function RegisterContent() {
             }
 
             if (!selectedTypeId) {
-                setErrors({ form: 'Please go back and select an account type.' })
+                toast.error('Please go back and select an account type.', { position: 'top-center' })
                 return
             }
 
@@ -142,7 +143,11 @@ function RegisterContent() {
 
                 router.push(`/auth/check-email?email=${encodeURIComponent(values.email)}`)
             } catch (err: any) {
-                setErrors((prev) => ({ ...prev, form: err.message }))
+                const raw = err.message || ''
+                const message = raw.toLowerCase().includes('invalid: email')
+                    ? 'This email is already registered. Please log in or use a different email.'
+                    : raw || 'Failed to create account. Please try again.'
+                toast.error(message, { position: 'top-center' })
                 setIsSubmitting(false)
             }
         },

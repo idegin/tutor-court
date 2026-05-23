@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateVideoSdkToken } from '@/lib/videosdk'
+import { CREDIT_RATE } from '@/lib/constants'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -35,9 +36,11 @@ export async function POST(request: Request) {
     })
 
     const wallet = wallets.docs[0]
-    if (!wallet || (wallet.creditBalance || 0) < 60) {
+    if (!wallet || (wallet.creditBalance || 0) < CREDIT_RATE.minimumClassCredits) {
       return NextResponse.json(
-        { error: 'You need at least 60 credits (1 hour) to start a live class.' },
+        {
+          error: `You need at least ${CREDIT_RATE.minimumClassCredits} credits (1 hour) to start a live class.`,
+        },
         { status: 400 },
       )
     }

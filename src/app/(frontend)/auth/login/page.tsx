@@ -72,10 +72,11 @@ function LoginContent() {
         onError: (err: any) => {
             if (err.message === 'The email or password provided is incorrect.') {
                 toast.error(err.message, {
-                    description: 'Please check your credentials and try again.'
+                    description: 'Please check your credentials and try again.',
+                    position: 'top-center',
                 })
             } else {
-                toast.error(err.message || 'An error occurred during log in')
+                toast.error(err.message || 'An error occurred during log in', { position: 'top-center' })
             }
         }
     })

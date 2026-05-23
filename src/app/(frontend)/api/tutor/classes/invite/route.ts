@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { getBaseEmailLayout } from '@/lib/email-template'
+import { sendEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -73,12 +74,35 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `User is already in this class.` }, { status: 400 })
       }
 
+      const updatedClassData: Record<string, any> = {
+        [fieldKey]: [...existingIds, inviteUser.id],
+      }
+
+      // When adding an existing parent, also enrol all of their existing children
+      if (inviteeType === 'parent') {
+        const childStudents = await payload.find({
+          collection: 'students',
+          where: { parent: { equals: inviteUser.id } },
+          depth: 1,
+          limit: 50,
+        })
+        const existingStudentIds = (classDoc.students || []).map((s: any) =>
+          typeof s === 'object' ? s.id : s,
+        )
+        for (const childDoc of childStudents.docs) {
+          const childUserId =
+            typeof childDoc.user === 'object' ? (childDoc.user as any).id : childDoc.user
+          if (childUserId && !existingStudentIds.includes(childUserId)) {
+            existingStudentIds.push(childUserId)
+          }
+        }
+        updatedClassData.students = existingStudentIds
+      }
+
       await payload.update({
         collection: 'classes',
         id: classId,
-        data: {
-          [fieldKey]: [...existingIds, inviteUser.id],
-        } as any,
+        data: updatedClassData as any,
       })
 
       // Send email to existing user
@@ -94,11 +118,11 @@ export async function POST(request: Request) {
         `Added to Class: ${classDoc.title || 'Live Class'}`,
         emailContent
       )
-      payload.sendEmail({
+      sendEmail({
         to: trimmedEmail,
         subject: `Added to Class: ${classDoc.title || 'Live Class'}`,
         html: emailHtml,
-      }).catch(err => console.error('Error sending email to existing user:', err))
+      }).catch(err => console.error('[invite] Error sending email to existing user:', err))
 
       return NextResponse.json({ success: true, added: true, user: inviteUser })
     } else {
@@ -150,11 +174,11 @@ export async function POST(request: Request) {
         `Class Invitation: ${classDoc.title || 'Live Class'}`,
         emailContent
       )
-      payload.sendEmail({
+      sendEmail({
         to: trimmedEmail,
         subject: `Class Invitation: ${classDoc.title || 'Live Class'}`,
         html: emailHtml,
-      }).catch(err => console.error('Error sending email to invited user:', err))
+      }).catch(err => console.error('[invite] Error sending email to invited user:', err))
 
       return NextResponse.json({ success: true, added: false, invitation })
     }

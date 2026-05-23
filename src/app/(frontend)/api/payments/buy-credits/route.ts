@@ -2,7 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { COIN_RATE } from '@/lib/constants'
+import { CREDIT_RATE } from '@/lib/constants'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Valid number of credits is required.' }, { status: 400 })
   }
 
-  const cost = credits * COIN_RATE.nairaPerCoin
+  const cost = credits * CREDIT_RATE.nairaPerCoin
 
   try {
     const wallets = await payload.find({

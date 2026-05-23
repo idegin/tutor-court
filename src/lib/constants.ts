@@ -1,6 +1,6 @@
-export const COIN_RATE = {
-  coinsPerNaira: 1,
-  nairaPerCoin: 1,
+export const CREDIT_RATE = {
+  coinsPerNaira: 0.1,
+  nairaPerCoin: 10,
   coinsPerHour: 60,
   coinsPerMinute: 1,
   minimumClassCredits: 60,
@@ -32,9 +32,9 @@ export function formatCredits(credits: number): string {
 }
 
 export function nairaToCredits(naira: number): number {
-  return Math.floor(naira * COIN_RATE.coinsPerNaira)
+  return Math.floor(naira * CREDIT_RATE.coinsPerNaira)
 }
 
 export function coinsToNaira(credits: number): number {
-  return credits * COIN_RATE.nairaPerCoin
+  return credits * CREDIT_RATE.nairaPerCoin
 }

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,7 +40,10 @@ import {
     HiOutlineSparkles,
     HiOutlineChevronLeft,
     HiOutlinePencil,
+    HiOutlineClipboardDocumentList,
+    HiOutlineAcademicCap,
 } from 'react-icons/hi2';
+import { CREDIT_RATE } from '@/lib/constants';
 
 function isCloseToSchedule(cls: any): boolean {
     if (!cls || !cls.schedule || !Array.isArray(cls.schedule) || cls.schedule.length === 0) {
@@ -47,40 +51,40 @@ function isCloseToSchedule(cls: any): boolean {
     }
 
     const now = new Date();
-    
+
     // Check if now is within startDate and endDate
     const start = new Date(cls.startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(cls.endDate);
     end.setHours(23, 59, 59, 999);
-    
+
     if (now < start || now > end) {
         return false;
     }
 
     const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const currentDay = daysOfWeek[now.getDay()];
-    
+
     for (const item of cls.schedule) {
         if (item.day.toLowerCase() === currentDay) {
             const [startHour, startMin] = item.startTime.split(':').map(Number);
             const [endHour, endMin] = item.endTime.split(':').map(Number);
-            
+
             const classStart = new Date(now);
             classStart.setHours(startHour, startMin, 0, 0);
-            
+
             const classEnd = new Date(now);
             classEnd.setHours(endHour, endMin, 0, 0);
-            
+
             // Allow 15 minutes window before start
             const windowStart = new Date(classStart.getTime() - 15 * 60 * 1000);
-            
+
             if (now >= windowStart && now <= classEnd) {
                 return true;
             }
         }
     }
-    
+
     return false;
 }
 
@@ -115,6 +119,21 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
     const [pendingInvites, setPendingInvites] = useState<any[]>([]);
     const [isResending, setIsResending] = useState<string | null>(null);
     const [isCloseToScheduledTime, setIsCloseToScheduledTime] = useState(false);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [resendConfirmId, setResendConfirmId] = useState<string | null>(null);
+
+    // Assessment assignment states
+    const [tutorAssessments, setTutorAssessments] = useState<any[]>([]);
+    const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
+    const [availableQuestions, setAvailableQuestions] = useState<any[]>([]);
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<string>>(new Set());
+    const [questionsLoading, setQuestionsLoading] = useState(false);
+    const [assignAssessmentId, setAssignAssessmentId] = useState('');
+    const [assignRecipient, setAssignRecipient] = useState<string>('all');
+    const [assignDueDate, setAssignDueDate] = useState('');
+    const [assignInstructions, setAssignInstructions] = useState('');
+    const [isAssigning, setIsAssigning] = useState(false);
+    const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
 
     // Edit sheet states
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -171,6 +190,8 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
         fetchCredits();
         checkActiveSession();
         fetchPendingInvites();
+        fetchTutorAssessments();
+        fetchRecentAssignments();
 
         const checkSchedule = () => {
             setIsCloseToScheduledTime(isCloseToSchedule(cls));
@@ -189,7 +210,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
             setMaxStudents(String(cls.maxStudents || 1));
             setStartDate(cls.startDate ? new Date(cls.startDate) : undefined);
             setEndDate(cls.endDate ? new Date(cls.endDate) : undefined);
-            
+
             const newSchedule: Record<string, { checked: boolean; startTime: string; endTime: string }> = {
                 sun: { checked: false, startTime: '09:00', endTime: '10:00' },
                 mon: { checked: false, startTime: '09:00', endTime: '10:00' },
@@ -224,6 +245,16 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
         }
     }, [cls]);
 
+    useEffect(() => {
+        if (assignAssessmentId) {
+            fetchAssessmentQuestions(assignAssessmentId);
+        } else {
+            setAvailableQuestions([]);
+            setSelectedQuestionIds(new Set());
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [assignAssessmentId]);
+
     const fetchPendingInvites = async () => {
         try {
             const res = await fetch(`/api/class-invitations?where[class][equals]=${cls.id}&where[status][equals]=pending`);
@@ -236,7 +267,96 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
         }
     };
 
+    const fetchTutorAssessments = async () => {
+        try {
+            const res = await fetch('/api/assessments?limit=50');
+            const data = await res.json();
+            if (data?.docs) setTutorAssessments(data.docs);
+        } catch (err) {
+            console.error('Error fetching assessments:', err);
+        }
+    };
+
+    const fetchRecentAssignments = async () => {
+        try {
+            const res = await fetch(`/api/assessments/tutor-assessments?classId=${cls.id}&limit=10`);
+            const data = await res.json();
+            if (data?.docs) setRecentAssignments(data.docs);
+        } catch (err) {
+            console.error('Error fetching recent assignments:', err);
+        }
+    };
+
+    const fetchAssessmentQuestions = async (assessmentId: string) => {
+        setQuestionsLoading(true);
+        setAvailableQuestions([]);
+        setSelectedQuestionIds(new Set());
+        try {
+            const res = await fetch(`/api/assessments/questions?assessmentId=${assessmentId}&limit=100`);
+            const data = await res.json();
+            const questions = data?.docs || [];
+            setAvailableQuestions(questions);
+            setSelectedQuestionIds(new Set(questions.map((q: any) => q.id)));
+        } catch (err) {
+            console.error('Error fetching questions:', err);
+        } finally {
+            setQuestionsLoading(false);
+        }
+    };
+
+    const handleAssignAssessment = async () => {
+        if (!assignAssessmentId) {
+            toast.error('Please select an assessment.');
+            return;
+        }
+        if (availableQuestions.length > 0 && selectedQuestionIds.size === 0) {
+            toast.error('Please select at least one question.');
+            return;
+        }
+        const students: any[] = assignRecipient === 'all'
+            ? (cls.students || [])
+            : (cls.students || []).filter((s: any) => (typeof s === 'object' ? s.id : s) === assignRecipient);
+        if (students.length === 0) {
+            toast.error('No students to assign to. Add students to this class first.');
+            return;
+        }
+        setIsAssigning(true);
+        try {
+            let count = 0;
+            for (const student of students) {
+                const studentId = typeof student === 'object' ? student.id : student;
+                const res = await fetch('/api/assessments/tutor-assessments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        assessmentId: assignAssessmentId,
+                        studentId,
+                        classId: cls.id,
+                        selectedQuestionIds: Array.from(selectedQuestionIds),
+                        dueDate: assignDueDate || undefined,
+                        instructions: assignInstructions || undefined,
+                    }),
+                });
+                if (res.ok) count++;
+            }
+            toast.success(`Assessment assigned to ${count} student${count !== 1 ? 's' : ''}!`);
+            setIsAssignDialogOpen(false);
+            setAssignAssessmentId('');
+            setAssignRecipient('all');
+            setAssignDueDate('');
+            setAssignInstructions('');
+            setAvailableQuestions([]);
+            setSelectedQuestionIds(new Set());
+            fetchRecentAssignments();
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to assign assessment.');
+        } finally {
+            setIsAssigning(false);
+        }
+    };
+
     const handleResendInvite = async (invitationId: string) => {
+        setResendConfirmId(null);
         setIsResending(invitationId);
         try {
             const res = await fetch('/api/tutor/classes/resend-invite', {
@@ -360,7 +480,10 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
     };
 
     const handleDeleteInvite = async (invitationId: string) => {
-        if (!confirm('Are you sure you want to delete this invitation?')) return;
+        setDeleteConfirmId(null);
+        // Optimistic update — remove from list immediately
+        const prev = pendingInvites;
+        setPendingInvites(current => current.filter(i => i.id !== invitationId));
         try {
             const res = await fetch(`/api/tutor/classes/invite?id=${invitationId}`, {
                 method: 'DELETE',
@@ -370,8 +493,8 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                 throw new Error(data.error || 'Failed to delete invitation.');
             }
             toast.success('Invitation deleted successfully!');
-            fetchPendingInvites();
         } catch (err: any) {
+            setPendingInvites(prev); // restore on error
             toast.error(err.message || 'Error deleting invitation.');
         }
     };
@@ -437,8 +560,8 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
             return;
         }
 
-        if (tutorCredits < 60) {
-            toast.error('Insufficient credits. You need at least 60 credits (1 hour) to start a live class.');
+        if (tutorCredits < CREDIT_RATE.minimumClassCredits) {
+            toast.error(`Insufficient credits. You need at least ${CREDIT_RATE.minimumClassCredits} credits (1 hour) to start a live class.`);
             return;
         }
 
@@ -646,9 +769,11 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                 <div className="flex flex-col items-start md:items-end w-full md:w-auto">
                                                     <span className="text-xs font-medium text-muted-foreground">Parent</span>
                                                     <span className="text-xs text-foreground font-semibold mt-0.5">
-                                                        {cls.parents && cls.parents.length > 0
-                                                            ? cls.parents.map((p: any) => `${p.firstName} ${p.lastName}`).join(', ')
-                                                            : 'None linked'}
+                                                        {student.parent && typeof student.parent === 'object'
+                                                            ? `${(student.parent as any).firstName} ${(student.parent as any).lastName}`
+                                                            : cls.parents && cls.parents.length > 0
+                                                                ? cls.parents.map((p: any) => `${p.firstName} ${p.lastName}`).join(', ')
+                                                                : 'None linked'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -680,7 +805,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                         variant="ghost"
                                                         className="h-7 text-xs text-tutor-purple-600 hover:text-tutor-purple-700 cursor-pointer px-2"
                                                         disabled={isResending === inv.id}
-                                                        onClick={() => handleResendInvite(inv.id)}
+                                                        onClick={() => setResendConfirmId(inv.id)}
                                                     >
                                                         {isResending === inv.id ? 'Resending...' : 'Resend'}
                                                     </Button>
@@ -688,7 +813,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                         size="sm"
                                                         variant="ghost"
                                                         className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/5 cursor-pointer px-2"
-                                                        onClick={() => handleDeleteInvite(inv.id)}
+                                                        onClick={() => setDeleteConfirmId(inv.id)}
                                                     >
                                                         Delete
                                                     </Button>
@@ -700,7 +825,147 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* Assessments Card */}
+                    <Card className="border border-border bg-card">
+                        <CardHeader className="flex flex-row justify-between items-center space-y-0">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <HiOutlineClipboardDocumentList className="h-5 w-5" /> Assessments
+                                </CardTitle>
+                                <CardDescription>
+                                    Assigned assessments for students in this class.
+                                </CardDescription>
+                            </div>
+                            <Button
+                                size="sm"
+                                onClick={() => setIsAssignDialogOpen(true)}
+                                className="bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white cursor-pointer text-xs font-semibold h-8 px-3 gap-1 flex items-center"
+                            >
+                                <HiPlus className="h-3.5 w-3.5" /> Assign
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {recentAssignments.length > 0 ? (
+                                <div className="divide-y border rounded-lg bg-card/50">
+                                    {recentAssignments.map((ta: any) => {
+                                        const studentName = typeof ta.student === 'object'
+                                            ? `${ta.student.firstName} ${ta.student.lastName}`
+                                            : 'Student';
+                                        const assessmentTitle = typeof ta.assessment === 'object'
+                                            ? ta.assessment.title
+                                            : 'Assessment';
+                                        const assessmentType = typeof ta.assessment === 'object'
+                                            ? ta.assessment.type
+                                            : '';
+                                        const questionCount = Array.isArray(ta.selectedQuestions) ? ta.selectedQuestions.length : 0;
+                                        const statusColors: Record<string, string> = {
+                                            pending: 'bg-amber-50 text-amber-700 border-amber-100',
+                                            in_progress: 'bg-blue-50 text-blue-700 border-blue-100',
+                                            completed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                                            expired: 'bg-red-50 text-red-700 border-red-100',
+                                        };
+                                        const typeColors: Record<string, string> = {
+                                            quiz: 'bg-violet-50 text-violet-700 border-violet-100',
+                                            flashcard: 'bg-sky-50 text-sky-700 border-sky-100',
+                                            practice_test: 'bg-amber-50 text-amber-700 border-amber-100',
+                                            homework: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                                        };
+                                        return (
+                                            <div key={ta.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/30">
+                                                        <HiOutlineClipboardDocumentList className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h5 className="text-sm font-bold text-foreground truncate">{assessmentTitle}</h5>
+                                                            {assessmentType && (
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 capitalize ${typeColors[assessmentType] || 'bg-secondary/30 text-muted-foreground border-border'}`}>
+                                                                    {assessmentType.replace('_', ' ')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">{studentName}</p>
+                                                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                                            {questionCount > 0 && (
+                                                                <span className="text-[10px] text-muted-foreground">{questionCount} question{questionCount !== 1 ? 's' : ''}</span>
+                                                            )}
+                                                            {ta.dueDate && (
+                                                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                                                    <HiOutlineClock className="h-3 w-3" /> Due {format(new Date(ta.dueDate), 'MMM d, yyyy')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] border font-semibold capitalize ${statusColors[ta.status] || ''}`}>
+                                                        {ta.status.replace('_', ' ')}
+                                                    </span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="text-xs h-7 text-tutor-purple-600 hover:text-tutor-purple-700 cursor-pointer px-2"
+                                                        onClick={() => router.push(`/dashboard/tutor/assessments/${ta.id}`)}
+                                                    >
+                                                        View
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 border border-dashed rounded-lg text-sm text-muted-foreground">
+                                    <HiOutlineClipboardDocumentList className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                    No assessments assigned yet. Click &quot;Assign&quot; to get started.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
+
+                {/* Delete Invitation Confirmation */}
+                <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to delete this invitation? This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                // className="bg-destructive text-white hover:bg-destructive/90"
+                                onClick={() => deleteConfirmId && handleDeleteInvite(deleteConfirmId)}
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Resend Invitation Confirmation */}
+                <AlertDialog open={!!resendConfirmId} onOpenChange={(open) => !open && setResendConfirmId(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Resend Invitation</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Resend the invitation email to this person? They will receive a new invitation link.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => resendConfirmId && handleResendInvite(resendConfirmId)}
+                            >
+                                Resend
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Right Columns (Live Class Actions & Whiteboard management) */}
                 <div className="space-y-6">
@@ -737,8 +1002,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                         <DialogTrigger asChild>
                                             <Button
                                                 onClick={fetchCredits}
-                                                disabled={!isCloseToScheduledTime}
-                                                className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-semibold cursor-pointer disabled:opacity-50"
+                                                className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-semibold cursor-pointer"
                                             >
                                                 Start Live Classroom
                                             </Button>
@@ -750,18 +1014,18 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                     Start Live Classroom Session
                                                 </DialogTitle>
                                                 <DialogDescription>
-                                                    Starting a live session costs <strong>1 credit per minute</strong>. A minimum of 60 credits (1 hour) is required to start.
+                                                    Starting a live session costs <strong>1 credit per minute per student/parent</strong> on the call. A minimum of {CREDIT_RATE.minimumClassCredits} credits (1 hour for 1 student) is required to start.
                                                 </DialogDescription>
                                             </DialogHeader>
 
                                             <div className="py-4 border-t border-b border-muted my-2">
                                                 <div className="flex justify-between items-center text-sm mb-2">
                                                     <span className="font-medium text-muted-foreground">Required Credits:</span>
-                                                    <span className="font-bold text-foreground">60 Credits</span>
+                                                    <span className="font-bold text-foreground">{CREDIT_RATE.minimumClassCredits} Credits</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="font-medium text-muted-foreground">Your Balance:</span>
-                                                    <span className={`font-bold ${tutorCredits !== null && tutorCredits < 60 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    <span className={`font-bold ${tutorCredits !== null && tutorCredits < CREDIT_RATE.minimumClassCredits ? 'text-red-600' : 'text-green-600'}`}>
                                                         {tutorCredits !== null ? `${tutorCredits} Credits` : 'Loading...'}
                                                     </span>
                                                 </div>
@@ -775,7 +1039,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                 >
                                                     Cancel
                                                 </Button>
-                                                {tutorCredits !== null && tutorCredits < 60 ? (
+                                                {tutorCredits !== null && tutorCredits < CREDIT_RATE.minimumClassCredits ? (
                                                     <Button
                                                         onClick={() => {
                                                             setIsStartSessionOpen(false);
@@ -797,11 +1061,6 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                             </DialogFooter>
                                         </DialogContent>
                                     </Dialog>
-                                    {!isCloseToScheduledTime && (
-                                        <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded p-2 text-center mt-2">
-                                            Disabled: You can only start the class within 15 minutes of scheduled day/time.
-                                        </p>
-                                    )}
                                     <p className="text-[11px] text-muted-foreground text-center">
                                         Starting a class deducts credits from your wallet based on call duration.
                                     </p>
@@ -867,7 +1126,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                     {whiteboards.map((wb) => (
                                         <div
                                             key={wb.id}
-                                            onClick={() => router.push(`/classroom/${cls.id}?whiteboardId=${wb.id}`)}
+                                            onClick={() => router.push(`/whiteboard/${wb.id}`)}
                                             className="p-3 border rounded-lg hover:bg-muted/10 cursor-pointer flex items-center justify-between transition-colors"
                                         >
                                             <div className="flex items-center gap-2">
@@ -889,8 +1148,183 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                             )}
                         </CardContent>
                     </Card>
+
                 </div>
             </div>
+
+            {/* Assign Assessment Dialog */}
+            <Dialog
+                open={isAssignDialogOpen}
+                onOpenChange={(open) => {
+                    setIsAssignDialogOpen(open);
+                    if (!open) {
+                        setAssignAssessmentId('');
+                        setAssignRecipient('all');
+                        setAssignDueDate('');
+                        setAssignInstructions('');
+                        setAvailableQuestions([]);
+                        setSelectedQuestionIds(new Set());
+                    }
+                }}
+            >
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-card border-border">
+                    <DialogHeader>
+                        <DialogTitle className="text-foreground">Assign Assessment</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                            Choose an assessment and select the specific questions to include.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        {/* Assessment select */}
+                        <div className="space-y-1.5">
+                            <Label className="text-foreground">Assessment <span className="text-destructive">*</span></Label>
+                            <Select value={assignAssessmentId} onValueChange={setAssignAssessmentId}>
+                                <SelectTrigger className="border-input text-foreground">
+                                    <SelectValue placeholder="Select an assessment" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border">
+                                    {tutorAssessments.length === 0 ? (
+                                        <div className="px-3 py-3 text-xs text-muted-foreground">No assessments created yet.</div>
+                                    ) : tutorAssessments.map((a: any) => (
+                                        <SelectItem key={a.id} value={a.id}>{a.title}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Question selection */}
+                        {assignAssessmentId && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-foreground">Questions</Label>
+                                    {availableQuestions.length > 0 && (
+                                        <button
+                                            type="button"
+                                            className="text-xs text-tutor-purple-600 hover:underline cursor-pointer"
+                                            onClick={() => {
+                                                if (selectedQuestionIds.size === availableQuestions.length) {
+                                                    setSelectedQuestionIds(new Set());
+                                                } else {
+                                                    setSelectedQuestionIds(new Set(availableQuestions.map((q: any) => q.id)));
+                                                }
+                                            }}
+                                        >
+                                            {selectedQuestionIds.size === availableQuestions.length ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
+                                {questionsLoading ? (
+                                    <div className="space-y-2">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className="h-10 rounded-lg bg-muted/40 animate-pulse" />
+                                        ))}
+                                    </div>
+                                ) : availableQuestions.length === 0 ? (
+                                    <div className="p-3 border border-dashed rounded-lg text-xs text-muted-foreground text-center">
+                                        No questions found for this assessment.
+                                    </div>
+                                ) : (
+                                    <div className="border rounded-lg divide-y max-h-52 overflow-y-auto">
+                                        {availableQuestions.map((q: any, idx: number) => (
+                                            <label
+                                                key={q.id}
+                                                className="flex items-start gap-3 p-2.5 hover:bg-muted/10 cursor-pointer"
+                                            >
+                                                <Checkbox
+                                                    checked={selectedQuestionIds.has(q.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        setSelectedQuestionIds(prev => {
+                                                            const next = new Set(prev);
+                                                            if (checked) next.add(q.id);
+                                                            else next.delete(q.id);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    className="mt-0.5 border-input"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-medium text-foreground line-clamp-2">
+                                                        Q{idx + 1}. {q.questionText}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[10px] text-muted-foreground capitalize">{q.type?.replace(/_/g, ' ')}</span>
+                                                        <span className="text-[10px] text-muted-foreground">{q.points} pt{q.points !== 1 ? 's' : ''}</span>
+                                                    </div>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                {availableQuestions.length > 0 && (
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {selectedQuestionIds.size} of {availableQuestions.length} question{availableQuestions.length !== 1 ? 's' : ''} selected
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Recipient select */}
+                        <div className="space-y-1.5">
+                            <Label className="text-foreground">Recipient <span className="text-destructive">*</span></Label>
+                            <Select value={assignRecipient} onValueChange={setAssignRecipient}>
+                                <SelectTrigger className="border-input text-foreground">
+                                    <SelectValue placeholder="Select recipient" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-card border-border">
+                                    <SelectItem value="all">All Students ({cls.students?.length || 0})</SelectItem>
+                                    {(cls.students || []).map((student: any) => (
+                                        <SelectItem key={student.id} value={student.id}>
+                                            {student.firstName} {student.lastName}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Due date */}
+                        <div className="space-y-1.5">
+                            <Label className="text-foreground">Due Date <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                            <Input
+                                type="date"
+                                value={assignDueDate}
+                                onChange={e => setAssignDueDate(e.target.value)}
+                                className="border-input text-foreground"
+                            />
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="space-y-1.5">
+                            <Label className="text-foreground">Instructions <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                            <Textarea
+                                value={assignInstructions}
+                                onChange={e => setAssignInstructions(e.target.value)}
+                                placeholder="Any specific instructions for the student..."
+                                rows={2}
+                                className="border-input text-foreground resize-none text-sm"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsAssignDialogOpen(false)}
+                            disabled={isAssigning}
+                            className="cursor-pointer border-input"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAssignAssessment}
+                            disabled={isAssigning || !assignAssessmentId || (availableQuestions.length > 0 && selectedQuestionIds.size === 0)}
+                            className="bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white cursor-pointer"
+                        >
+                            <HiOutlineAcademicCap className="h-4 w-4 mr-1.5" />
+                            {isAssigning ? 'Assigning...' : 'Assign Assessment'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Invite Parent/Student Dialog */}
             <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>

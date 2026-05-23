@@ -20,6 +20,7 @@ import {
     HiOutlineUser,
     HiOutlineDocumentText,
     HiPlus,
+    HiOutlineTv,
 } from 'react-icons/hi2';
 import { MeetingProvider, useMeeting, useParticipant, usePubSub } from '@videosdk.live/react-sdk';
 
@@ -29,6 +30,128 @@ interface ClassroomClientProps {
     initialSession: any;
     initialWhiteboards: any[];
     videoSdkToken: string;
+}
+
+function LocalMediaPreview({
+    micEnabled,
+    setMicEnabled,
+    camEnabled,
+    setCamEnabled,
+}: {
+    micEnabled: boolean
+    setMicEnabled: (val: boolean) => void
+    camEnabled: boolean
+    setCamEnabled: (val: boolean) => void
+}) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [permissionError, setPermissionError] = useState(false);
+
+    useEffect(() => {
+        let activeStream: MediaStream | null = null;
+
+        async function getStream() {
+            try {
+                setPermissionError(false);
+                const mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
+                activeStream = mediaStream;
+                setStream(mediaStream);
+                if (videoRef.current) {
+                    videoRef.current.srcObject = mediaStream;
+                }
+            } catch (err) {
+                console.warn("Error accessing media devices for preview:", err);
+                setPermissionError(true);
+            }
+        }
+
+        if (camEnabled) {
+            getStream();
+        } else {
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+        }
+
+        return () => {
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [camEnabled]);
+
+    useEffect(() => {
+        if (stream) {
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = micEnabled;
+            }
+        }
+    }, [micEnabled, stream]);
+
+    return (
+        <div className="w-full h-full min-h-[320px] rounded-2xl bg-card border border-border flex flex-col items-center justify-center relative overflow-hidden shadow-lg group">
+            {camEnabled && !permissionError ? (
+                <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+                />
+            ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-muted/20">
+                    <div className="p-4 rounded-full bg-muted/50 mb-3 text-muted-foreground">
+                        <HiOutlineVideoCamera className="h-8 w-8" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground">
+                        {permissionError ? "Camera/Mic permission denied or unavailable" : "Camera is turned off"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-[240px]">
+                        Please check your browser permissions to enable audio and video preview.
+                    </p>
+                </div>
+            )}
+
+            {/* Device Setup Preview Badge */}
+            <span className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm border border-border px-3 py-1 rounded-full text-[10px] font-semibold text-foreground tracking-wide uppercase shadow-sm">
+                Device Preview
+            </span>
+
+            {/* Bottom Controls Overlay */}
+            <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-3 z-10">
+                <Button
+                    size="icon"
+                    variant={micEnabled ? 'outline' : 'destructive'}
+                    onClick={() => setMicEnabled(!micEnabled)}
+                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${
+                        micEnabled 
+                            ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105' 
+                            : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
+                    }`}
+                    title={micEnabled ? 'Mute Microphone' : 'Unmute Microphone'}
+                >
+                    <HiOutlineMicrophone className="h-5 w-5" />
+                </Button>
+                <Button
+                    size="icon"
+                    variant={camEnabled ? 'outline' : 'destructive'}
+                    onClick={() => setCamEnabled(!camEnabled)}
+                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${
+                        camEnabled 
+                            ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105' 
+                            : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
+                    }`}
+                    title={camEnabled ? 'Turn off Camera' : 'Turn on Camera'}
+                >
+                    <HiOutlineVideoCamera className="h-5 w-5" />
+                </Button>
+            </div>
+        </div>
+    );
 }
 
 export function ClassroomClient({ cls, currentUser, initialSession, initialWhiteboards, videoSdkToken }: ClassroomClientProps) {
@@ -52,10 +175,10 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [newWbTitle, setNewWbTitle] = useState('');
 
     // Collapsible side tabs panel
-    const [activeTab, setActiveTab] = useState<'chat' | 'tools'>('chat');
+    const [activeTab, setActiveTab] = useState<'chat' | 'participants' | 'tools'>('chat');
     const [isPanelOpen, setIsPanelOpen] = useState(true);
 
-    const toggleTab = (tab: 'chat' | 'tools') => {
+    const toggleTab = (tab: 'chat' | 'participants' | 'tools') => {
         if (isPanelOpen && activeTab === tab) {
             setIsPanelOpen(false);
         } else {
@@ -92,18 +215,46 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }
     }, [searchParams, whiteboards]);
 
+    // Sync whiteboard helper
+    const syncWhiteboardStateToDB = async (show: boolean, wbId: string | null) => {
+        const currentSession = sessionRef.current;
+        if (!isTutor || !currentSession?.id) return;
+        try {
+            await fetch(`/api/live-sessions/${currentSession.id}/whiteboard`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    showWhiteboard: show,
+                    activeWhiteboard: wbId
+                })
+            });
+        } catch (err) {
+            console.error("Failed to sync whiteboard state to DB:", err);
+        }
+    };
+
     // Student waiting room polling
     useEffect(() => {
         if (isLive) return;
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/live-sessions?where[class][equals]=${cls.id}&where[status][equals]=live&limit=1`);
-                const data = await res.json();
-                if (data?.docs?.length > 0) {
-                    setSession(data.docs[0]);
-                    setIsLive(true);
-                    toast.success('Your tutor has started the class! Joining room...');
+                const res = await fetch(`/api/live-sessions/status?classId=${cls.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.status === 'live' && data?.sessionId) {
+                        setSession({ id: data.sessionId, roomId: data.roomId, status: 'live' });
+                        setIsLive(true);
+                        // Sync whiteboard state immediately
+                        setShowWhiteboard(data.showWhiteboard || false);
+                        if (data.activeWhiteboard) {
+                            const found = whiteboards.find(w => w.id === data.activeWhiteboard);
+                            if (found) {
+                                setSelectedWhiteboard(found);
+                            }
+                        }
+                        toast.success('Your tutor has started the class! Joining room...');
+                    }
                 }
             } catch (err) {
                 console.error('Polling active session error:', err);
@@ -111,7 +262,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }, 3000);
 
         return () => clearInterval(interval);
-    }, [isLive, cls.id]);
+    }, [isLive, cls.id, whiteboards]);
 
     // Register attendance and join live session
     useEffect(() => {
@@ -165,18 +316,65 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         };
     }, [isTutor]);
 
-    // Poll session status for students
+    // Track leave duration analytics for everyone
     useEffect(() => {
-        if (isTutor || !isLive || !session?.id) return;
+        const handleLeave = () => {
+            const currentSession = sessionRef.current;
+            if (currentSession?.id) {
+                fetch('/api/live-sessions/leave', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: currentSession.id }),
+                    keepalive: true,
+                });
+            }
+        };
+
+        window.addEventListener('beforeunload', handleLeave);
+        return () => {
+            window.removeEventListener('beforeunload', handleLeave);
+            handleLeave();
+        };
+    }, []);
+
+    // Poll session status for active whiteboard updates, session termination & alert handling
+    const tutorAlertedRef = useRef(false);
+    useEffect(() => {
+        if (!isLive || !session?.id) return;
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/live-sessions/${session.id}`);
+                const res = await fetch(`/api/live-sessions/${session.id}/status`);
                 if (res.ok) {
                     const data = await res.json();
+                    
+                    // Handle session ended
                     if (data?.status === 'ended') {
-                        toast.info('The tutor has ended this live session.');
-                        router.push('/dashboard/student');
+                        clearInterval(interval);
+                        if (isTutor) {
+                            if (!tutorAlertedRef.current) {
+                                tutorAlertedRef.current = true;
+                                alert("This live classroom session has ended.");
+                                router.push(`/dashboard/tutor/classes/${cls.id}`);
+                            }
+                        } else {
+                            toast.info('The tutor has ended this live session.');
+                            router.push('/dashboard/student');
+                        }
+                        return;
+                    }
+
+                    // Sync whiteboard state if changed
+                    if (!isTutor) {
+                        if (typeof data.showWhiteboard === 'boolean') {
+                            setShowWhiteboard(data.showWhiteboard);
+                        }
+                        if (data.activeWhiteboard) {
+                            const found = whiteboards.find(w => w.id === data.activeWhiteboard);
+                            if (found) {
+                                setSelectedWhiteboard(found);
+                            }
+                        }
                     }
                 }
             } catch (err) {
@@ -185,7 +383,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [isTutor, isLive, session?.id, router]);
+    }, [isTutor, isLive, session?.id, router, cls.id, whiteboards]);
 
     const handleStartSession = async () => {
         setIsLoading(true);
@@ -265,53 +463,80 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Render Waiting Room for Student or Pre-start screen for Tutor
     if (!isLive) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-6">
-                <Card className="w-full max-w-md bg-card border-border shadow-xl">
-                    <CardContent className="flex flex-col items-center text-center p-8 space-y-6">
-                        <div className="relative flex h-16 w-16 items-center justify-center">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-20"></span>
-                            <span className="relative inline-flex rounded-full h-12 w-12 bg-secondary items-center justify-center text-white">
-                                <HiOutlineVideoCamera className="h-6 w-6" />
-                            </span>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-muted/10 text-foreground p-4 sm:p-6 md:p-10">
+                <Card className="w-full max-w-4xl bg-card border-border shadow-2xl overflow-hidden rounded-2xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 md:p-8">
+                        {/* Column 1: Local Device setup and camera feed preview */}
+                        <div className="flex flex-col justify-center w-full h-full min-h-[300px]">
+                            <LocalMediaPreview
+                                micEnabled={micEnabled}
+                                setMicEnabled={setMicEnabled}
+                                camEnabled={camEnabled}
+                                setCamEnabled={setCamEnabled}
+                            />
                         </div>
-                        <div className="space-y-2">
-                            <h2 className="text-xl font-bold text-foreground">{cls.title}</h2>
-                            <p className="text-sm text-muted-foreground">Subject: {typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')}</p>
-                        </div>
-                        <div className="border-t border-border w-full pt-6">
-                            {isTutor ? (
-                                <div className="space-y-4">
-                                    <p className="text-sm text-muted-foreground">
-                                        You are the tutor for this class. Click below to start the live session.
-                                    </p>
-                                    <Button
-                                        onClick={handleStartSession}
-                                        disabled={isLoading}
-                                        className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold py-2 rounded-lg cursor-pointer"
-                                    >
-                                        {isLoading ? 'Starting Class...' : 'Start Live Classroom'}
-                                    </Button>
+
+                        {/* Column 2: Meeting Context and Action buttons */}
+                        <div className="flex flex-col justify-between space-y-6 py-2">
+                            <div className="space-y-4">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/15 border border-secondary/20 text-secondary text-xs font-semibold select-none">
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                    </span>
+                                    {isTutor ? "Setup Live Class" : "Live Waiting Room"}
                                 </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-center gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg">
-                                        <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                                        Waiting for your tutor to start the class...
+
+                                <div className="space-y-2">
+                                    <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{cls.title}</h2>
+                                    <div className="flex flex-wrap gap-2 pt-1">
+                                        <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border py-1 px-3">
+                                            Subject: {typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')}
+                                        </Badge>
+                                        <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border py-1 px-3 font-medium">
+                                            Role: {isTutor ? "Tutor (Host)" : "Student"}
+                                        </Badge>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        The screen will refresh automatically once the class starts.
-                                    </p>
                                 </div>
-                            )}
+
+                                <p className="text-sm text-muted-foreground leading-relaxed pt-2">
+                                    Test your camera and microphone options prior to entering the live class. Ensure that you are in a quiet, well-lit environment for the best interactive learning experience.
+                                </p>
+                            </div>
+
+                            <div className="border-t border-border pt-6 space-y-4">
+                                {isTutor ? (
+                                    <div className="space-y-3">
+                                        <Button
+                                            onClick={handleStartSession}
+                                            disabled={isLoading}
+                                            className="w-full bg-secondary hover:bg-secondary/95 text-secondary-foreground font-semibold py-3 rounded-xl cursor-pointer text-sm shadow-md transition-all active:scale-[0.98]"
+                                        >
+                                            {isLoading ? 'Starting Class...' : 'Start Live Classroom'}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-sm text-amber-800 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 p-4 rounded-xl shadow-inner">
+                                            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                            <p className="font-medium text-amber-800 dark:text-amber-400">Waiting for your tutor to start the class...</p>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground text-center">
+                                            This waiting screen will automatically redirect and connect when the tutor launches the class.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : '/dashboard/student')}
+                                    className="w-full text-muted-foreground hover:text-foreground cursor-pointer text-xs py-2 hover:bg-muted/50 rounded-lg"
+                                >
+                                    Return to Dashboard
+                                </Button>
+                            </div>
                         </div>
-                        <Button
-                            variant="ghost"
-                            onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : '/dashboard/student')}
-                            className="text-muted-foreground hover:text-foreground cursor-pointer"
-                        >
-                            Return to Dashboard
-                        </Button>
-                    </CardContent>
+                    </div>
                 </Card>
             </div>
         );
@@ -366,8 +591,8 @@ interface ClassroomMeetingViewProps {
     handleCreateWhiteboard: (title: string) => Promise<void>;
     newWbTitle: string;
     setNewWbTitle: (title: string) => void;
-    activeTab: 'chat' | 'tools';
-    toggleTab: (tab: 'chat' | 'tools') => void;
+    activeTab: 'chat' | 'participants' | 'tools';
+    toggleTab: (tab: 'chat' | 'participants' | 'tools') => void;
     isPanelOpen: boolean;
 }
 
@@ -389,9 +614,23 @@ function ClassroomMeetingView({
     toggleTab,
     isPanelOpen,
 }: ClassroomMeetingViewProps) {
-    const { join, leave, toggleMic, toggleWebcam, participants } = useMeeting({
+    const router = useRouter();
+    const {
+        join,
+        leave,
+        toggleMic,
+        toggleWebcam,
+        toggleScreenShare,
+        localScreenShareOn,
+        presenterId,
+        removeParticipant,
+        participants
+    } = useMeeting({
         onMeetingJoined: () => {
             console.log("Connected to VideoSDK WebRTC room");
+        },
+        onMeetingLeft: () => {
+            router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`);
         },
         onError: (error) => {
             console.error("VideoSDK error event:", error);
@@ -421,10 +660,34 @@ function ClassroomMeetingView({
     const [newMessage, setNewMessage] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // Real-time Whiteboard Toggle using VideoSDK PubSub
+    const { publish: publishWhiteboard, messages: whiteboardMessages } = usePubSub("WHITEBOARD_TOGGLE");
+
     // Scroll chat to bottom when new messages arrive
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    // Sync Whiteboard State across all participants in the meeting room
+    useEffect(() => {
+        if (whiteboardMessages && whiteboardMessages.length > 0) {
+            const latestMsg = whiteboardMessages[whiteboardMessages.length - 1];
+            try {
+                const data = JSON.parse(latestMsg.message);
+                if (typeof data.showWhiteboard === 'boolean') {
+                    setShowWhiteboard(data.showWhiteboard);
+                    if (data.whiteboardId) {
+                        const found = whiteboards.find(w => w.id === data.whiteboardId);
+                        if (found) {
+                            setSelectedWhiteboard(found);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing whiteboard toggle message:", e);
+            }
+        }
+    }, [whiteboardMessages, whiteboards, setShowWhiteboard, setSelectedWhiteboard]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -441,7 +704,9 @@ function ClassroomMeetingView({
     const handleFormCreateWhiteboard = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newWbTitle.trim()) return;
-        handleCreateWhiteboard(newWbTitle.trim());
+        handleCreateWhiteboard(newWbTitle.trim()).then(() => {
+            // Creation notifies others via handleCreateWhiteboard's integration with PubSub if tutor
+        });
         setNewWbTitle('');
     };
 
@@ -472,6 +737,35 @@ function ClassroomMeetingView({
                     <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">
                         {typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')}
                     </Badge>
+
+                    {/* Whiteboard Sync Toggle */}
+                    <div className="flex items-center gap-2 border-l border-border pl-3 ml-3">
+                        {isTutor ? (
+                            <Button
+                                size="sm"
+                                variant={showWhiteboard ? "default" : "outline"}
+                                onClick={() => {
+                                    const nextState = !showWhiteboard;
+                                    publishWhiteboard(JSON.stringify({
+                                        showWhiteboard: nextState,
+                                        whiteboardId: selectedWhiteboard?.id
+                                    }), { persist: true });
+                                    syncWhiteboardStateToDB(nextState, selectedWhiteboard?.id || null);
+                                }}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
+                                    showWhiteboard ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground" : "border-border text-foreground"
+                                }`}
+                            >
+                                <HiOutlineDocumentText className="h-4 w-4 mr-1.5" />
+                                {showWhiteboard ? "Close Whiteboard for All" : "Share Whiteboard with Class"}
+                            </Button>
+                        ) : (
+                            <Badge variant={showWhiteboard ? "default" : "secondary"} className="h-6 text-[10px] gap-1 px-2.5">
+                                <HiOutlineDocumentText className="h-3 w-3" />
+                                Whiteboard: {showWhiteboard ? "Active" : "Inactive"}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
 
                 {/* Call Control Center */}
@@ -495,6 +789,15 @@ function ClassroomMeetingView({
                         <HiOutlineVideoCamera className="h-4.5 w-4.5" />
                     </Button>
                     <Button
+                        size="icon"
+                        variant={localScreenShareOn ? 'secondary' : 'outline'}
+                        onClick={() => toggleScreenShare()}
+                        className={`h-9 w-9 rounded-full cursor-pointer ${localScreenShareOn ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'border-border text-foreground hover:bg-muted'}`}
+                        title={localScreenShareOn ? 'Stop Presenting' : 'Share Screen'}
+                    >
+                        <HiOutlineTv className="h-4.5 w-4.5" />
+                    </Button>
+                    <Button
                         variant="destructive"
                         onClick={handleLeaveSession}
                         className="rounded-full flex items-center gap-1 px-4 py-1.5 text-xs font-semibold cursor-pointer bg-red-600 hover:bg-red-700 text-white border-0"
@@ -509,11 +812,52 @@ function ClassroomMeetingView({
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Area: Video Call Viewport & Shared Whiteboard */}
                 <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden relative bg-muted/20">
-                    {showWhiteboard && selectedWhiteboard ? (
+                    {presenterId ? (
+                        /* Screen Share Presenter Mode */
+                        <div className="flex-1 flex flex-col min-h-0 relative">
+                            {/* Small Video Avatars at top */}
+                            <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
+                                {isParticipantJoined(tutorId) ? (
+                                    <SmallParticipantVideoView participantId={tutorId} />
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Avatar className="h-7 w-7 border border-border border-dashed">
+                                            <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
+                                                {tutorInfo?.firstName?.[0] || 'T'}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <span className="text-[10px] text-muted-foreground font-medium">Tutor ({tutorInfo?.firstName || 'Offline'})</span>
+                                    </div>
+                                )}
+                                {expectedStudents.map((student: any) => (
+                                    <div key={student.id} className="border-l border-border pl-2">
+                                        {isParticipantJoined(student.id) ? (
+                                            <SmallParticipantVideoView participantId={student.id} />
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Avatar className="h-7 w-7 border border-border border-dashed">
+                                                    <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
+                                                        {student.firstName?.[0] || 'S'}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-[10px] text-muted-foreground font-medium">{student.firstName} (Offline)</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {guestParticipantIds.map((guestId) => (
+                                    <div key={guestId} className="border-l border-border pl-2">
+                                        <SmallParticipantVideoView participantId={guestId} />
+                                    </div>
+                                ))}
+                            </div>
+                            <PresenterScreenShare presenterId={presenterId} />
+                        </div>
+                    ) : showWhiteboard && selectedWhiteboard ? (
                         /* Share Whiteboard Mode */
                         <div className="flex-1 flex flex-col min-h-0 relative">
                             {/* Small Video Avatars at top */}
-                            <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-14 left-4 z-20 shadow-md">
+                            <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
                                 {isParticipantJoined(tutorId) ? (
                                     <SmallParticipantVideoView participantId={tutorId} />
                                 ) : (
@@ -550,10 +894,11 @@ function ClassroomMeetingView({
                             </div>
 
                             {/* Whiteboard Canvas */}
-                            <div className="flex-1 min-h-0 text-foreground">
+                            <div className="flex-1 min-h-0 text-foreground pt-14">
                                 <WhiteboardCanvas
                                     whiteboardId={selectedWhiteboard.id}
                                     isTutor={isTutor}
+                                    initialSlides={selectedWhiteboard.slides}
                                 />
                             </div>
                         </div>
@@ -612,7 +957,7 @@ function ClassroomMeetingView({
 
                 {/* Collapsible Panel */}
                 {isPanelOpen && (
-                    <div className="w-80 border-l border-border bg-background flex flex-col shrink-0">
+                    <div className="w-80 border-l border-border bg-background flex flex-col shrink-0 animate-none">
                         {activeTab === 'chat' && (
                             <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
                                 <div className="border-b border-border pb-3 flex items-center justify-between">
@@ -647,12 +992,69 @@ function ClassroomMeetingView({
                                         value={newMessage}
                                         onChange={(e) => setNewMessage(e.target.value)}
                                         placeholder="Type message..."
-                                        className="h-9 bg-background border-border text-xs focus:ring-secondary focus:border-secondary text-foreground"
+                                        className="h-9 bg-background border-border text-xs focus:ring-secondary focus:border-secondary text-foreground animate-none"
                                     />
                                     <Button type="submit" size="sm" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground cursor-pointer h-9 text-xs">
                                         Send
                                     </Button>
                                 </form>
+                            </div>
+                        )}
+
+                        {activeTab === 'participants' && (
+                            <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
+                                <div className="border-b border-border pb-3 flex items-center justify-between">
+                                    <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                        <HiOutlineUserGroup className="h-4 w-4 text-muted-foreground" /> Participants ({participantIds.length})
+                                    </h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+                                    {Array.from(participants.values()).map((p: any) => {
+                                        const isParticipantTutor = p.id === tutorId;
+                                        return (
+                                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/40">
+                                                <div className="flex items-center gap-2">
+                                                    <Avatar className="h-7 w-7 border border-border">
+                                                        <AvatarFallback className="text-[10px] bg-secondary text-secondary-foreground font-bold">
+                                                            {p.displayName?.[0] || 'P'}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-semibold text-foreground truncate max-w-[120px]">
+                                                            {p.displayName} {p.local && '(You)'}
+                                                        </span>
+                                                        <span className="text-[9px] text-muted-foreground">
+                                                            {isParticipantTutor ? 'Tutor' : 'Student/Parent'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className={`p-1 rounded-full ${p.micOn ? 'text-emerald-500' : 'text-red-500'}`} title={p.micOn ? 'Mic On' : 'Mic Off'}>
+                                                        <HiOutlineMicrophone className="h-3.5 w-3.5" />
+                                                    </span>
+                                                    <span className={`p-1 rounded-full ${p.webcamOn ? 'text-emerald-500' : 'text-red-500'}`} title={p.webcamOn ? 'Cam On' : 'Cam Off'}>
+                                                        <HiOutlineVideoCamera className="h-3.5 w-3.5" />
+                                                    </span>
+                                                    {isTutor && !p.local && !isParticipantTutor && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => {
+                                                                if (window.confirm(`Are you sure you want to remove ${p.displayName} from the call?`)) {
+                                                                    removeParticipant(p.id);
+                                                                    toast.success(`${p.displayName} removed.`);
+                                                                }
+                                                            }}
+                                                            className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0 cursor-pointer ml-1"
+                                                        >
+                                                            Kick
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
 
@@ -673,8 +1075,16 @@ function ClassroomMeetingView({
                                             <div
                                                 key={wb.id}
                                                 onClick={() => {
-                                                    setSelectedWhiteboard(wb);
-                                                    setShowWhiteboard(true);
+                                                    if (isTutor) {
+                                                        publishWhiteboard(JSON.stringify({
+                                                            showWhiteboard: true,
+                                                            whiteboardId: wb.id
+                                                        }), { persist: true });
+                                                        syncWhiteboardStateToDB(true, wb.id);
+                                                    } else {
+                                                        setSelectedWhiteboard(wb);
+                                                        setShowWhiteboard(true);
+                                                    }
                                                 }}
                                                 className={`p-3 border rounded-lg cursor-pointer transition-colors flex items-center justify-between text-xs ${selectedWhiteboard?.id === wb.id && showWhiteboard
                                                     ? 'bg-secondary/10 border-secondary/20 text-secondary font-semibold'
@@ -692,7 +1102,16 @@ function ClassroomMeetingView({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => setShowWhiteboard(false)}
+                                            onClick={() => {
+                                                if (isTutor) {
+                                                    publishWhiteboard(JSON.stringify({
+                                                        showWhiteboard: false
+                                                    }), { persist: true });
+                                                    syncWhiteboardStateToDB(false, null);
+                                                } else {
+                                                    setShowWhiteboard(false);
+                                                }
+                                            }}
                                             className="w-full text-xs border-border hover:bg-muted cursor-pointer mt-2 text-foreground"
                                         >
                                             Hide Whiteboard (View Cameras)
@@ -707,7 +1126,7 @@ function ClassroomMeetingView({
                                                     value={newWbTitle}
                                                     onChange={(e) => setNewWbTitle(e.target.value)}
                                                     placeholder="Whiteboard title..."
-                                                    className="h-8 bg-background border-border text-xs text-foreground"
+                                                    className="h-8 bg-background border-border text-xs text-foreground animate-none"
                                                     required
                                                 />
                                                 <Button
@@ -737,6 +1156,16 @@ function ClassroomMeetingView({
                         title="Chat"
                     >
                         <HiOutlineChatBubbleLeftRight className="h-5 w-5" />
+                    </button>
+                    <button
+                        onClick={() => toggleTab('participants')}
+                        className={`p-2.5 rounded-xl cursor-pointer transition-colors relative ${isPanelOpen && activeTab === 'participants'
+                            ? 'bg-secondary text-secondary-foreground shadow-md shadow-secondary/20'
+                            : 'text-muted-foreground hover:bg-primary/30 hover:text-foreground'
+                            }`}
+                        title="Participants"
+                    >
+                        <HiOutlineUserGroup className="h-5 w-5" />
                     </button>
                     <button
                         onClick={() => toggleTab('tools')}
@@ -911,6 +1340,39 @@ function OfflineParticipantView({ displayName, isTutorUser, avatarInitials }: Of
             <span className="absolute bottom-3 left-3 bg-background/90 border border-border px-2 py-0.5 rounded text-xs text-foreground font-semibold flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" />
                 {isTutorUser ? 'Tutor: ' : ''}{displayName} (Offline)
+            </span>
+        </div>
+    );
+}
+
+// Presenter Screen Share View Component
+function PresenterScreenShare({ presenterId }: { presenterId: string }) {
+    const { screenShareStream, screenShareOn, displayName } = useParticipant(presenterId);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (videoRef.current) {
+            if (screenShareOn && screenShareStream) {
+                const mediaStream = new MediaStream([screenShareStream.track]);
+                videoRef.current.srcObject = mediaStream;
+                videoRef.current.play().catch((err) => console.error("Presenter screen share play failed:", err));
+            } else {
+                videoRef.current.srcObject = null;
+            }
+        }
+    }, [screenShareStream, screenShareOn]);
+
+    return (
+        <div className="flex-1 h-full min-h-[300px] rounded-xl bg-black border border-border flex flex-col items-center justify-center relative overflow-hidden shadow-md">
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="w-full h-full object-contain"
+            />
+            <span className="absolute bottom-3 left-3 bg-background/90 border border-border px-2 py-0.5 rounded text-xs text-foreground font-semibold flex items-center gap-1.5 z-10">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                {displayName}'s Screen Presentation
             </span>
         </div>
     );

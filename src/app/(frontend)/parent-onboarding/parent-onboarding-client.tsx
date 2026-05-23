@@ -9,6 +9,7 @@ import {
   HiOutlineUsers,
   HiOutlineTrash,
   HiOutlineCheck,
+  HiOutlineCheckCircle,
   HiOutlineDocumentDuplicate,
   HiOutlineEye,
   HiOutlineEyeSlash,
@@ -44,13 +45,19 @@ type Invitation = {
   tutorName: string
 }
 
+type EnrolledClass = {
+  className: string
+  tutorName: string
+}
+
 type Props = {
   parentName: string
   initialChildren: Child[]
   initialInvitations: Invitation[]
+  initialEnrolledClasses: EnrolledClass[]
 }
 
-export function ParentOnboardingClient({ parentName, initialChildren, initialInvitations }: Props) {
+export function ParentOnboardingClient({ parentName, initialChildren, initialInvitations, initialEnrolledClasses }: Props) {
   const router = useRouter()
   const [children, setChildren] = React.useState<Child[]>(initialChildren)
   const [invitations, setInvitations] = React.useState<Invitation[]>(initialInvitations)
@@ -224,6 +231,34 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
                   >
                     Accept Invite
                   </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Already-enrolled classes (auto-accepted on registration) */}
+        {initialEnrolledClasses.length > 0 && invitations.length === 0 && (
+          <section className="mt-8 rounded-xl border bg-green-50/60 border-green-200 p-6 md:p-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-700">
+                <HiOutlineCheckCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-green-900">You&apos;ve been enrolled in {initialEnrolledClasses.length === 1 ? 'a class' : 'classes'}</h2>
+                <p className="text-sm text-green-700">
+                  Your account was automatically linked when you registered. Add your child below to enrol them too.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {initialEnrolledClasses.map((cls, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-green-200">
+                  <HiOutlineCheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{cls.className}</p>
+                    <p className="text-xs text-muted-foreground">Tutor: {cls.tutorName}</p>
+                  </div>
                 </div>
               ))}
             </div>

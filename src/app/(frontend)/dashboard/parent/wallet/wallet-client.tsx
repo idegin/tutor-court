@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { formatCredits, formatNaira, COIN_RATE } from '@/lib/constants'
+import { formatCredits, formatNaira, CREDIT_RATE } from '@/lib/constants'
 
 type WalletClientProps = {
   initialWallet: any
@@ -104,7 +104,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
       return
     }
 
-    const cost = coinsVal * COIN_RATE.nairaPerCoin
+    const cost = coinsVal * CREDIT_RATE.nairaPerCoin
     const currentBalance = wallet?.balance || 0
     if (currentBalance < cost) {
       toast.error(`Insufficient balance. You need ₦${cost.toLocaleString()} but only have ₦${currentBalance.toLocaleString()}.`)
@@ -187,7 +187,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCredits(credits)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            1 credit = ₦{COIN_RATE.nairaPerCoin} · {COIN_RATE.coinsPerHour} credits / hour live class
+            1 credit = ₦{CREDIT_RATE.nairaPerCoin} · {CREDIT_RATE.coinsPerHour} credits / hour live class
           </p>
         </div>
       </div>
@@ -315,7 +315,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
                 />
                 {buyingCredits && (
                   <p className="text-sm font-medium text-emerald-600">
-                    Cost: {formatNaira(parseInt(buyingCredits.replace(/,/g, ''), 10) * COIN_RATE.nairaPerCoin)}
+                    Cost: {formatNaira(parseInt(buyingCredits.replace(/,/g, ''), 10) * CREDIT_RATE.nairaPerCoin)}
                   </p>
                 )}
               </div>

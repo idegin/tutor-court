@@ -35,6 +35,19 @@ export default async function ParentOnboardingPage() {
     limit: 50,
   })
 
+  const acceptedInvitesResult = await payload.find({
+    collection: 'class-invitations',
+    where: {
+      and: [
+        { inviteeEmail: { equals: user!.email } },
+        { status: { equals: 'accepted' } },
+        { inviteeType: { equals: 'parent' } },
+      ],
+    },
+    depth: 2,
+    limit: 50,
+  })
+
   const initialInvitations = invitesResult.docs.map((inv) => {
     const classDoc = inv.class as any
     const inviterDoc = inv.inviter as any
@@ -42,6 +55,15 @@ export default async function ParentOnboardingPage() {
       id: String(inv.id),
       className: classDoc?.title || 'Unknown Class',
       classId: String(classDoc?.id || ''),
+      tutorName: inviterDoc ? `${inviterDoc.firstName} ${inviterDoc.lastName}` : 'Tutor',
+    }
+  })
+
+  const initialEnrolledClasses = acceptedInvitesResult.docs.map((inv) => {
+    const classDoc = inv.class as any
+    const inviterDoc = inv.inviter as any
+    return {
+      className: classDoc?.title || 'Unknown Class',
       tutorName: inviterDoc ? `${inviterDoc.firstName} ${inviterDoc.lastName}` : 'Tutor',
     }
   })
@@ -58,6 +80,7 @@ export default async function ParentOnboardingPage() {
         gradeLevel: (d.gradeLevel as string) || null,
       }))}
       initialInvitations={initialInvitations}
+      initialEnrolledClasses={initialEnrolledClasses}
     />
   )
 }

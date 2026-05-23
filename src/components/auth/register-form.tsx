@@ -202,8 +202,6 @@ export function RegisterForm({
                 By signing up, you agree to our <a href="#" className="text-primary hover:underline transition-colors">Terms of Service</a> and <a href="#" className="text-primary hover:underline transition-colors">Privacy Policy</a>.
             </div>
 
-            {errors?.form ? <p className="text-sm text-center text-destructive font-medium">{errors.form}</p> : null}
-
             <div className="pt-4 border-t border-border/50 text-center">
                 <p className="text-sm text-muted-foreground">
                     Already have an account?{' '}

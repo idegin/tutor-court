@@ -82,6 +82,12 @@ export interface Config {
     'whiteboard-slides': WhiteboardSlide;
     'live-sessions': LiveSession;
     attendance: Attendance;
+    'live-session-participants': LiveSessionParticipant;
+    assessments: Assessment;
+    'assessment-questions': AssessmentQuestion;
+    'tutor-assessments': TutorAssessment;
+    'assessment-results': AssessmentResult;
+    notifications: Notification;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -104,6 +110,12 @@ export interface Config {
     'whiteboard-slides': WhiteboardSlidesSelect<false> | WhiteboardSlidesSelect<true>;
     'live-sessions': LiveSessionsSelect<false> | LiveSessionsSelect<true>;
     attendance: AttendanceSelect<false> | AttendanceSelect<true>;
+    'live-session-participants': LiveSessionParticipantsSelect<false> | LiveSessionParticipantsSelect<true>;
+    assessments: AssessmentsSelect<false> | AssessmentsSelect<true>;
+    'assessment-questions': AssessmentQuestionsSelect<false> | AssessmentQuestionsSelect<true>;
+    'tutor-assessments': TutorAssessmentsSelect<false> | TutorAssessmentsSelect<true>;
+    'assessment-results': AssessmentResultsSelect<false> | AssessmentResultsSelect<true>;
+    notifications: NotificationsSelect<false> | NotificationsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -436,6 +448,8 @@ export interface LiveSession {
   endedAt?: string | null;
   status: 'scheduled' | 'waiting' | 'live' | 'ended' | 'cancelled';
   attendees?: (string | User)[] | null;
+  showWhiteboard?: boolean | null;
+  activeWhiteboard?: (string | null) | Whiteboard;
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
   updatedAt: string;
@@ -495,6 +509,168 @@ export interface Attendance {
   leftAt?: string | null;
   durationMinutes?: number | null;
   status: 'present' | 'late' | 'left-early' | 'absent';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-session-participants".
+ */
+export interface LiveSessionParticipant {
+  id: string;
+  liveSession: string | LiveSession;
+  class: string | Class;
+  user: string | User;
+  accountType: 'tutor' | 'student' | 'parent';
+  joinedAt: string;
+  leftAt?: string | null;
+  durationSeconds?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessments".
+ */
+export interface Assessment {
+  id: string;
+  title: string;
+  description?: string | null;
+  subject: string | Subject;
+  tutor: string | User;
+  type: 'quiz' | 'flashcard' | 'practice_test' | 'homework';
+  /**
+   * Optional time limit in minutes (0 = no limit)
+   */
+  timeLimitMinutes?: number | null;
+  /**
+   * Max questions (up to 100)
+   */
+  maxQuestions?: number | null;
+  /**
+   * Passing score percentage (0-100)
+   */
+  passingScore?: number | null;
+  isPublished?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessment-questions".
+ */
+export interface AssessmentQuestion {
+  id: string;
+  assessment: string | Assessment;
+  /**
+   * Supports Markdown syntax
+   */
+  questionText: string;
+  type: 'single_choice' | 'multiple_choice' | 'true_false';
+  /**
+   * For choice-based questions. Mark one or more as correct.
+   */
+  options?:
+    | {
+        optionText: string;
+        isCorrect?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Shown after the student answers (optional)
+   */
+  explanation?: string | null;
+  points: number;
+  order?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutor-assessments".
+ */
+export interface TutorAssessment {
+  id: string;
+  assessment: string | Assessment;
+  tutor: string | User;
+  student: string | User;
+  class: string | Class;
+  selectedQuestions?: (string | AssessmentQuestion)[] | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'expired';
+  dueDate?: string | null;
+  instructions?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessment-results".
+ */
+export interface AssessmentResult {
+  id: string;
+  tutorAssessment: string | TutorAssessment;
+  student: string | User;
+  tutor: string | User;
+  answers?:
+    | {
+        question: string | AssessmentQuestion;
+        selectedOptions?:
+          | {
+              optionIndex?: number | null;
+              id?: string | null;
+            }[]
+          | null;
+        textAnswer?: string | null;
+        isCorrect?: boolean | null;
+        pointsEarned?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  totalPoints?: number | null;
+  earnedPoints?: number | null;
+  /**
+   * Score as a percentage (0-100)
+   */
+  score?: number | null;
+  passed?: boolean | null;
+  submittedAt?: string | null;
+  timeTakenSeconds?: number | null;
+  /**
+   * Optional tutor feedback on the result
+   */
+  feedback?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications".
+ */
+export interface Notification {
+  id: string;
+  recipient: string | User;
+  type:
+    | 'student_joined_class'
+    | 'parent_accepted_invite'
+    | 'student_added_to_class'
+    | 'assessment_completed'
+    | 'assessment_sent'
+    | 'new_booking'
+    | 'class_reminder'
+    | 'payment_received'
+    | 'general';
+  title: string;
+  message: string;
+  isRead?: boolean | null;
+  /**
+   * Optional URL to redirect to when notification is clicked
+   */
+  link?: string | null;
+  relatedEntity?: {
+    collection?: string | null;
+    id?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -581,6 +757,30 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'attendance';
         value: string | Attendance;
+      } | null)
+    | ({
+        relationTo: 'live-session-participants';
+        value: string | LiveSessionParticipant;
+      } | null)
+    | ({
+        relationTo: 'assessments';
+        value: string | Assessment;
+      } | null)
+    | ({
+        relationTo: 'assessment-questions';
+        value: string | AssessmentQuestion;
+      } | null)
+    | ({
+        relationTo: 'tutor-assessments';
+        value: string | TutorAssessment;
+      } | null)
+    | ({
+        relationTo: 'assessment-results';
+        value: string | AssessmentResult;
+      } | null)
+    | ({
+        relationTo: 'notifications';
+        value: string | Notification;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -886,6 +1086,8 @@ export interface LiveSessionsSelect<T extends boolean = true> {
   endedAt?: T;
   status?: T;
   attendees?: T;
+  showWhiteboard?: T;
+  activeWhiteboard?: T;
   coinsConsumed?: T;
   durationMinutes?: T;
   updatedAt?: T;
@@ -905,6 +1107,128 @@ export interface AttendanceSelect<T extends boolean = true> {
   leftAt?: T;
   durationMinutes?: T;
   status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-session-participants_select".
+ */
+export interface LiveSessionParticipantsSelect<T extends boolean = true> {
+  liveSession?: T;
+  class?: T;
+  user?: T;
+  accountType?: T;
+  joinedAt?: T;
+  leftAt?: T;
+  durationSeconds?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessments_select".
+ */
+export interface AssessmentsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  subject?: T;
+  tutor?: T;
+  type?: T;
+  timeLimitMinutes?: T;
+  maxQuestions?: T;
+  passingScore?: T;
+  isPublished?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessment-questions_select".
+ */
+export interface AssessmentQuestionsSelect<T extends boolean = true> {
+  assessment?: T;
+  questionText?: T;
+  type?: T;
+  options?:
+    | T
+    | {
+        optionText?: T;
+        isCorrect?: T;
+        id?: T;
+      };
+  explanation?: T;
+  points?: T;
+  order?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tutor-assessments_select".
+ */
+export interface TutorAssessmentsSelect<T extends boolean = true> {
+  assessment?: T;
+  tutor?: T;
+  student?: T;
+  class?: T;
+  selectedQuestions?: T;
+  status?: T;
+  dueDate?: T;
+  instructions?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "assessment-results_select".
+ */
+export interface AssessmentResultsSelect<T extends boolean = true> {
+  tutorAssessment?: T;
+  student?: T;
+  tutor?: T;
+  answers?:
+    | T
+    | {
+        question?: T;
+        selectedOptions?:
+          | T
+          | {
+              optionIndex?: T;
+              id?: T;
+            };
+        textAnswer?: T;
+        isCorrect?: T;
+        pointsEarned?: T;
+        id?: T;
+      };
+  totalPoints?: T;
+  earnedPoints?: T;
+  score?: T;
+  passed?: T;
+  submittedAt?: T;
+  timeTakenSeconds?: T;
+  feedback?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notifications_select".
+ */
+export interface NotificationsSelect<T extends boolean = true> {
+  recipient?: T;
+  type?: T;
+  title?: T;
+  message?: T;
+  isRead?: T;
+  link?: T;
+  relatedEntity?:
+    | T
+    | {
+        collection?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
