@@ -6,9 +6,16 @@ export const Users: CollectionConfig = {
   slug: 'users',
   admin: {
     useAsTitle: 'email',
-    defaultColumns: ['firstName', 'lastName', 'email', 'accountType'],
+    defaultColumns: ['firstName', 'lastName', 'email', 'accountType', 'isActive'],
   },
   auth: {
+    tokenExpiration: 60 * 60 * 24 * 7, // 7 days
+    maxLoginAttempts: 5,
+    lockTime: 15 * 60 * 1000, // 15 minutes
+    cookies: {
+      sameSite: 'Lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
     verify: {
       generateEmailHTML: (args) => {
         const token = args?.token
