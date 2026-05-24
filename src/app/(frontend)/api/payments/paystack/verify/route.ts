@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const userId = metadata?.userId
     const purpose = metadata?.purpose
 
-    if (userId !== user.id || purpose !== 'wallet_funding') {
+    if (String(userId) !== String(user.id) || purpose !== 'wallet_funding') {
       return NextResponse.json({ error: 'Invalid transaction metadata.' }, { status: 400 })
     }
 

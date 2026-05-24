@@ -118,7 +118,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
 
     const openEditClass = (cls: any) => {
         setEditingClassId(cls.id);
-        setSubject(typeof cls.subject === 'object' ? cls.subject.id : cls.subject);
+        setSubject(cls.subject ? (typeof cls.subject === 'object' ? String(cls.subject.id) : String(cls.subject)) : '');
         setDescription(cls.description || '');
         setClassType(cls.classType || 'one-on-one');
         setMaxStudents(String(cls.maxStudents || 1));
@@ -263,7 +263,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                     </SelectTrigger>
                                     <SelectContent>
                                         {subjects?.map((sub) => (
-                                            <SelectItem key={sub.id} value={sub.id}>
+                                            <SelectItem key={sub.id} value={String(sub.id)}>
                                                 {sub.name}
                                             </SelectItem>
                                         ))}

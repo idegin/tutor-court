@@ -45,10 +45,11 @@ export async function POST(request: Request) {
     const amountKobo = data.amount
     const amountNaira = amountKobo / 100
     const metadata = data.metadata
-    const userId = metadata?.userId
+    const rawUserId = metadata?.userId
     const purpose = metadata?.purpose
+    const userId = typeof rawUserId === 'string' ? Number(rawUserId) : rawUserId
 
-    if (userId && purpose === 'wallet_funding') {
+    if (userId && !Number.isNaN(userId) && purpose === 'wallet_funding') {
       try {
         // Find user wallet
         const wallets = await payload.find({

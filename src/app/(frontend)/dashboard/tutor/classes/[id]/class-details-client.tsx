@@ -138,7 +138,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
     // Edit sheet states
     const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
     const [isUpdatingClass, setIsUpdatingClass] = useState(false);
-    const [subject, setSubject] = useState(typeof cls.subject === 'object' ? cls.subject.id : cls.subject);
+    const [subject, setSubject] = useState(cls.subject ? (typeof cls.subject === 'object' ? String(cls.subject.id) : String(cls.subject)) : '');
     const [description, setDescription] = useState(cls.description || '');
     const [classType, setClassType] = useState(cls.classType || 'one-on-one');
     const [maxStudents, setMaxStudents] = useState(String(cls.maxStudents || 1));
@@ -204,7 +204,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
     // Keep form state in sync with updated class props
     useEffect(() => {
         if (cls) {
-            setSubject(typeof cls.subject === 'object' ? cls.subject?.id || cls.subject : cls.subject);
+            setSubject(cls.subject ? (typeof cls.subject === 'object' ? String(cls.subject.id) : String(cls.subject)) : '');
             setDescription(cls.description || '');
             setClassType(cls.classType || 'one-on-one');
             setMaxStudents(String(cls.maxStudents || 1));
@@ -1450,7 +1450,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                 </SelectTrigger>
                                 <SelectContent className="bg-card border-border text-foreground">
                                     {subjects?.map((sub) => (
-                                        <SelectItem key={sub.id} value={sub.id}>
+                                        <SelectItem key={sub.id} value={String(sub.id)}>
                                             {sub.name}
                                         </SelectItem>
                                     ))}

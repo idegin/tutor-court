@@ -57,10 +57,34 @@ export function TutorWalletClient({
 
   React.useEffect(() => {
     const reference = searchParams.get('reference')
-    if (reference) {
-      toast.success('Wallet funded successfully! Your balance will update shortly.')
-      router.replace('/dashboard/tutor/wallet')
+    if (!reference) return
+
+    const verifyPayment = async () => {
+      const promise = fetch(`/api/payments/paystack/verify?reference=${reference}`)
+        .then(async (res) => {
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Verification failed')
+          return data
+        })
+
+      toast.promise(promise, {
+        loading: 'Verifying payment...',
+        success: (data) => {
+          if (data.wallet) {
+            setWallet(data.wallet)
+          }
+          router.refresh()
+          router.replace('/dashboard/tutor/wallet')
+          return 'Wallet funded successfully!'
+        },
+        error: (err) => {
+          router.replace('/dashboard/tutor/wallet')
+          return err.message || 'Verification failed. Please contact support.'
+        },
+      })
     }
+
+    verifyPayment()
   }, [searchParams, router])
 
   const onFundWallet = async (e: React.FormEvent) => {
