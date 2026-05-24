@@ -4,6 +4,7 @@
  * Docs: https://www.npmjs.com/package/zeptomail
  */
 import { SendMailClient } from 'zeptomail'
+import { MANAGED_ACCOUNT_DOMAIN } from './constants'
 
 const ZEPTO_URL = 'https://api.zeptomail.com/v1.1/email'
 const _rawToken = process.env.ZEPTO_MAIL_API_KEY || ''
@@ -47,6 +48,13 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
   }
 
   const toAddress = typeof to === 'string' ? { address: to } : to
+
+  if (toAddress.address.toLowerCase().endsWith(`@${MANAGED_ACCOUNT_DOMAIN}`)) {
+    console.log(
+      `[EmailService] Skipping email to managed account "${toAddress.address}" (local domain).`,
+    )
+    return
+  }
 
   console.log(`[EmailService] Preparing email → to="${toAddress.address}" subject="${subject}"`)
 

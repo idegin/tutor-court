@@ -3,6 +3,8 @@
 import {
   HiOutlineHome,
   HiHome,
+  HiOutlineAcademicCap,
+  HiAcademicCap,
   HiOutlineClipboardDocumentList,
   HiClipboardDocumentList,
 } from 'react-icons/hi2'
@@ -17,8 +19,14 @@ const studentNavItems = [
     activeIcon: HiHome,
   },
   {
-    name: 'Assignments',
-    href: '/dashboard/student/assignments',
+    name: 'Classes',
+    href: '/dashboard/student/classes',
+    icon: HiOutlineAcademicCap,
+    activeIcon: HiAcademicCap,
+  },
+  {
+    name: 'Assessments',
+    href: '/dashboard/student/assessments',
     icon: HiOutlineClipboardDocumentList,
     activeIcon: HiClipboardDocumentList,
   },

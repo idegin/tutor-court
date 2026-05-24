@@ -8,8 +8,10 @@ export function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   
-  const isProtectedRoute = 
-    pathname.startsWith('/tutor-onboarding') || 
+  const isProtectedRoute =
+    pathname.startsWith('/tutor-onboarding') ||
+    pathname.startsWith('/parent-onboarding') ||
+    pathname.startsWith('/student-onboarding') ||
     pathname.startsWith('/dashboard')
 
   const isAuthRoute = pathname.startsWith('/auth')
@@ -72,6 +74,8 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/tutor-onboarding/:path*',
+    '/parent-onboarding/:path*',
+    '/student-onboarding/:path*',
     '/dashboard/:path*',
     '/auth/:path*'
   ],

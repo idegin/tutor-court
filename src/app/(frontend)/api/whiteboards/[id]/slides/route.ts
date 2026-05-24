@@ -35,13 +35,28 @@ export async function POST(
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
 
+  const { id } = params
+
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id } = params
-
   try {
+    const whiteboard = await payload.findByID({
+      collection: 'whiteboards',
+      id,
+      depth: 0,
+    })
+
+    if (!whiteboard) {
+      return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 })
+    }
+
+    const ownerId = typeof whiteboard.owner === 'object' ? whiteboard.owner?.id : whiteboard.owner
+    if (ownerId !== user.id && user.accountType !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Only the owner of this whiteboard can add slides' }, { status: 403 })
+    }
+
     // Find highest order slide to determine the order of the new slide
     const existingSlides = await payload.find({
       collection: 'whiteboard-slides',

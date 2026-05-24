@@ -218,6 +218,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleStartDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isTutor) return;
         const coords = getCoordinates(e);
         if (!coords) return;
 
@@ -232,7 +233,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if (!isDrawing) return;
+        if (!isTutor || !isDrawing) return;
         const coords = getCoordinates(e);
         if (!coords) return;
 
@@ -247,12 +248,13 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleStopDrawing = () => {
-        if (!isDrawing) return;
+        if (!isTutor || !isDrawing) return;
         setIsDrawing(false);
         saveCurrentSlideData(lines);
     };
 
     const handleClear = () => {
+        if (!isTutor) return;
         if (window.confirm('Clear all drawings on this slide?')) {
             setLines([]);
             saveCurrentSlideData([]);
@@ -260,6 +262,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleAddSlide = async () => {
+        if (!isTutor) return;
         try {
             const res = await fetch(`/api/whiteboards/${whiteboardId}/slides`, {
                 method: 'POST',
@@ -297,38 +300,44 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         <div className="flex flex-col h-full bg-background border border-border rounded-xl overflow-hidden shadow-sm relative">
             {/* Top Toolbar */}
             <div className="bg-background border-b border-border px-4 py-2.5 flex items-center justify-between gap-4 z-10 shrink-0">
-                <div className="flex items-center gap-1.5">
-                    <Button
-                        size="icon"
-                        variant={tool === 'pen' ? 'default' : 'outline'}
-                        onClick={() => setTool('pen')}
-                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'pen' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
-                        title="Pen Tool"
-                    >
-                        <HiOutlinePencil className="h-4.5 w-4.5" />
-                    </Button>
-                    <Button
-                        size="icon"
-                        variant={tool === 'eraser' ? 'default' : 'outline'}
-                        onClick={() => setTool('eraser')}
-                        className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'eraser' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
-                        title="Eraser Tool"
-                    >
-                        <HiOutlineSparkles className="h-4.5 w-4.5" />
-                    </Button>
-                    <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={handleClear}
-                        className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 border-destructive/20 cursor-pointer"
-                        title="Clear Slide"
-                    >
-                        <HiOutlineTrash className="h-4.5 w-4.5" />
-                    </Button>
-                </div>
+                {isTutor ? (
+                    <div className="flex items-center gap-1.5">
+                        <Button
+                            size="icon"
+                            variant={tool === 'pen' ? 'default' : 'outline'}
+                            onClick={() => setTool('pen')}
+                            className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'pen' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
+                            title="Pen Tool"
+                        >
+                            <HiOutlinePencil className="h-4.5 w-4.5" />
+                        </Button>
+                        <Button
+                            size="icon"
+                            variant={tool === 'eraser' ? 'default' : 'outline'}
+                            onClick={() => setTool('eraser')}
+                            className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'eraser' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
+                            title="Eraser Tool"
+                        >
+                            <HiOutlineSparkles className="h-4.5 w-4.5" />
+                        </Button>
+                        <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={handleClear}
+                            className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10 border-destructive/20 cursor-pointer"
+                            title="Clear Slide"
+                        >
+                            <HiOutlineTrash className="h-4.5 w-4.5" />
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="text-xs text-muted-foreground font-semibold px-2 py-1 bg-muted rounded-md select-none">
+                        View Only Mode
+                    </div>
+                )}
 
                 {/* Color Palette */}
-                {tool === 'pen' && (
+                {isTutor && tool === 'pen' && (
                     <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
                         {['#000000', '#ea4335', '#0f9d58', '#4285f4', '#ab47bc'].map(c => (
                             <button

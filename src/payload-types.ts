@@ -177,6 +177,18 @@ export interface User {
    */
   isManagedAccount?: boolean | null;
   hasCompletedOnboarding?: boolean | null;
+  /**
+   * Subjects the student is interested in learning.
+   */
+  subjectsOfInterest?: (string | Subject)[] | null;
+  /**
+   * Current grade or year of study for the student.
+   */
+  gradeLevel?: string | null;
+  /**
+   * What the student hopes to achieve.
+   */
+  learningGoals?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -226,6 +238,17 @@ export interface Media {
       filename?: string | null;
     };
   };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subjects".
+ */
+export interface Subject {
+  id: string;
+  name: string;
+  slug?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -285,17 +308,6 @@ export interface TutorProfile {
    * Maximum age of students the tutor teaches.
    */
   maxAge?: number | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "subjects".
- */
-export interface Subject {
-  id: string;
-  name: string;
-  slug?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -839,6 +851,9 @@ export interface UsersSelect<T extends boolean = true> {
   parent?: T;
   isManagedAccount?: T;
   hasCompletedOnboarding?: T;
+  subjectsOfInterest?: T;
+  gradeLevel?: T;
+  learningGoals?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;

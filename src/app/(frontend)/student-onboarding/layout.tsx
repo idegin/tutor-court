@@ -2,9 +2,8 @@ import { redirect } from 'next/navigation'
 import React from 'react'
 
 import { getServerSideUser } from '@/lib/auth'
-import { StudentShell } from './student-shell'
 
-export default async function StudentDashboardLayout({
+export default async function StudentOnboardingLayout({
   children,
 }: {
   children: React.ReactNode
@@ -12,16 +11,16 @@ export default async function StudentDashboardLayout({
   const { user } = await getServerSideUser()
 
   if (!user) {
-    redirect('/auth/login?redirect=/dashboard/student')
+    redirect('/auth/login?redirect=/student-onboarding')
   }
 
   if (user.accountType !== 'student') {
     redirect(`/dashboard/${user.accountType}`)
   }
 
-  if (!user.hasCompletedOnboarding) {
-    redirect('/student-onboarding')
+  if (user.hasCompletedOnboarding) {
+    redirect('/dashboard/student')
   }
 
-  return <StudentShell>{children}</StudentShell>
+  return <>{children}</>
 }

@@ -16,7 +16,26 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { slideId } = params
+  const { id, slideId } = params
+
+  try {
+    const whiteboard = await payload.findByID({
+      collection: 'whiteboards',
+      id,
+      depth: 0,
+    })
+
+    if (!whiteboard) {
+      return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 })
+    }
+
+    const ownerId = typeof whiteboard.owner === 'object' ? whiteboard.owner?.id : whiteboard.owner
+    if (ownerId !== user.id && user.accountType !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Only the owner of this whiteboard can edit slides' }, { status: 403 })
+    }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   let body: any
   try {
@@ -55,7 +74,26 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { slideId } = params
+  const { id, slideId } = params
+
+  try {
+    const whiteboard = await payload.findByID({
+      collection: 'whiteboards',
+      id,
+      depth: 0,
+    })
+
+    if (!whiteboard) {
+      return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 })
+    }
+
+    const ownerId = typeof whiteboard.owner === 'object' ? whiteboard.owner?.id : whiteboard.owner
+    if (ownerId !== user.id && user.accountType !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden: Only the owner of this whiteboard can delete slides' }, { status: 403 })
+    }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   try {
     await payload.delete({

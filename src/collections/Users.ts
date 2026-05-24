@@ -233,5 +233,28 @@ export const Users: CollectionConfig = {
       type: 'checkbox',
       defaultValue: false,
     },
+    {
+      name: 'subjectsOfInterest',
+      type: 'relationship',
+      relationTo: 'subjects',
+      hasMany: true,
+      admin: {
+        description: 'Subjects the student is interested in learning.',
+      },
+    },
+    {
+      name: 'gradeLevel',
+      type: 'text',
+      admin: {
+        description: 'Current grade or year of study for the student.',
+      },
+    },
+    {
+      name: 'learningGoals',
+      type: 'textarea',
+      admin: {
+        description: 'What the student hopes to achieve.',
+      },
+    },
   ],
 }

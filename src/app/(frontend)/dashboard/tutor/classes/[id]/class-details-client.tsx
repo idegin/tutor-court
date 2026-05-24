@@ -279,7 +279,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
 
     const fetchRecentAssignments = async () => {
         try {
-            const res = await fetch(`/api/assessments/tutor-assessments?classId=${cls.id}&limit=10`);
+            const res = await fetch(`/api/assessments/tutor-assessments?classId=${cls.id}&limit=200`);
             const data = await res.json();
             if (data?.docs) setRecentAssignments(data.docs);
         } catch (err) {
@@ -848,73 +848,118 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                         <CardContent>
                             {recentAssignments.length > 0 ? (
                                 <div className="divide-y border rounded-lg bg-card/50">
-                                    {recentAssignments.map((ta: any) => {
-                                        const studentName = typeof ta.student === 'object'
-                                            ? `${ta.student.firstName} ${ta.student.lastName}`
-                                            : 'Student';
-                                        const assessmentTitle = typeof ta.assessment === 'object'
-                                            ? ta.assessment.title
-                                            : 'Assessment';
-                                        const assessmentType = typeof ta.assessment === 'object'
-                                            ? ta.assessment.type
-                                            : '';
-                                        const questionCount = Array.isArray(ta.selectedQuestions) ? ta.selectedQuestions.length : 0;
-                                        const statusColors: Record<string, string> = {
-                                            pending: 'bg-amber-50 text-amber-700 border-amber-100',
-                                            in_progress: 'bg-blue-50 text-blue-700 border-blue-100',
-                                            completed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                            expired: 'bg-red-50 text-red-700 border-red-100',
-                                        };
+                                    {(() => {
                                         const typeColors: Record<string, string> = {
                                             quiz: 'bg-violet-50 text-violet-700 border-violet-100',
                                             flashcard: 'bg-sky-50 text-sky-700 border-sky-100',
                                             practice_test: 'bg-amber-50 text-amber-700 border-amber-100',
                                             homework: 'bg-emerald-50 text-emerald-700 border-emerald-100',
                                         };
-                                        return (
-                                            <div key={ta.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+                                        // Group tutor-assessment rows by underlying assessment id
+                                        const grouped = new Map<string, {
+                                            assessmentId: string;
+                                            title: string;
+                                            type: string;
+                                            assigned: number;
+                                            completed: number;
+                                            pending: number;
+                                            inProgress: number;
+                                            expired: number;
+                                        }>();
+
+                                        for (const ta of recentAssignments) {
+                                            const a = typeof ta.assessment === 'object' ? ta.assessment : null;
+                                            if (!a?.id) continue;
+                                            const key = String(a.id);
+                                            let g = grouped.get(key);
+                                            if (!g) {
+                                                g = {
+                                                    assessmentId: key,
+                                                    title: a.title || 'Assessment',
+                                                    type: a.type || '',
+                                                    assigned: 0,
+                                                    completed: 0,
+                                                    pending: 0,
+                                                    inProgress: 0,
+                                                    expired: 0,
+                                                };
+                                                grouped.set(key, g);
+                                            }
+                                            g.assigned += 1;
+                                            if (ta.status === 'completed') g.completed += 1;
+                                            else if (ta.status === 'in_progress') g.inProgress += 1;
+                                            else if (ta.status === 'expired') g.expired += 1;
+                                            else g.pending += 1;
+                                        }
+
+                                        const groups = [...grouped.values()];
+                                        if (groups.length === 0) {
+                                            return (
+                                                <div className="p-6 text-center text-sm text-muted-foreground">
+                                                    No assessments assigned yet.
+                                                </div>
+                                            );
+                                        }
+
+                                        return groups.map((g) => (
+                                            <div
+                                                key={g.assessmentId}
+                                                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                            >
                                                 <div className="flex items-start gap-3 flex-1 min-w-0">
                                                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary/30">
                                                         <HiOutlineClipboardDocumentList className="h-4 w-4 text-muted-foreground" />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <h5 className="text-sm font-bold text-foreground truncate">{assessmentTitle}</h5>
-                                                            {assessmentType && (
-                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 capitalize ${typeColors[assessmentType] || 'bg-secondary/30 text-muted-foreground border-border'}`}>
-                                                                    {assessmentType.replace('_', ' ')}
+                                                            <h5 className="text-sm font-bold text-foreground truncate">{g.title}</h5>
+                                                            {g.type && (
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 capitalize ${typeColors[g.type] || 'bg-secondary/30 text-muted-foreground border-border'}`}>
+                                                                    {g.type.replace('_', ' ')}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">{studentName}</p>
-                                                        <div className="flex items-center gap-3 mt-1 flex-wrap">
-                                                            {questionCount > 0 && (
-                                                                <span className="text-[10px] text-muted-foreground">{questionCount} question{questionCount !== 1 ? 's' : ''}</span>
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            {g.completed}/{g.assigned} completed
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                            {g.pending > 0 && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-100">
+                                                                    {g.pending} pending
+                                                                </span>
                                                             )}
-                                                            {ta.dueDate && (
-                                                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                                                                    <HiOutlineClock className="h-3 w-3" /> Due {format(new Date(ta.dueDate), 'MMM d, yyyy')}
+                                                            {g.inProgress > 0 && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-100">
+                                                                    {g.inProgress} in progress
+                                                                </span>
+                                                            )}
+                                                            {g.completed > 0 && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-100">
+                                                                    {g.completed} done
+                                                                </span>
+                                                            )}
+                                                            {g.expired > 0 && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 rounded border bg-red-50 text-red-700 border-red-100">
+                                                                    {g.expired} expired
                                                                 </span>
                                                             )}
                                                         </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] border font-semibold capitalize ${statusColors[ta.status] || ''}`}>
-                                                        {ta.status.replace('_', ' ')}
-                                                    </span>
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
                                                         className="text-xs h-7 text-tutor-purple-600 hover:text-tutor-purple-700 cursor-pointer px-2"
-                                                        onClick={() => router.push(`/dashboard/tutor/assessments/${ta.id}`)}
+                                                        onClick={() => router.push(`/dashboard/tutor/classes/${cls.id}/assessments/${g.assessmentId}`)}
                                                     >
-                                                        View
+                                                        View performance
                                                     </Button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        ));
+                                    })()}
                                 </div>
                             ) : (
                                 <div className="text-center py-10 border border-dashed rounded-lg text-sm text-muted-foreground">

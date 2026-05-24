@@ -61,7 +61,9 @@ export default async function StandaloneWhiteboardPage({
 
   const isStudentMember = students.some((s: any) => (typeof s === 'object' ? s.id : s) === user.id)
   const isParentMember = parents.some((p: any) => (typeof p === 'object' ? p.id : p) === user.id)
-  const isTutorMember = tutorId === user.id
+  const wbOwnerId = typeof wb.owner === 'object' ? wb.owner?.id : wb.owner
+  const isOwner = wbOwnerId === user.id
+  const canEdit = isOwner || user.accountType === 'admin'
 
   if (!isTutorMember && !isStudentMember && !isParentMember && user.accountType !== 'admin') {
     return (
@@ -89,7 +91,7 @@ export default async function StandaloneWhiteboardPage({
           </div>
         </div>
         <div className="text-xs text-muted-foreground font-medium">
-          Mode: Standalone Viewer
+          Mode: {canEdit ? 'Tutor Editor' : 'Standalone Viewer'}
         </div>
       </header>
 
@@ -97,7 +99,7 @@ export default async function StandaloneWhiteboardPage({
       <div className="flex-1 min-h-0 p-4">
         <WhiteboardCanvas
           whiteboardId={wb.id}
-          isTutor={isTutor}
+          isTutor={canEdit}
           initialSlides={initialSlides}
         />
       </div>
