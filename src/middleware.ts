@@ -4,7 +4,7 @@ import { jwtDecode } from 'jwt-decode'
 
 export function middleware(request: NextRequest) {
   // Payload CMS uses 'payload-token' by default
-  const token = request.cookies.get('payload-token')
+  const token = request.cookies.get('tutorcourt-token')
 
   const pathname = request.nextUrl.pathname;
   

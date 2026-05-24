@@ -73,6 +73,7 @@ export const Users: CollectionConfig = {
               user: doc.id,
               isApproved: false,
             } as any,
+            overrideAccess: true,
             req,
           })
         }
@@ -82,6 +83,7 @@ export const Users: CollectionConfig = {
           where: { user: { equals: doc.id } },
           limit: 1,
           depth: 0,
+          overrideAccess: true,
           req,
         })
 
@@ -94,6 +96,7 @@ export const Users: CollectionConfig = {
               balance: 0,
               creditBalance: 0,
             } as any,
+            overrideAccess: true,
             req,
           })
         }
