@@ -22,6 +22,10 @@ export const metadata = {
   description: 'TutorCourt is an online tutoring marketplace that connects students with qualified tutors for personalized learning experiences.',
   title: 'TutorCourt - Your Trusted Online Tutoring Marketplace',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/logo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
