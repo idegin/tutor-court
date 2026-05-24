@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Where } from 'payload'
 import crypto from 'crypto'
 
 export const Whiteboards: CollectionConfig = {
@@ -24,7 +24,8 @@ export const Whiteboards: CollectionConfig = {
       if (user.accountType === 'admin') return true
 
       if (user.accountType === 'tutor') {
-        return { owner: { equals: user.id } }
+        const tutorWhere: Where = { owner: { equals: user.id } }
+        return { or: [tutorWhere] }
       }
 
       if (user.accountType === 'student') {
@@ -35,12 +36,9 @@ export const Whiteboards: CollectionConfig = {
           depth: 0,
         })
         const classIds = studentClasses.docs.map((c: any) => c.id)
-        return {
-          or: [
-            { class: { in: classIds } },
-            { isPublic: { equals: true } },
-          ],
-        }
+        const classWhere: Where = { class: { in: classIds } }
+        const publicWhere: Where = { isPublic: { equals: true } }
+        return { or: [classWhere, publicWhere] }
       }
 
       if (user.accountType === 'parent') {
@@ -51,12 +49,9 @@ export const Whiteboards: CollectionConfig = {
           depth: 0,
         })
         const classIds = parentClasses.docs.map((c: any) => c.id)
-        return {
-          or: [
-            { class: { in: classIds } },
-            { isPublic: { equals: true } },
-          ],
-        }
+        const classWhere: Where = { class: { in: classIds } }
+        const publicWhere: Where = { isPublic: { equals: true } }
+        return { or: [classWhere, publicWhere] }
       }
 
       return false

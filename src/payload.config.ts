@@ -2,6 +2,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
+import type { PayloadEmailAdapter, SendEmailOptions } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 import { s3Storage } from '@payloadcms/storage-s3'
@@ -37,22 +38,41 @@ console.log('[payload.config] ZEPTO_MAIL_API_KEY set:', Boolean(process.env.ZEPT
 
 // Custom Payload email adapter — routes all auth emails (verify, forgot-password)
 // through the ZeptoMail SDK instead of SMTP, matching how invite emails are sent.
-const zeptoEmailAdapter = () => ({
+const zeptoEmailAdapter: PayloadEmailAdapter = () => ({
   name: 'zeptomail-sdk',
   defaultFromAddress: process.env.ZEPTO_MAIL_FROM || 'noreply@idegin.com',
   defaultFromName: 'TutorCourt',
-  sendEmail: async (message: {
-    to: string | string[]
-    subject: string
-    html?: string
-    text?: string
-  }) => {
-    const to = Array.isArray(message.to) ? message.to[0] : message.to
-    const html = message.html || message.text || ''
+  sendEmail: async (message: SendEmailOptions) => {
+    const toField = message.to
+    const toList = Array.isArray(toField) ? toField : toField ? [toField] : []
+    const to = toList
+      .map((entry) => (typeof entry === 'string' ? entry : entry.address))
+      .find(Boolean)
+    const html =
+      (typeof message.html === 'string' ? message.html : message.html?.toString()) ||
+      (typeof message.text === 'string' ? message.text : message.text?.toString()) ||
+      ''
+
+    if (!to) {
+      throw new Error('[payload.config] Email "to" address is required.')
+    }
+    if (!message.subject) {
+      throw new Error('[payload.config] Email "subject" is required.')
+    }
+
+    const replyToField = message.replyTo
+    const replyToList = Array.isArray(replyToField)
+      ? replyToField
+      : replyToField
+        ? [replyToField]
+        : []
+    const replyTo = replyToList
+      .map((entry) => (typeof entry === 'string' ? entry : entry.address))
+      .find(Boolean)
     console.log(
       `[payload.config] Sending auth email via ZeptoMail SDK → ${to} | ${message.subject}`,
     )
-    await sendZeptoEmail({ to, subject: message.subject, html })
+    await sendZeptoEmail({ to, subject: message.subject, html, replyTo })
   },
 })
 
@@ -121,12 +141,6 @@ export default buildConfig({
       fileSize: 25 * 1024 * 1024,
     },
   },
-  // Soft rate limit for the admin API (per IP, per window).
-  rateLimit: {
-    trustProxy: true,
-    max: 500,
-    window: 60 * 1000,
-  },
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
@@ -137,8 +151,6 @@ export default buildConfig({
     push: process.env.NODE_ENV !== 'production',
   }),
   sharp,
-  // Default IANA timezone list shown to the user; defaults to Africa/Lagos.
-  defaultTimezone: 'Africa/Lagos',
   plugins: [
     s3Storage({
       collections: {

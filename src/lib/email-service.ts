@@ -73,7 +73,7 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
     ],
     subject,
     htmlbody: html,
-    ...(replyTo ? { reply_to: [{ address: replyTo }] } : {}),
+    ...(replyTo ? { reply_to: [{ address: replyTo, name: replyTo }] } : {}),
   }
 
   console.log(
