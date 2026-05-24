@@ -1,3 +1,4 @@
+import { headers as getHeaders } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getPayload } from 'payload';
 import config from '@payload-config';
@@ -102,7 +103,8 @@ export async function POST(req: Request) {
         }
 
         if (tutorEmail) {
-            const serverUrl = getEmailServerUrl();
+            const headers = await getHeaders();
+            const serverUrl = getEmailServerUrl(headers);
             const htmlContent = `
               <p class="text">Hi there,</p>
               <p class="text">You have received a new booking request from ${user.firstName} ${user.lastName}.</p>
@@ -115,7 +117,7 @@ export async function POST(req: Request) {
             await payload.sendEmail({
                 to: tutorEmail,
                 subject: 'New Booking Request - TutorCourt',
-                html: getBaseEmailLayout('New Booking Request', htmlContent),
+                html: getBaseEmailLayout('New Booking Request', htmlContent, serverUrl),
             });
         }
 

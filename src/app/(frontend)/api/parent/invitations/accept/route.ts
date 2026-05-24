@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const tutorName = typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
     if (tutorEmail) {
-      const serverUrl = getEmailServerUrl()
+      const serverUrl = getEmailServerUrl(headers)
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
         <p class="text">Great news! Parent <strong>${user.firstName} ${user.lastName}</strong> has accepted your invitation to join the class <strong>"${cls.title}"</strong>.</p>
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
           <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
         </div>
       `
-      const emailHtml = getBaseEmailLayout('Tutor Invitation Accepted', emailContent)
+      const emailHtml = getBaseEmailLayout('Tutor Invitation Accepted', emailContent, serverUrl)
       await sendEmail({
         to: tutorEmail,
         subject: `${user.firstName} ${user.lastName} Accepted Your Class Invitation`,

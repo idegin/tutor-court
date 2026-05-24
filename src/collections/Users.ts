@@ -19,7 +19,7 @@ export const Users: CollectionConfig = {
     verify: {
       generateEmailHTML: (args) => {
         const token = args?.token
-        const serverUrl = getEmailServerUrl()
+        const serverUrl = getEmailServerUrl((args as any)?.req?.headers)
         const url = `${serverUrl}/auth/verified-email?token=${token}`
         const content = `
           <p class="text">Hi there,</p>
@@ -28,13 +28,13 @@ export const Users: CollectionConfig = {
             <a href="${url}" class="btn">Verify My Email</a>
           </div>
         `
-        return getBaseEmailLayout('Verify Your Email', content)
+        return getBaseEmailLayout('Verify Your Email', content, serverUrl)
       },
     },
     forgotPassword: {
       generateEmailHTML: (args) => {
         const token = args?.token
-        const serverUrl = getEmailServerUrl()
+        const serverUrl = getEmailServerUrl((args as any)?.req?.headers)
         const url = `${serverUrl}/auth/update-password?token=${token}`
         const content = `
           <p class="text">Hi there,</p>
@@ -43,7 +43,7 @@ export const Users: CollectionConfig = {
             <a href="${url}" class="btn">Reset Password</a>
           </div>
         `
-        return getBaseEmailLayout('Reset Your Password', content)
+        return getBaseEmailLayout('Reset Your Password', content, serverUrl)
       },
     },
   },
@@ -157,7 +157,7 @@ export const Users: CollectionConfig = {
 
               if (tutorEmail) {
                 const inviteeName = `${doc.firstName} ${doc.lastName}`
-                const serverUrl = getEmailServerUrl()
+                const serverUrl = getEmailServerUrl(req?.headers)
                 const emailContent = `
                   <p class="text">Hi ${tutorName},</p>
                   <p class="text">Great news! <strong>${inviteeName}</strong> has registered and accepted your invite to join the class <strong>"${cls.title}"</strong> as a <strong>${invitation.inviteeType}</strong>.</p>
@@ -165,7 +165,7 @@ export const Users: CollectionConfig = {
                     <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
                   </div>
                 `
-                const emailHtml = getBaseEmailLayout('Class Invitation Accepted', emailContent)
+                const emailHtml = getBaseEmailLayout('Class Invitation Accepted', emailContent, serverUrl)
                 sendEmail({
                   to: tutorEmail,
                   subject: `${inviteeName} Accepted Your Invite to ${cls.title}`,

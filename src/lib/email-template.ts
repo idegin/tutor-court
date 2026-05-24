@@ -1,17 +1,61 @@
-export const getEmailServerUrl = () => {
-  const serverUrl =
-    process.env.NEXT_PUBLIC_SERVER_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : 'https://demo.tutorcourt.com')
-  return serverUrl.replace(/\/$/, '');
-};
+type HeadersGetter = { get: (name: string) => string | null | undefined }
+type HeadersRecord = Record<string, string | string[] | undefined>
+export type EmailHeaders = HeadersGetter | HeadersRecord | Headers | null | undefined
 
-export const getBaseEmailLayout = (title: string, content: string) => {
-  const hostUrl = getEmailServerUrl();
-  
+const readHeader = (headers: EmailHeaders, name: string): string | undefined => {
+  if (!headers) return undefined
+  const lower = name.toLowerCase()
+  if (typeof (headers as HeadersGetter).get === 'function') {
+    const v = (headers as HeadersGetter).get(lower) ?? (headers as HeadersGetter).get(name)
+    return v ?? undefined
+  }
+  const rec = headers as HeadersRecord
+  const raw = rec[lower] ?? rec[name]
+  if (Array.isArray(raw)) return raw[0]
+  return raw ?? undefined
+}
+
+const isLocalHost = (host: string) =>
+  host.startsWith('localhost') || host.startsWith('127.0.0.1') || host.startsWith('0.0.0.0')
+
+export const getEmailServerUrl = (headers?: EmailHeaders): string => {
+  // 1. Prefer the actual incoming request host (so emails sent from a deploy preview,
+  //    local dev, or staging all link back to the correct origin).
+  if (headers) {
+    const forwardedHost = readHeader(headers, 'x-forwarded-host')
+    const host = forwardedHost || readHeader(headers, 'host')
+    if (host) {
+      const forwardedProto = readHeader(headers, 'x-forwarded-proto')
+      const proto = forwardedProto || (isLocalHost(host) ? 'http' : 'https')
+      return `${proto}://${host}`.replace(/\/$/, '')
+    }
+  }
+
+  // 2. Explicit env override.
+  if (process.env.NEXT_PUBLIC_SERVER_URL) {
+    return process.env.NEXT_PUBLIC_SERVER_URL.replace(/\/$/, '')
+  }
+
+  // 3. Vercel-injected hostnames (build/runtime).
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  // 4. Last-resort local dev fallback.
+  return 'http://localhost:5021'
+}
+
+export const getBaseEmailLayout = (
+  title: string,
+  content: string,
+  headersOrUrl?: EmailHeaders | string,
+) => {
+  const hostUrl =
+    typeof headersOrUrl === 'string' ? headersOrUrl.replace(/\/$/, '') : getEmailServerUrl(headersOrUrl)
+
   return `
 <!DOCTYPE html>
 <html>

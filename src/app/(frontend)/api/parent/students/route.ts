@@ -136,7 +136,7 @@ export async function POST(request: Request) {
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
       if (tutorEmail) {
-        const serverUrl = getEmailServerUrl()
+        const serverUrl = getEmailServerUrl(headers)
         const emailContent = `
           <p class="text">Hi ${tutorName},</p>
           <p class="text">Great news! A parent, <strong>${user.firstName} ${user.lastName}</strong>, has completed onboarding and added their child, <strong>${firstName} ${lastName}</strong>, to your class <strong>"${cls.title}"</strong>.</p>
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
             <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
           </div>
         `
-        const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)
+        const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent, serverUrl)
         await sendEmail({
           to: tutorEmail,
           subject: `New Student: ${firstName} ${lastName} Joined ${cls.title}`,
@@ -196,7 +196,7 @@ export async function POST(request: Request) {
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
       if (tutorEmail) {
-        const serverUrl = getEmailServerUrl()
+        const serverUrl = getEmailServerUrl(headers)
         const emailContent = `
           <p class="text">Hi ${tutorName},</p>
           <p class="text">Great news! A parent, <strong>${user.firstName} ${user.lastName}</strong>, has added their child, <strong>${firstName} ${lastName}</strong>, to your class <strong>"${cls.title}"</strong>.</p>
@@ -205,7 +205,7 @@ export async function POST(request: Request) {
             <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
           </div>
         `
-        const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)
+        const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent, serverUrl)
         await sendEmail({
           to: tutorEmail,
           subject: `New Student: ${firstName} ${lastName} Joined ${cls.title}`,

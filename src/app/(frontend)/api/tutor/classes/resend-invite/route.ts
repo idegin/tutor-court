@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const classIdVal = typeof invitation.class === 'object' ? invitation.class.id : invitation.class
     const classObj = typeof invitation.class === 'object' ? invitation.class : await payload.findByID({ collection: 'classes', id: classIdVal })
 
-    const serverUrl = getEmailServerUrl()
+    const serverUrl = getEmailServerUrl(headers)
     const signupUrl = `${serverUrl}/auth/register?token=${token}&email=${encodeURIComponent(updatedInvite.inviteeEmail)}&role=${updatedInvite.inviteeType}`
 
     const emailContent = `
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
         <a href="${signupUrl}" class="btn font-semibold">Join Class</a>
       </div>
     `
-    const emailHtml = getBaseEmailLayout(`Resent Class Invitation: ${classObj.title}`, emailContent)
+    const emailHtml = getBaseEmailLayout(`Resent Class Invitation: ${classObj.title}`, emailContent, serverUrl)
     sendEmail({
       to: updatedInvite.inviteeEmail,
       subject: `Resent Class Invitation: ${classObj.title}`,

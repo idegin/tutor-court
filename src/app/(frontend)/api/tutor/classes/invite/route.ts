@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       })
 
       // Send email to existing user
-      const serverUrl = getEmailServerUrl()
+      const serverUrl = getEmailServerUrl(headers)
       const emailContent = `
         <p class="text">Hi ${inviteUser.firstName || 'there'},</p>
         <p class="text">Tutor <strong>${user.firstName} ${user.lastName}</strong> has added you to their class <strong>"${classDoc.title || 'Live Class'}"</strong>.</p>
@@ -116,7 +116,8 @@ export async function POST(request: Request) {
       `
       const emailHtml = getBaseEmailLayout(
         `Added to Class: ${classDoc.title || 'Live Class'}`,
-        emailContent
+        emailContent,
+        serverUrl,
       )
       sendEmail({
         to: trimmedEmail,
@@ -159,7 +160,7 @@ export async function POST(request: Request) {
         } as any,
       })
 
-      const serverUrl = getEmailServerUrl()
+      const serverUrl = getEmailServerUrl(headers)
       const signupUrl = `${serverUrl}/auth/register?token=${token}&email=${encodeURIComponent(trimmedEmail)}&role=${inviteeType}`
 
       const emailContent = `
@@ -172,7 +173,8 @@ export async function POST(request: Request) {
       `
       const emailHtml = getBaseEmailLayout(
         `Class Invitation: ${classDoc.title || 'Live Class'}`,
-        emailContent
+        emailContent,
+        serverUrl,
       )
       sendEmail({
         to: trimmedEmail,
