@@ -76,7 +76,6 @@ export async function POST(req: Request) {
 
         type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 
-        // Create booking in Payload
         const booking = await payload.create({
             collection: 'bookings',
             data: {
@@ -91,7 +90,7 @@ export async function POST(req: Request) {
                 price: totalPrice,
                 status: 'pending',
             }
-        });
+        } as any);
 
         // Email the tutor
         let tutorEmail = '';

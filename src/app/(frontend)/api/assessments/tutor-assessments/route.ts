@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     message: `${tutorName} has assigned you "${assessmentTitle}". Please complete it before the deadline.`,
     link: `/dashboard/student/assessments/${tutorAssessment.id}`,
     relatedCollection: 'tutor-assessments',
-    relatedId: tutorAssessment.id,
+    relatedId: String(tutorAssessment.id),
   })
 
   return NextResponse.json({ success: true, tutorAssessment })

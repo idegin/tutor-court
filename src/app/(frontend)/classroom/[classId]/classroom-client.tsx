@@ -552,6 +552,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 webcamEnabled: camEnabled,
                 name: `${currentUser.firstName} ${currentUser.lastName}`,
                 participantId: currentUser.id,
+                debugMode: false,
             }}
         >
             <ClassroomMeetingView
@@ -571,6 +572,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 activeTab={activeTab}
                 toggleTab={toggleTab}
                 isPanelOpen={isPanelOpen}
+                syncWhiteboardStateToDB={syncWhiteboardStateToDB}
             />
         </MeetingProvider>
     );
@@ -594,6 +596,7 @@ interface ClassroomMeetingViewProps {
     activeTab: 'chat' | 'participants' | 'tools';
     toggleTab: (tab: 'chat' | 'participants' | 'tools') => void;
     isPanelOpen: boolean;
+    syncWhiteboardStateToDB: (show: boolean, wbId: string | null) => Promise<void>;
 }
 
 function ClassroomMeetingView({
@@ -613,6 +616,7 @@ function ClassroomMeetingView({
     activeTab,
     toggleTab,
     isPanelOpen,
+    syncWhiteboardStateToDB,
 }: ClassroomMeetingViewProps) {
     const router = useRouter();
     const {
@@ -623,7 +627,6 @@ function ClassroomMeetingView({
         toggleScreenShare,
         localScreenShareOn,
         presenterId,
-        removeParticipant,
         participants
     } = useMeeting({
         onMeetingJoined: () => {
@@ -1041,7 +1044,7 @@ function ClassroomMeetingView({
                                                             variant="ghost"
                                                             onClick={() => {
                                                                 if (window.confirm(`Are you sure you want to remove ${p.displayName} from the call?`)) {
-                                                                    removeParticipant(p.id);
+                                                                    p.remove();
                                                                     toast.success(`${p.displayName} removed.`);
                                                                 }
                                                             }}

@@ -160,7 +160,7 @@ export async function POST(request: Request) {
           message: `${user.firstName} ${user.lastName} added their child ${firstName} ${lastName} to "${cls.title}" during onboarding.`,
           link: `/dashboard/tutor/classes/${classId}`,
           relatedCollection: 'classes',
-          relatedId: classId,
+          relatedId: String(classId),
         })
       }
     }
@@ -219,7 +219,7 @@ export async function POST(request: Request) {
           message: `${user.firstName} ${user.lastName} added their child ${firstName} ${lastName} to "${cls.title}".`,
           link: `/dashboard/tutor/classes/${cls.id}`,
           relatedCollection: 'classes',
-          relatedId: cls.id,
+          relatedId: String(cls.id),
         })
       }
     }

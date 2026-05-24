@@ -35,7 +35,7 @@ export default async function TutorWalletPage() {
 
   let wallet = walletRes.docs[0]
   if (!wallet) {
-    wallet = await payload.create({
+    wallet = (await payload.create({
       collection: 'wallets',
       data: {
         user: user!.id,
@@ -43,7 +43,7 @@ export default async function TutorWalletPage() {
         balance: 0,
         creditBalance: 0,
       },
-    })
+    } as any)) as any
   }
 
   const transactions = txRes.docs

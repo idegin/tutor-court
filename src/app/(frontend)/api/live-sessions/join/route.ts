@@ -142,7 +142,7 @@ export async function POST(request: Request) {
         message: `${studentName} has joined "${className}" live session.`,
         link: `/dashboard/tutor/classes/${classIdVal}`,
         relatedCollection: 'classes',
-        relatedId: classIdVal,
+        relatedId: String(classIdVal),
       }).catch(() => {})
     }
 

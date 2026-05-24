@@ -14,8 +14,8 @@ export const TutorAssessments: CollectionConfig = {
     read: ({ req: { user } }) => {
       if (!user) return false
       if (user.accountType === 'admin') return true
-      if (user.accountType === 'tutor') return { tutor: { equals: user.id } }
-      if (user.accountType === 'student') return { student: { equals: user.id } }
+      if (user.accountType === 'tutor') return { tutor: { equals: user.id } } as any
+      if (user.accountType === 'student') return { student: { equals: user.id } } as any
       return false
     },
     create: ({ req: { user } }) =>
@@ -23,15 +23,15 @@ export const TutorAssessments: CollectionConfig = {
     update: ({ req: { user } }) => {
       if (!user) return false
       if (user.accountType === 'admin') return true
-      if (user.accountType === 'tutor') return { tutor: { equals: user.id } }
+      if (user.accountType === 'tutor') return { tutor: { equals: user.id } } as any
       // Students can only update status (via API logic)
-      if (user.accountType === 'student') return { student: { equals: user.id } }
+      if (user.accountType === 'student') return { student: { equals: user.id } } as any
       return false
     },
     delete: ({ req: { user } }) => {
       if (!user) return false
       if (user.accountType === 'admin') return true
-      return { tutor: { equals: user.id } }
+      return { tutor: { equals: user.id } } as any
     },
   },
   fields: [

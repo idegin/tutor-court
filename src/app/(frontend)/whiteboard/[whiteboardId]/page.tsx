@@ -59,6 +59,7 @@ export default async function StandaloneWhiteboardPage({
   const students = classDoc.students || []
   const parents = classDoc.parents || []
 
+  const isTutorMember = user.accountType === 'tutor' && tutorId === user.id
   const isStudentMember = students.some((s: any) => (typeof s === 'object' ? s.id : s) === user.id)
   const isParentMember = parents.some((p: any) => (typeof p === 'object' ? p.id : p) === user.id)
   const wbOwnerId = typeof wb.owner === 'object' ? wb.owner?.id : wb.owner
