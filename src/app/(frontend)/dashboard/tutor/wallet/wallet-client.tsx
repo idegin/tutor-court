@@ -192,7 +192,7 @@ export function TutorWalletClient({
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Coin Balance</p>
+            <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Credit Balance</p>
             <h2 className="text-3xl font-semibold tracking-tight text-gray-900">
               {formatCredits(credits)}
             </h2>

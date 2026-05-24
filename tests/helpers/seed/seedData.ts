@@ -33,7 +33,7 @@ export async function seedData() {
     collection: 'users',
     data: {
       email: 'admin@tutorcourt.com',
-      password: 'password123',
+      password: 'Superman6625*',
       firstName: 'Super',
       lastName: 'Admin',
       phoneNumber: '+1234567890',
@@ -97,7 +97,7 @@ export async function seedData() {
       collection: 'users',
       data: {
         email,
-        password: 'password123',
+        password: 'Superman6625*',
         firstName,
         lastName,
         phoneNumber: faker.phone.number(),

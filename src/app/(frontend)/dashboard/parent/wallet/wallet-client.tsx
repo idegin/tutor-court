@@ -54,8 +54,32 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
     // Check if redirect query param indicates payment success
     const reference = searchParams.get('reference')
     if (reference) {
-      toast.success('Wallet funded successfully! Your balance will update shortly.')
-      router.replace('/dashboard/parent/wallet')
+      const verifyPayment = async () => {
+        const promise = fetch(`/api/payments/paystack/verify?reference=${reference}`)
+          .then(async (res) => {
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Verification failed')
+            return data
+          })
+
+        toast.promise(promise, {
+          loading: 'Verifying payment...',
+          success: (data) => {
+            if (data.wallet) {
+              setWallet(data.wallet)
+            }
+            router.refresh()
+            router.replace('/dashboard/parent/wallet')
+            return 'Wallet funded successfully!'
+          },
+          error: (err) => {
+            router.replace('/dashboard/parent/wallet')
+            return err.message || 'Verification failed. Please contact support.'
+          },
+        })
+      }
+
+      verifyPayment()
     }
   }, [searchParams, router])
 
@@ -183,7 +207,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
             </Button>
           </div>
           <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Coin balance
+            Credit balance
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCredits(credits)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
