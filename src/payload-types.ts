@@ -232,6 +232,21 @@ export interface User {
 export interface Media {
   id: number;
   alt: string;
+  /**
+   * Auto-populated from the authenticated uploader.
+   */
+  uploadedBy?: (number | null) | User;
+  purpose?:
+    | (
+        | 'avatar'
+        | 'class_asset'
+        | 'assessment_question'
+        | 'identity_document'
+        | 'certification'
+        | 'class_material'
+        | 'general'
+      )
+    | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -252,6 +267,14 @@ export interface Media {
       filesize?: number | null;
       filename?: string | null;
     };
+    card?: {
+      url?: string | null;
+      width?: number | null;
+      height?: number | null;
+      mimeType?: string | null;
+      filesize?: number | null;
+      filename?: string | null;
+    };
   };
 }
 /**
@@ -261,6 +284,24 @@ export interface Media {
 export interface Subject {
   id: number;
   name: string;
+  category?:
+    | (
+        | 'math'
+        | 'science'
+        | 'language_arts'
+        | 'social_studies'
+        | 'world_languages'
+        | 'computing'
+        | 'arts'
+        | 'pe_health'
+        | 'test_prep'
+        | 'other'
+      )
+    | null;
+  /**
+   * K-12 grade levels this subject applies to (optional filter).
+   */
+  gradeLevels?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12')[] | null;
   slug?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -366,89 +407,23 @@ export interface Review {
   rating: number;
   user: number | User;
   tutor: number | TutorProfile;
+  /**
+   * Class this review is about (when applicable).
+   */
+  class?: (number | null) | Class;
+  /**
+   * Booking this review is about (when applicable).
+   */
+  booking?: (number | null) | Booking;
   tutorResponse?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "wallets".
- */
-export interface Wallet {
-  id: number;
-  user: number | User;
-  currency: 'ngn' | 'usd';
-  balance: number;
-  creditBalance: number;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "transactions".
- */
-export interface Transaction {
-  id: number;
-  sender: number | User;
-  receiver: number | User;
-  tutor?: (number | null) | User;
-  amount: number;
-  currency: 'usd' | 'ngn';
-  status: 'paid' | 'pending';
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "bookings".
- */
-export interface Booking {
-  id: number;
-  tutor: number | TutorProfile;
-  student: number | User;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   /**
-   * Start date of the engagement
+   * Admin moderation flag. Only approved reviews are visible publicly.
    */
-  date: string;
+  isApproved?: boolean | null;
   /**
-   * End date of the engagement
+   * Set when a user reports this review for moderation.
    */
-  endDate: string;
-  hoursPerDay: number;
-  daysOfWeek: ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[];
-  subjects: {
-    subject: string;
-    id?: string | null;
-  }[];
-  /**
-   * Total price for this booking
-   */
-  price: number;
-  /**
-   * Message from the student to the tutor
-   */
-  message?: string | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "students".
- */
-export interface Student {
-  id: number;
-  user: number | User;
-  parent: number | User;
-  firstName: string;
-  lastName: string;
-  generatedEmail: string;
-  /**
-   * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
-   */
-  generatedPassword: string;
-  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
-  notes?: string | null;
+  flagged?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -529,6 +504,133 @@ export interface LiveSession {
   activeWhiteboard?: (number | null) | Whiteboard;
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bookings".
+ */
+export interface Booking {
+  id: number;
+  tutor: number | TutorProfile;
+  student: number | User;
+  /**
+   * Parent user when the booking is made on behalf of a managed student.
+   */
+  parent?: (number | null) | User;
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'refunded';
+  paymentStatus: 'unpaid' | 'held' | 'paid' | 'refunded' | 'failed';
+  /**
+   * Linked transaction that paid for this booking.
+   */
+  transaction?: (number | null) | Transaction;
+  /**
+   * Start date of the engagement
+   */
+  date: string;
+  /**
+   * End date of the engagement
+   */
+  endDate: string;
+  hoursPerDay: number;
+  daysOfWeek: ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[];
+  subjects: (number | Subject)[];
+  /**
+   * Student's K-12 grade level at time of booking.
+   */
+  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  /**
+   * Total price for this booking
+   */
+  price: number;
+  currency: 'ngn' | 'usd';
+  /**
+   * Message from the student to the tutor
+   */
+  message?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "transactions".
+ */
+export interface Transaction {
+  id: number;
+  /**
+   * Internal or gateway reference (e.g. Paystack reference). Unique.
+   */
+  reference?: string | null;
+  gateway: 'wallet' | 'paystack' | 'manual';
+  type: 'deposit' | 'payment' | 'refund' | 'payout' | 'credit_grant' | 'adjustment';
+  sender: number | User;
+  receiver: number | User;
+  tutor?: (number | null) | User;
+  relatedBooking?: (number | null) | Booking;
+  relatedLiveSession?: (number | null) | LiveSession;
+  /**
+   * Amount in the smallest non-decimal unit (e.g. kobo or cents).
+   */
+  amount: number;
+  currency: 'ngn' | 'usd';
+  status: 'pending' | 'success' | 'failed' | 'reversed';
+  description?: string | null;
+  /**
+   * Gateway response payload, idempotency keys, etc.
+   */
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "wallets".
+ */
+export interface Wallet {
+  id: number;
+  user: number | User;
+  currency: 'ngn' | 'usd';
+  /**
+   * Spendable balance in NGN/USD.
+   */
+  balance: number;
+  /**
+   * Funds reserved for in-flight bookings/escrow. Available balance is (balance - lockedBalance).
+   */
+  lockedBalance: number;
+  /**
+   * Tutoring credits used to pay for live-session minutes.
+   */
+  creditBalance: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "students".
+ */
+export interface Student {
+  id: number;
+  user: number | User;
+  parent: number | User;
+  firstName: string;
+  lastName: string;
+  generatedEmail: string;
+  /**
+   * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
+   */
+  generatedPassword: string;
+  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  notes?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -735,6 +837,13 @@ export interface AssessmentResult {
    */
   score?: number | null;
   passed?: boolean | null;
+  /**
+   * Which attempt this result represents (1-based).
+   */
+  attempt?: number | null;
+  /**
+   * Once set, the student can no longer edit answers.
+   */
   submittedAt?: string | null;
   timeTakenSeconds?: number | null;
   /**
@@ -751,6 +860,10 @@ export interface AssessmentResult {
 export interface Notification {
   id: number;
   recipient: number | User;
+  /**
+   * User that triggered this notification (optional).
+   */
+  actor?: (number | null) | User;
   type:
     | 'student_joined_class'
     | 'parent_accepted_invite'
@@ -764,6 +877,11 @@ export interface Notification {
   title: string;
   message: string;
   isRead?: boolean | null;
+  /**
+   * When the notification was surfaced/viewed (badge cleared). Distinct from isRead which is set when opened.
+   */
+  seenAt?: string | null;
+  priority?: ('low' | 'normal' | 'high') | null;
   /**
    * Optional URL to redirect to when notification is clicked
    */
@@ -971,6 +1089,8 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  uploadedBy?: T;
+  purpose?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -986,6 +1106,16 @@ export interface MediaSelect<T extends boolean = true> {
     | T
     | {
         thumbnail?:
+          | T
+          | {
+              url?: T;
+              width?: T;
+              height?: T;
+              mimeType?: T;
+              filesize?: T;
+              filename?: T;
+            };
+        card?:
           | T
           | {
               url?: T;
@@ -1042,6 +1172,8 @@ export interface TutorProfilesSelect<T extends boolean = true> {
  */
 export interface SubjectsSelect<T extends boolean = true> {
   name?: T;
+  category?: T;
+  gradeLevels?: T;
   slug?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1055,7 +1187,11 @@ export interface ReviewsSelect<T extends boolean = true> {
   rating?: T;
   user?: T;
   tutor?: T;
+  class?: T;
+  booking?: T;
   tutorResponse?: T;
+  isApproved?: T;
+  flagged?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1067,6 +1203,7 @@ export interface WalletsSelect<T extends boolean = true> {
   user?: T;
   currency?: T;
   balance?: T;
+  lockedBalance?: T;
   creditBalance?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1076,12 +1213,19 @@ export interface WalletsSelect<T extends boolean = true> {
  * via the `definition` "transactions_select".
  */
 export interface TransactionsSelect<T extends boolean = true> {
+  reference?: T;
+  gateway?: T;
+  type?: T;
   sender?: T;
   receiver?: T;
   tutor?: T;
+  relatedBooking?: T;
+  relatedLiveSession?: T;
   amount?: T;
   currency?: T;
   status?: T;
+  description?: T;
+  metadata?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1092,18 +1236,18 @@ export interface TransactionsSelect<T extends boolean = true> {
 export interface BookingsSelect<T extends boolean = true> {
   tutor?: T;
   student?: T;
+  parent?: T;
   status?: T;
+  paymentStatus?: T;
+  transaction?: T;
   date?: T;
   endDate?: T;
   hoursPerDay?: T;
   daysOfWeek?: T;
-  subjects?:
-    | T
-    | {
-        subject?: T;
-        id?: T;
-      };
+  subjects?: T;
+  gradeLevel?: T;
   price?: T;
+  currency?: T;
   message?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1335,6 +1479,7 @@ export interface AssessmentResultsSelect<T extends boolean = true> {
   earnedPoints?: T;
   score?: T;
   passed?: T;
+  attempt?: T;
   submittedAt?: T;
   timeTakenSeconds?: T;
   feedback?: T;
@@ -1347,10 +1492,13 @@ export interface AssessmentResultsSelect<T extends boolean = true> {
  */
 export interface NotificationsSelect<T extends boolean = true> {
   recipient?: T;
+  actor?: T;
   type?: T;
   title?: T;
   message?: T;
   isRead?: T;
+  seenAt?: T;
+  priority?: T;
   link?: T;
   relatedEntity?:
     | T

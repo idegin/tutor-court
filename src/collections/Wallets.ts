@@ -41,12 +41,27 @@ export const Wallets: CollectionConfig = {
       type: 'number',
       required: true,
       defaultValue: 0,
+      min: 0,
+      admin: { description: 'Spendable balance in NGN/USD.' },
+    },
+    {
+      name: 'lockedBalance',
+      type: 'number',
+      required: true,
+      defaultValue: 0,
+      min: 0,
+      admin: {
+        description:
+          'Funds reserved for in-flight bookings/escrow. Available balance is (balance - lockedBalance).',
+      },
     },
     {
       name: 'creditBalance',
       type: 'number',
       required: true,
       defaultValue: 0,
+      min: 0,
+      admin: { description: 'Tutoring credits used to pay for live-session minutes.' },
     },
   ],
   timestamps: true,

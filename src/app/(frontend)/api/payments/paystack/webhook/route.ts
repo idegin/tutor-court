@@ -71,15 +71,20 @@ export async function POST(request: Request) {
             } as any,
           })
 
-          // Create transaction record
+          // Create transaction record (idempotent via unique reference)
           await payload.create({
             collection: 'transactions',
             data: {
+              reference,
+              gateway: 'paystack',
+              type: 'deposit',
               sender: userId,
               receiver: userId,
               amount: amountNaira,
               currency: 'ngn',
-              status: 'paid',
+              status: 'success',
+              description: 'Paystack wallet funding',
+              metadata: data,
             } as any,
           })
 

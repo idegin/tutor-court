@@ -64,11 +64,15 @@ export async function POST(request: Request) {
     await payload.create({
       collection: 'transactions',
       data: {
+        reference: `credits-${user.id}-${Date.now()}`,
+        gateway: 'wallet',
+        type: 'payment',
         sender: user.id,
         receiver: user.id,
         amount: cost,
         currency: 'ngn',
-        status: 'paid',
+        status: 'success',
+        description: `Purchased ${credits} credits from wallet balance.`,
       } as any,
     })
 

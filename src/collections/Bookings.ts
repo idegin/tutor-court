@@ -14,6 +14,16 @@ export const Bookings: CollectionConfig = {
         or: [{ student: { equals: user?.id } }, { 'tutor.user': { equals: user?.id } }],
       } as any
     },
+    create: ({ req: { user } }) =>
+      Boolean(user && (user.accountType === 'student' || user.accountType === 'parent' || user.accountType === 'admin')),
+    update: ({ req: { user } }) => {
+      if (!user) return false
+      if (user.accountType === 'admin') return true
+      return {
+        or: [{ student: { equals: user.id } }, { 'tutor.user': { equals: user.id } }],
+      } as any
+    },
+    delete: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
   },
   fields: [
     {
@@ -22,6 +32,7 @@ export const Bookings: CollectionConfig = {
       relationTo: 'tutor-profiles',
       required: true,
       hasMany: false,
+      index: true,
     },
     {
       name: 'student',
@@ -29,6 +40,18 @@ export const Bookings: CollectionConfig = {
       relationTo: 'users',
       required: true,
       hasMany: false,
+      index: true,
+    },
+    {
+      name: 'parent',
+      type: 'relationship',
+      relationTo: 'users',
+      required: false,
+      hasMany: false,
+      index: true,
+      admin: {
+        description: 'Parent user when the booking is made on behalf of a managed student.',
+      },
     },
     {
       name: 'status',
@@ -37,15 +60,42 @@ export const Bookings: CollectionConfig = {
       options: [
         { label: 'Pending', value: 'pending' },
         { label: 'Confirmed', value: 'confirmed' },
+        { label: 'In Progress', value: 'in_progress' },
         { label: 'Completed', value: 'completed' },
         { label: 'Cancelled', value: 'cancelled' },
+        { label: 'Refunded', value: 'refunded' },
       ],
       required: true,
+      index: true,
+    },
+    {
+      name: 'paymentStatus',
+      type: 'select',
+      defaultValue: 'unpaid',
+      options: [
+        { label: 'Unpaid', value: 'unpaid' },
+        { label: 'Held in Escrow', value: 'held' },
+        { label: 'Paid Out', value: 'paid' },
+        { label: 'Refunded', value: 'refunded' },
+        { label: 'Failed', value: 'failed' },
+      ],
+      required: true,
+      index: true,
+    },
+    {
+      name: 'transaction',
+      type: 'relationship',
+      relationTo: 'transactions',
+      hasMany: false,
+      admin: {
+        description: 'Linked transaction that paid for this booking.',
+      },
     },
     {
       name: 'date',
       type: 'date',
       required: true,
+      index: true,
       admin: {
         date: {
           pickerAppearance: 'dayOnly',
@@ -88,24 +138,49 @@ export const Bookings: CollectionConfig = {
     },
     {
       name: 'subjects',
-      type: 'array',
+      type: 'relationship',
+      relationTo: 'subjects',
+      hasMany: true,
       required: true,
-      minRows: 1,
-      fields: [
-        {
-          name: 'subject',
-          type: 'text',
-          required: true,
-        },
+    },
+    {
+      name: 'gradeLevel',
+      type: 'select',
+      options: [
+        { label: 'Kindergarten', value: 'K' },
+        { label: 'Grade 1', value: '1' },
+        { label: 'Grade 2', value: '2' },
+        { label: 'Grade 3', value: '3' },
+        { label: 'Grade 4', value: '4' },
+        { label: 'Grade 5', value: '5' },
+        { label: 'Grade 6', value: '6' },
+        { label: 'Grade 7', value: '7' },
+        { label: 'Grade 8', value: '8' },
+        { label: 'Grade 9', value: '9' },
+        { label: 'Grade 10', value: '10' },
+        { label: 'Grade 11', value: '11' },
+        { label: 'Grade 12', value: '12' },
       ],
+      admin: { description: "Student's K-12 grade level at time of booking." },
     },
     {
       name: 'price',
       type: 'number',
       required: true,
+      min: 0,
       admin: {
         description: 'Total price for this booking',
       },
+    },
+    {
+      name: 'currency',
+      type: 'select',
+      options: [
+        { label: 'NGN', value: 'ngn' },
+        { label: 'USD', value: 'usd' },
+      ],
+      defaultValue: 'ngn',
+      required: true,
     },
     {
       name: 'message',

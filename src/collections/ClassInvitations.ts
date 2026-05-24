@@ -12,9 +12,10 @@ export const ClassInvitations: CollectionConfig = {
   hooks: {
     beforeValidate: [
       ({ data, operation }) => {
+        if (!data) return data
         if (operation === 'create') {
-          if (!data?.token) data.token = crypto.randomBytes(24).toString('hex')
-          if (!data?.expiresAt) {
+          if (!data.token) data.token = crypto.randomBytes(24).toString('hex')
+          if (!data.expiresAt) {
             data.expiresAt = new Date(Date.now() + DEFAULT_INVITATION_TTL_MS).toISOString()
           }
         }

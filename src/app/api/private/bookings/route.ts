@@ -12,6 +12,7 @@ const bookingSchema = z.object({
   endDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid endDate" }),
   hoursPerDay: z.number().min(1).max(10),
   daysOfWeek: z.array(z.string()).min(1),
+  // subjects may arrive as subject IDs or names; resolved to IDs server-side.
   subjects: z.array(z.string()).min(1),
   message: z.string().optional(),
 });
@@ -49,8 +50,29 @@ export async function POST(req: Request) {
         const estimatedTotalHours = weeks * parsed.daysOfWeek.length * parsed.hoursPerDay;
         const totalPrice = estimatedTotalHours * (tutorProfile.hourlyRate || 0);
 
-        // Subject structure formatting
-        const subjectsFormatted = parsed.subjects.map(sub => ({ subject: sub }));
+        // Resolve incoming subjects (IDs or names) to Subject IDs.
+        const subjectIds: (string | number)[] = []
+        for (const raw of parsed.subjects) {
+            const trimmed = raw.trim()
+            if (!trimmed) continue
+            // Try matching by slug, name, or id.
+            const match = await payload.find({
+                collection: 'subjects',
+                where: {
+                    or: [
+                        { id: { equals: trimmed } },
+                        { slug: { equals: trimmed.toLowerCase() } },
+                        { name: { equals: trimmed } },
+                    ],
+                },
+                limit: 1,
+                depth: 0,
+            })
+            if (match.docs[0]) subjectIds.push(match.docs[0].id)
+        }
+        if (subjectIds.length === 0) {
+            return NextResponse.json({ error: 'No valid subjects supplied' }, { status: 400 })
+        }
 
         type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 
@@ -64,7 +86,7 @@ export async function POST(req: Request) {
                 endDate: end.toISOString(),
                 hoursPerDay: parsed.hoursPerDay,
                 daysOfWeek: parsed.daysOfWeek as DayOfWeek[],
-                subjects: subjectsFormatted,
+                subjects: subjectIds as any,
                 message: parsed.message || '',
                 price: totalPrice,
                 status: 'pending',

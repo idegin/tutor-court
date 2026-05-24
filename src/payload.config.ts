@@ -56,9 +56,28 @@ const zeptoEmailAdapter = () => ({
   },
 })
 
+const SERVER_URL = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'
+
+// Trusted origins for CORS / CSRF — extend via PAYLOAD_ALLOWED_ORIGINS (comma-separated).
+const extraOrigins = (process.env.PAYLOAD_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
+const trustedOrigins = Array.from(new Set([SERVER_URL, ...extraOrigins]))
+
 export default buildConfig({
+  serverURL: SERVER_URL,
+  cors: trustedOrigins,
+  csrf: trustedOrigins,
+  telemetry: false,
+  cookiePrefix: 'tutorcourt',
   admin: {
     user: Users.slug,
+    meta: {
+      title: 'TutorCourt Admin',
+      description: 'TutorCourt K-12 tutoring platform admin',
+    },
     importMap: {
       baseDir: path.resolve(dirname),
     },
@@ -92,18 +111,40 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
+  // GraphQL is not used by the app; disabling its routes shrinks attack surface.
+  graphQL: {
+    disable: true,
+  },
+  // Cap upload size to 25 MB (PDFs, slides, identity docs).
+  upload: {
+    limits: {
+      fileSize: 25 * 1024 * 1024,
+    },
+  },
+  // Soft rate limit for the admin API (per IP, per window).
+  rateLimit: {
+    trustProxy: true,
+    max: 500,
+    window: 60 * 1000,
+  },
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URL || '',
+      max: Number(process.env.PG_POOL_MAX || 10),
+      idleTimeoutMillis: 30_000,
     },
+    // In production we never want Payload to auto-mutate the live schema.
+    push: process.env.NODE_ENV !== 'production',
   }),
   sharp,
+  // Default IANA timezone list shown to the user; defaults to Africa/Lagos.
+  defaultTimezone: 'Africa/Lagos',
   plugins: [
     s3Storage({
       collections: {
         media: true,
       },
-      bucket: 'tutor-court',
+      bucket: process.env.TIGRIS_STORAGE_BUCKET || 'tutor-court',
       config: {
         credentials: {
           accessKeyId: process.env.TIGRIS_STORAGE_ACCESS_KEY_ID || '',

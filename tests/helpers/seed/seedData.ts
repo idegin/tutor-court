@@ -168,13 +168,16 @@ export async function seedData() {
       await payload.create({
         collection: 'transactions',
         data: {
+          reference: `seed-${user.id}-${Date.now()}-${j}-${Math.random().toString(36).slice(2, 8)}`,
+          gateway: 'wallet',
+          type: 'payment',
           sender: user.id,
           receiver: user.id,
           tutor: isTutor ? user.id : null,
           amount: faker.number.int({ min: 10, max: 500 }),
           currency: isTutor ? 'usd' : 'ngn',
-          status: faker.helpers.arrayElement(['paid', 'pending']),
-        },
+          status: faker.helpers.arrayElement(['success', 'pending']),
+        } as any,
       })
     }
   }
@@ -239,6 +242,8 @@ export async function seedData() {
           tutor: tutor.id,
           student: student.id,
           status: faker.helpers.arrayElement(['pending', 'confirmed', 'completed', 'cancelled']),
+          paymentStatus: 'unpaid',
+          currency: 'ngn',
           date: startDate.toISOString(),
           endDate: endDate.toISOString(),
           hoursPerDay: faker.number.int({ min: 1, max: 4 }),
@@ -246,10 +251,10 @@ export async function seedData() {
             ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
             { min: 1, max: 3 },
           ),
-          subjects: [{ subject: faker.helpers.arrayElement(allSubjects.docs).name }],
+          subjects: [faker.helpers.arrayElement(allSubjects.docs).id],
           price: faker.number.int({ min: 5000, max: 200000 }),
           message: faker.lorem.sentences(2),
-        },
+        } as any,
       })
     }
 

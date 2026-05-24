@@ -139,11 +139,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       await payload.create({
         collection: 'transactions',
         data: {
+          reference: `session-${session.id}-${Date.now()}`,
+          gateway: 'wallet',
+          type: 'payment',
           sender: session.tutor,
           receiver: session.tutor,
+          tutor: session.tutor,
+          relatedLiveSession: session.id,
           amount: cost * CREDIT_RATE.nairaPerCoin,
           currency: 'ngn',
-          status: 'paid',
+          status: 'success',
+          description: `Live session credit consumption (${cost} credits).`,
         } as any,
       })
     }

@@ -33,6 +33,15 @@ export const Notifications: CollectionConfig = {
       index: true,
     },
     {
+      name: 'actor',
+      type: 'relationship',
+      relationTo: 'users',
+      hasMany: false,
+      admin: {
+        description: 'User that triggered this notification (optional).',
+      },
+    },
+    {
       name: 'type',
       type: 'select',
       required: true,
@@ -64,6 +73,23 @@ export const Notifications: CollectionConfig = {
       type: 'checkbox',
       defaultValue: false,
       index: true,
+    },
+    {
+      name: 'seenAt',
+      type: 'date',
+      admin: {
+        description: 'When the notification was surfaced/viewed (badge cleared). Distinct from isRead which is set when opened.',
+      },
+    },
+    {
+      name: 'priority',
+      type: 'select',
+      defaultValue: 'normal',
+      options: [
+        { label: 'Low', value: 'low' },
+        { label: 'Normal', value: 'normal' },
+        { label: 'High', value: 'high' },
+      ],
     },
     {
       name: 'link',
