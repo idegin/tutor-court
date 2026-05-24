@@ -4,6 +4,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { createNotification } from '@/lib/notification-service'
+import { createActivityLogs } from '@/lib/activity-log-service'
+import { sendEmail } from '@/lib/email-service'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 
 type SubmittedAnswer = {
   questionId: string
@@ -180,18 +183,77 @@ export async function POST(request: Request) {
   const classId = typeof ta.class === 'object' ? ta.class?.id : ta.class
   const assessmentId = typeof ta.assessment === 'object' ? ta.assessment?.id : ta.assessment
 
+  const tutorLink =
+    classId && assessmentId
+      ? `/dashboard/tutor/classes/${classId}/assessments/${assessmentId}`
+      : `/dashboard/tutor/assessments/${tutorAssessmentId}`
+
   if (tutorId) {
     await createNotification({
       recipientId: String(tutorId),
       type: 'assessment_completed',
       title: 'Assessment Completed',
       message: `${studentName} completed "${assessmentTitle}" with a score of ${score}%.`,
-      link: classId && assessmentId
-        ? `/dashboard/tutor/classes/${classId}/assessments/${assessmentId}`
-        : `/dashboard/tutor/assessments/${tutorAssessmentId}`,
+      link: tutorLink,
       relatedCollection: 'tutor-assessments',
       relatedId: String(tutorAssessmentId),
     })
+  }
+
+  createActivityLogs([
+    {
+      subjectId: user.id,
+      actorId: user.id,
+      type: 'assessment_completed',
+      title: `Completed ${assessmentTitle}`,
+      description: `Scored ${score}% (${passed ? 'passed' : 'did not pass'}).`,
+      link: `/dashboard/student/assessments/${tutorAssessmentId}`,
+      relatedCollection: 'assessment-results',
+      relatedId: String((result as any).id),
+      metadata: { score, passed, tutorAssessmentId },
+    },
+    {
+      subjectId: tutorId,
+      actorId: user.id,
+      type: 'assessment_completed',
+      title: `${studentName} completed "${assessmentTitle}"`,
+      description: `Scored ${score}% (${passed ? 'passed' : 'did not pass'}).`,
+      link: tutorLink,
+      relatedCollection: 'assessment-results',
+      relatedId: String((result as any).id),
+      metadata: { score, passed, studentId: user.id, tutorAssessmentId },
+    },
+  ]).catch(() => {})
+
+  if (tutorId) {
+    try {
+      const tutorUser = await payload.findByID({
+        collection: 'users',
+        id: tutorId,
+        depth: 0,
+      })
+      const tutorEmail = (tutorUser as any)?.email
+      if (tutorEmail) {
+        const serverUrl = getEmailServerUrl(headers)
+        const tutorFirstName = (tutorUser as any)?.firstName || 'there'
+        const emailContent = `
+          <p class="text">Hi ${tutorFirstName},</p>
+          <p class="text"><strong>${studentName}</strong> just completed <strong>"${assessmentTitle}"</strong>.</p>
+          <p class="text">Score: <strong>${score}%</strong> — ${passed ? 'Passed' : 'Did not pass'}.</p>
+          <div class="btn-container">
+            <a href="${serverUrl}${tutorLink}" class="btn">View Results</a>
+          </div>
+        `
+        const html = getBaseEmailLayout('Assessment Completed', emailContent, serverUrl)
+        await sendEmail({
+          to: tutorEmail,
+          subject: `${studentName} completed ${assessmentTitle}`,
+          html,
+        })
+      }
+    } catch (mailErr) {
+      console.error('[assessments/submit] Failed to email tutor:', mailErr)
+    }
   }
 
   return NextResponse.json({ success: true, result })

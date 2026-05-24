@@ -114,6 +114,33 @@ export const Attendance: CollectionConfig = {
         { label: 'Absent', value: 'absent' },
       ],
     },
+    {
+      name: 'latenessMinutes',
+      type: 'number',
+      defaultValue: 0,
+      min: 0,
+      admin: {
+        description:
+          'How many minutes after the session started the student joined. Computed at join time from live-session.startedAt.',
+      },
+    },
+    {
+      name: 'engagementFlag',
+      type: 'select',
+      index: true,
+      defaultValue: 'unknown',
+      options: [
+        { label: 'Unknown', value: 'unknown' },
+        { label: 'Good', value: 'good' },
+        { label: 'Partial', value: 'partial' },
+        { label: 'Poor', value: 'poor' },
+        { label: 'Absent', value: 'absent' },
+      ],
+      admin: {
+        description:
+          'Auto-derived from durationMinutes vs session length when the session ends. good ≥ 80%, partial ≥ 40%, poor < 40%.',
+      },
+    },
   ],
   timestamps: true,
 }

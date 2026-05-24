@@ -29,6 +29,7 @@ import { AssessmentQuestions } from './collections/AssessmentQuestions'
 import { TutorAssessments } from './collections/TutorAssessments'
 import { AssessmentResults } from './collections/AssessmentResults'
 import { Notifications } from './collections/Notifications'
+import { ActivityLogs } from './collections/ActivityLogs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -125,6 +126,7 @@ export default buildConfig({
     TutorAssessments,
     AssessmentResults,
     Notifications,
+    ActivityLogs,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',

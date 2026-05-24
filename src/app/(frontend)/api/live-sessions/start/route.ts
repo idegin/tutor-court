@@ -2,10 +2,21 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { generateVideoSdkToken } from '@/lib/videosdk'
+import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { CREDIT_RATE } from '@/lib/constants'
 
 export async function POST(request: Request) {
+  if (!isVideoSdkAvailable()) {
+    return NextResponse.json(
+      {
+        error: 'live_classes_unavailable',
+        message:
+          "We're working on bringing live classes back online. Please try again in a little while.",
+      },
+      { status: 503 },
+    )
+  }
+
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })

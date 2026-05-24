@@ -3,8 +3,23 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createNotification } from '@/lib/notification-service'
+import { createActivityLogs } from '@/lib/activity-log-service'
+import { isVideoSdkAvailable } from '@/lib/videosdk'
+
+const LATE_THRESHOLD_MINUTES = 5
 
 export async function POST(request: Request) {
+  if (!isVideoSdkAvailable()) {
+    return NextResponse.json(
+      {
+        error: 'live_classes_unavailable',
+        message:
+          "We're working on bringing live classes back online. Please try again in a little while.",
+      },
+      { status: 503 },
+    )
+  }
+
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
@@ -26,7 +41,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 1. Fetch live session
     const session = await payload.findByID({
       collection: 'live-sessions',
       id: sessionId,
@@ -40,7 +54,6 @@ export async function POST(request: Request) {
     const classIdVal = typeof session.class === 'object' ? session.class.id : session.class
     const tutorIdVal = typeof session.tutor === 'object' ? session.tutor.id : session.tutor
 
-    // 2. Add user to session attendees if not already present
     const currentAttendees = session.attendees
       ? session.attendees.map((a: any) => (typeof a === 'object' ? a.id : a))
       : []
@@ -55,14 +68,10 @@ export async function POST(request: Request) {
       })
     }
 
-    // 2b. Log the join event in live-session-participants for analytics
     const existingLog = await payload.find({
       collection: 'live-session-participants',
       where: {
-        and: [
-          { liveSession: { equals: sessionId } },
-          { user: { equals: user.id } },
-        ],
+        and: [{ liveSession: { equals: sessionId } }, { user: { equals: user.id } }],
       },
       sort: '-createdAt',
       limit: 1,
@@ -83,9 +92,13 @@ export async function POST(request: Request) {
       })
     }
 
-    // 3. If joining user is a student, create/update an Attendance record linking student and parent
+    const sessionStartedAt = session.startedAt ? new Date(session.startedAt).getTime() : null
+    const joinedAt = new Date()
+    const latenessMinutes = sessionStartedAt
+      ? Math.max(0, Math.floor((joinedAt.getTime() - sessionStartedAt) / (1000 * 60)))
+      : 0
+
     if (user.accountType === 'student') {
-      // Find parent from student user profile
       const studentUser = await payload.findByID({
         collection: 'users',
         id: user.id,
@@ -94,14 +107,10 @@ export async function POST(request: Request) {
 
       const parentId = studentUser.parent
 
-      // Check if attendance already exists
       const existingAttendance = await payload.find({
         collection: 'attendance',
         where: {
-          and: [
-            { liveSession: { equals: sessionId } },
-            { student: { equals: user.id } },
-          ],
+          and: [{ liveSession: { equals: sessionId } }, { student: { equals: user.id } }],
         },
         limit: 1,
         depth: 0,
@@ -116,14 +125,15 @@ export async function POST(request: Request) {
             student: user.id,
             parent: parentId || undefined,
             tutor: tutorIdVal,
-            joinedAt: new Date().toISOString(),
-            status: 'present',
+            joinedAt: joinedAt.toISOString(),
+            latenessMinutes,
+            status: latenessMinutes > LATE_THRESHOLD_MINUTES ? 'late' : 'present',
+            engagementFlag: 'unknown',
           } as any,
         })
       }
     }
 
-    // 4. Fire notification to the tutor when a student or parent joins
     if (user.accountType === 'student' || user.accountType === 'parent') {
       const cls = await payload.findByID({
         collection: 'classes',
@@ -133,7 +143,8 @@ export async function POST(request: Request) {
 
       const studentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
       const className = (cls as any)?.title || 'the class'
-      const notifType = user.accountType === 'student' ? 'student_joined_class' : 'student_added_to_class'
+      const notifType =
+        user.accountType === 'student' ? 'student_joined_class' : 'student_added_to_class'
 
       createNotification({
         recipientId: String(tutorIdVal),
@@ -144,6 +155,39 @@ export async function POST(request: Request) {
         relatedCollection: 'classes',
         relatedId: String(classIdVal),
       }).catch(() => {})
+
+      // Activity log on both perspectives so the parent (via subject = childId)
+      // and the tutor (via subject = self) both see the event.
+      if (user.accountType === 'student') {
+        createActivityLogs([
+          {
+            subjectId: user.id,
+            actorId: user.id,
+            type: 'class_joined',
+            title: `Joined ${className}`,
+            description: latenessMinutes > LATE_THRESHOLD_MINUTES
+              ? `Joined ${latenessMinutes} minutes late.`
+              : 'Joined on time.',
+            link: `/dashboard/student/classes/${classIdVal}`,
+            relatedCollection: 'live-sessions',
+            relatedId: String(sessionId),
+            metadata: { latenessMinutes, classId: classIdVal },
+          },
+          {
+            subjectId: tutorIdVal,
+            actorId: user.id,
+            type: 'class_joined',
+            title: `${studentName} joined ${className}`,
+            description: latenessMinutes > LATE_THRESHOLD_MINUTES
+              ? `${studentName} joined ${latenessMinutes} minutes late.`
+              : `${studentName} joined on time.`,
+            link: `/dashboard/tutor/classes/${classIdVal}`,
+            relatedCollection: 'live-sessions',
+            relatedId: String(sessionId),
+            metadata: { latenessMinutes, classId: classIdVal, studentId: user.id },
+          },
+        ]).catch(() => {})
+      }
     }
 
     return NextResponse.json({ success: true })

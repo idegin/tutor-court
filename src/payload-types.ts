@@ -88,6 +88,7 @@ export interface Config {
     'tutor-assessments': TutorAssessment;
     'assessment-results': AssessmentResult;
     notifications: Notification;
+    'activity-logs': ActivityLog;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -116,6 +117,7 @@ export interface Config {
     'tutor-assessments': TutorAssessmentsSelect<false> | TutorAssessmentsSelect<true>;
     'assessment-results': AssessmentResultsSelect<false> | AssessmentResultsSelect<true>;
     notifications: NotificationsSelect<false> | NotificationsSelect<true>;
+    'activity-logs': ActivityLogsSelect<false> | ActivityLogsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -690,6 +692,14 @@ export interface Attendance {
   leftAt?: string | null;
   durationMinutes?: number | null;
   status: 'present' | 'late' | 'left-early' | 'absent';
+  /**
+   * How many minutes after the session started the student joined. Computed at join time from live-session.startedAt.
+   */
+  latenessMinutes?: number | null;
+  /**
+   * Auto-derived from durationMinutes vs session length when the session ends. good ≥ 80%, partial ≥ 40%, poor < 40%.
+   */
+  engagementFlag?: ('unknown' | 'good' | 'partial' | 'poor' | 'absent') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -894,6 +904,46 @@ export interface Notification {
   createdAt: string;
 }
 /**
+ * Per-user activity feed. Subject is the user whose timeline this row belongs to; actor is who triggered it.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity-logs".
+ */
+export interface ActivityLog {
+  id: number;
+  /**
+   * Whose activity feed this row belongs to. A parent reading a child sees rows where subject = child.
+   */
+  subject: number | User;
+  /**
+   * User who triggered the event (may equal subject).
+   */
+  actor?: (number | null) | User;
+  type: 'assessment_assigned' | 'assessment_completed' | 'class_joined' | 'class_left' | 'class_ended';
+  title: string;
+  description?: string | null;
+  /**
+   * In-app deep-link the activity row should navigate to.
+   */
+  link?: string | null;
+  relatedCollection?: string | null;
+  relatedId?: string | null;
+  /**
+   * Arbitrary structured payload — score, duration, etc.
+   */
+  metadata?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -1000,6 +1050,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'notifications';
         value: number | Notification;
+      } | null)
+    | ({
+        relationTo: 'activity-logs';
+        value: number | ActivityLog;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -1375,6 +1429,8 @@ export interface AttendanceSelect<T extends boolean = true> {
   leftAt?: T;
   durationMinutes?: T;
   status?: T;
+  latenessMinutes?: T;
+  engagementFlag?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1506,6 +1562,23 @@ export interface NotificationsSelect<T extends boolean = true> {
         collection?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity-logs_select".
+ */
+export interface ActivityLogsSelect<T extends boolean = true> {
+  subject?: T;
+  actor?: T;
+  type?: T;
+  title?: T;
+  description?: T;
+  link?: T;
+  relatedCollection?: T;
+  relatedId?: T;
+  metadata?: T;
   updatedAt?: T;
   createdAt?: T;
 }

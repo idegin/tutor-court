@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createNotification } from '@/lib/notification-service'
+import { createActivityLogs } from '@/lib/activity-log-service'
 
 // GET – list tutor assessments sent by tutor or received by student
 export async function GET(request: Request) {
@@ -102,6 +103,32 @@ export async function POST(request: Request) {
     relatedCollection: 'tutor-assessments',
     relatedId: String(tutorAssessment.id),
   })
+
+  const studentName = `${(student as any)?.firstName || ''} ${(student as any)?.lastName || ''}`.trim() || (student as any)?.email
+  createActivityLogs([
+    {
+      subjectId: studentId,
+      actorId: user.id,
+      type: 'assessment_assigned',
+      title: `New assessment assigned: ${assessmentTitle}`,
+      description: `${tutorName} assigned this assessment${dueDate ? `, due ${new Date(dueDate).toLocaleDateString()}` : ''}.`,
+      link: `/dashboard/student/assessments/${tutorAssessment.id}`,
+      relatedCollection: 'tutor-assessments',
+      relatedId: String(tutorAssessment.id),
+      metadata: { classId, assessmentId, dueDate: dueDate || null },
+    },
+    {
+      subjectId: user.id,
+      actorId: user.id,
+      type: 'assessment_assigned',
+      title: `Assigned "${assessmentTitle}" to ${studentName}`,
+      description: dueDate ? `Due ${new Date(dueDate).toLocaleDateString()}.` : 'No due date set.',
+      link: `/dashboard/tutor/assessments/${tutorAssessment.id}`,
+      relatedCollection: 'tutor-assessments',
+      relatedId: String(tutorAssessment.id),
+      metadata: { classId, assessmentId, studentId, dueDate: dueDate || null },
+    },
+  ]).catch(() => {})
 
   return NextResponse.json({ success: true, tutorAssessment })
 }

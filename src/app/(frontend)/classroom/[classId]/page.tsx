@@ -5,7 +5,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { ClassroomClient } from './classroom-client'
-import { generateVideoSdkToken } from '@/lib/videosdk'
+import { LiveClassUnavailable } from './live-class-unavailable'
+import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 
 interface PageProps {
   params: Promise<{ classId: string }>
@@ -22,6 +23,10 @@ export default async function ClassroomPage(props: PageProps) {
   }
 
   const { classId } = params
+
+  if (!isVideoSdkAvailable()) {
+    return <LiveClassUnavailable accountType={user.accountType} />
+  }
 
   try {
     const cls = await payload.findByID({

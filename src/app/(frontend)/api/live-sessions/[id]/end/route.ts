@@ -3,6 +3,19 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
+import { createActivityLogs } from '@/lib/activity-log-service'
+
+function deriveEngagementFlag(
+  attendanceMinutes: number,
+  sessionMinutes: number,
+): 'good' | 'partial' | 'poor' | 'absent' {
+  if (attendanceMinutes <= 0) return 'absent'
+  if (sessionMinutes <= 0) return 'good'
+  const ratio = attendanceMinutes / sessionMinutes
+  if (ratio >= 0.8) return 'good'
+  if (ratio >= 0.4) return 'partial'
+  return 'poor'
+}
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
@@ -81,6 +94,33 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         data: {
           leftAt: endedIso,
           durationMinutes: attDurationMinutes,
+          engagementFlag: deriveEngagementFlag(attDurationMinutes, sessionDurationMinutes),
+        } as any,
+      })
+    }
+
+    // Backfill engagement flag on any earlier-closed attendance rows that
+    // weren't yet flagged (so the session ending is the single source of truth).
+    const closedAttendance = await payload.find({
+      collection: 'attendance',
+      where: {
+        and: [
+          { liveSession: { equals: session.id } },
+          { engagementFlag: { equals: 'unknown' } },
+        ],
+      },
+      limit: 1000,
+      depth: 0,
+    })
+    for (const att of closedAttendance.docs as any[]) {
+      await payload.update({
+        collection: 'attendance',
+        id: att.id,
+        data: {
+          engagementFlag: deriveEngagementFlag(
+            Number(att.durationMinutes || 0),
+            sessionDurationMinutes,
+          ),
         } as any,
       })
     }
@@ -165,6 +205,58 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         durationMinutes: sessionDurationMinutes,
       } as any,
     })
+
+    // Activity logs — write one row per participating student (subject = student)
+    // plus one row for the tutor (subject = tutor), so each role's feed reflects
+    // the ended session.
+    try {
+      const cls = await payload.findByID({
+        collection: 'classes',
+        id: typeof session.class === 'object' ? (session.class as any).id : session.class,
+        depth: 0,
+      })
+      const className = (cls as any)?.title || 'the class'
+      const tutorIdVal = typeof session.tutor === 'object' ? (session.tutor as any).id : session.tutor
+
+      const studentParticipants = (participantLogs.docs as any[]).filter(
+        (p) => p.accountType === 'student',
+      )
+
+      const classIdForLink =
+        typeof session.class === 'object' ? (session.class as any).id : session.class
+
+      const entries: Parameters<typeof createActivityLogs>[0] = studentParticipants.map((p) => ({
+        subjectId: p.user,
+        actorId: tutorIdVal,
+        type: 'class_ended',
+        title: `${className} ended`,
+        description: `Live session ended after ${sessionDurationMinutes} minutes.`,
+        link: `/dashboard/student/classes/${classIdForLink}`,
+        relatedCollection: 'live-sessions',
+        relatedId: String(session.id),
+        metadata: { sessionDurationMinutes, classId: cls?.id },
+      }))
+
+      entries.push({
+        subjectId: tutorIdVal,
+        actorId: tutorIdVal,
+        type: 'class_ended',
+        title: `Ended ${className}`,
+        description: `Session lasted ${sessionDurationMinutes} minutes with ${studentParticipants.length} student(s) attending.`,
+        link: `/dashboard/tutor/classes/${classIdForLink}`,
+        relatedCollection: 'live-sessions',
+        relatedId: String(session.id),
+        metadata: {
+          sessionDurationMinutes,
+          classId: cls?.id,
+          studentCount: studentParticipants.length,
+        },
+      })
+
+      await createActivityLogs(entries)
+    } catch (logErr) {
+      console.error('[live-sessions/end] Failed to write activity logs:', logErr)
+    }
 
     return NextResponse.json({ success: true, session: updatedSession })
   } catch (error: any) {
