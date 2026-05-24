@@ -4,7 +4,7 @@ import config from '@payload-config';
 import { getServerSideUser } from '@/lib/auth';
 import { z } from 'zod';
 import { differenceInBusinessDays, differenceInDays } from 'date-fns';
-import { getBaseEmailLayout } from '@/lib/email-template';
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template';
 
 const bookingSchema = z.object({
   tutorId: z.string(),
@@ -102,13 +102,14 @@ export async function POST(req: Request) {
         }
 
         if (tutorEmail) {
+            const serverUrl = getEmailServerUrl();
             const htmlContent = `
               <p class="text">Hi there,</p>
               <p class="text">You have received a new booking request from ${user.firstName} ${user.lastName}.</p>
               <p class="text">They are requesting ${parsed.hoursPerDay} hours per day for ${parsed.subjects.join(', ')}.</p>
               ${parsed.message ? `<p class="text">Message: "${parsed.message}"</p>` : ''}
               <div class="btn-container">
-                <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/dashboard/bookings" class="btn">View Booking</a>
+                <a href="${serverUrl}/dashboard/bookings" class="btn">View Booking</a>
               </div>
             `;
             await payload.sendEmail({

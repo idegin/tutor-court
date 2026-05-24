@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { getBaseEmailLayout } from '../lib/email-template'
+import { getBaseEmailLayout, getEmailServerUrl } from '../lib/email-template'
 import { sendEmail } from '../lib/email-service'
 
 export const Users: CollectionConfig = {
@@ -19,7 +19,8 @@ export const Users: CollectionConfig = {
     verify: {
       generateEmailHTML: (args) => {
         const token = args?.token
-        const url = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/verified-email?token=${token}`
+        const serverUrl = getEmailServerUrl()
+        const url = `${serverUrl}/auth/verified-email?token=${token}`
         const content = `
           <p class="text">Hi there,</p>
           <p class="text">Welcome to TutorCourt! We're excited to have you on board. Please verify your email address to get started.</p>
@@ -33,7 +34,8 @@ export const Users: CollectionConfig = {
     forgotPassword: {
       generateEmailHTML: (args) => {
         const token = args?.token
-        const url = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'}/auth/update-password?token=${token}`
+        const serverUrl = getEmailServerUrl()
+        const url = `${serverUrl}/auth/update-password?token=${token}`
         const content = `
           <p class="text">Hi there,</p>
           <p class="text">We received a request to reset your password for your TutorCourt account.</p>
@@ -152,11 +154,12 @@ export const Users: CollectionConfig = {
 
               if (tutorEmail) {
                 const inviteeName = `${doc.firstName} ${doc.lastName}`
+                const serverUrl = getEmailServerUrl()
                 const emailContent = `
                   <p class="text">Hi ${tutorName},</p>
                   <p class="text">Great news! <strong>${inviteeName}</strong> has registered and accepted your invite to join the class <strong>"${cls.title}"</strong> as a <strong>${invitation.inviteeType}</strong>.</p>
                   <div class="btn-container">
-                    <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
+                    <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
                   </div>
                 `
                 const emailHtml = getBaseEmailLayout('Class Invitation Accepted', emailContent)

@@ -2,7 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { getBaseEmailLayout } from '@/lib/email-template'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
@@ -87,12 +87,13 @@ export async function POST(request: Request) {
     const tutorName = typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
     if (tutorEmail) {
+      const serverUrl = getEmailServerUrl()
       const studentName = `${user.firstName} ${user.lastName}`
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
         <p class="text">Great news! Student <strong>${studentName}</strong> has accepted your invitation to join the class <strong>"${cls.title}"</strong>.</p>
         <div class="btn-container">
-          <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
+          <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
         </div>
       `
       const emailHtml = getBaseEmailLayout('Student Invitation Accepted', emailContent)

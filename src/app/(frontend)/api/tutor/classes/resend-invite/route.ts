@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
-import { getBaseEmailLayout } from '@/lib/email-template'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const classIdVal = typeof invitation.class === 'object' ? invitation.class.id : invitation.class
     const classObj = typeof invitation.class === 'object' ? invitation.class : await payload.findByID({ collection: 'classes', id: classIdVal })
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'
+    const serverUrl = getEmailServerUrl()
     const signupUrl = `${serverUrl}/auth/register?token=${token}&email=${encodeURIComponent(updatedInvite.inviteeEmail)}&role=${updatedInvite.inviteeType}`
 
     const emailContent = `

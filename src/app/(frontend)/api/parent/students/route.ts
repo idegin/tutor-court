@@ -4,7 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { generateManagedEmail, generateManagedPassword } from '@/lib/managed-account'
-import { getBaseEmailLayout } from '@/lib/email-template'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
 
@@ -136,12 +136,13 @@ export async function POST(request: Request) {
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
       if (tutorEmail) {
+        const serverUrl = getEmailServerUrl()
         const emailContent = `
           <p class="text">Hi ${tutorName},</p>
           <p class="text">Great news! A parent, <strong>${user.firstName} ${user.lastName}</strong>, has completed onboarding and added their child, <strong>${firstName} ${lastName}</strong>, to your class <strong>"${cls.title}"</strong>.</p>
           <p class="text">You can now view this student in your class details page and start scheduling sessions.</p>
           <div class="btn-container">
-            <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
+            <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
           </div>
         `
         const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)
@@ -195,12 +196,13 @@ export async function POST(request: Request) {
         typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
 
       if (tutorEmail) {
+        const serverUrl = getEmailServerUrl()
         const emailContent = `
           <p class="text">Hi ${tutorName},</p>
           <p class="text">Great news! A parent, <strong>${user.firstName} ${user.lastName}</strong>, has added their child, <strong>${firstName} ${lastName}</strong>, to your class <strong>"${cls.title}"</strong>.</p>
           <p class="text">You can now view this student in your class details page and start scheduling sessions.</p>
           <div class="btn-container">
-            <a href="${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
+            <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
           </div>
         `
         const emailHtml = getBaseEmailLayout('Student Added to Your Class', emailContent)

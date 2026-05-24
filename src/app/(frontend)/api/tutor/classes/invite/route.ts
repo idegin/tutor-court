@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
-import { getBaseEmailLayout } from '@/lib/email-template'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       })
 
       // Send email to existing user
-      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'
+      const serverUrl = getEmailServerUrl()
       const emailContent = `
         <p class="text">Hi ${inviteUser.firstName || 'there'},</p>
         <p class="text">Tutor <strong>${user.firstName} ${user.lastName}</strong> has added you to their class <strong>"${classDoc.title || 'Live Class'}"</strong>.</p>
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
         } as any,
       })
 
-      const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5021'
+      const serverUrl = getEmailServerUrl()
       const signupUrl = `${serverUrl}/auth/register?token=${token}&email=${encodeURIComponent(trimmedEmail)}&role=${inviteeType}`
 
       const emailContent = `

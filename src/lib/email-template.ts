@@ -1,5 +1,13 @@
+export const getEmailServerUrl = () => {
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+  if (!serverUrl) {
+    throw new Error('[email] NEXT_PUBLIC_SERVER_URL is required to generate email links.');
+  }
+  return serverUrl.replace(/\/$/, '');
+};
+
 export const getBaseEmailLayout = (title: string, content: string) => {
-  const hostUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000';
+  const hostUrl = getEmailServerUrl();
   
   return `
 <!DOCTYPE html>
