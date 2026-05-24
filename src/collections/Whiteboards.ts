@@ -1,10 +1,21 @@
 import type { CollectionConfig } from 'payload'
+import crypto from 'crypto'
 
 export const Whiteboards: CollectionConfig = {
   slug: 'whiteboards',
   admin: {
     useAsTitle: 'title',
     defaultColumns: ['title', 'owner', 'class', 'updatedAt'],
+  },
+  hooks: {
+    beforeValidate: [
+      ({ data, operation }) => {
+        if (operation === 'create' && data && !data.shareToken) {
+          data.shareToken = crypto.randomBytes(24).toString('hex')
+        }
+        return data
+      },
+    ],
   },
   access: {
     read: async ({ req }) => {
@@ -79,17 +90,23 @@ export const Whiteboards: CollectionConfig = {
       name: 'class',
       type: 'relationship',
       relationTo: 'classes',
+      index: true,
     },
     {
       name: 'liveSession',
       type: 'relationship',
       relationTo: 'live-sessions',
+      index: true,
     },
     {
       name: 'shareToken',
       type: 'text',
       unique: true,
       index: true,
+      admin: {
+        description: 'Auto-generated on create. Used for public/share-link access.',
+        readOnly: true,
+      },
     },
     {
       name: 'isPublic',

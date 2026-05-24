@@ -89,15 +89,48 @@ export const Classes: CollectionConfig = {
       ],
     },
     {
+      name: 'gradeLevel',
+      type: 'select',
+      required: true,
+      options: [
+        { label: 'Kindergarten', value: 'K' },
+        { label: 'Grade 1', value: '1' },
+        { label: 'Grade 2', value: '2' },
+        { label: 'Grade 3', value: '3' },
+        { label: 'Grade 4', value: '4' },
+        { label: 'Grade 5', value: '5' },
+        { label: 'Grade 6', value: '6' },
+        { label: 'Grade 7', value: '7' },
+        { label: 'Grade 8', value: '8' },
+        { label: 'Grade 9', value: '9' },
+        { label: 'Grade 10', value: '10' },
+        { label: 'Grade 11', value: '11' },
+        { label: 'Grade 12', value: '12' },
+      ],
+      defaultValue: '6',
+      index: true,
+    },
+    {
+      name: 'timezone',
+      type: 'text',
+      required: true,
+      defaultValue: 'Africa/Lagos',
+      admin: {
+        description: 'IANA timezone used to interpret schedule start/end times.',
+      },
+    },
+    {
       name: 'maxStudents',
       type: 'number',
       defaultValue: 1,
       min: 1,
+      max: 100,
     },
     {
       name: 'startDate',
       type: 'date',
       required: true,
+      index: true,
     },
     {
       name: 'endDate',
@@ -129,11 +162,25 @@ export const Classes: CollectionConfig = {
           name: 'startTime',
           type: 'text',
           required: true,
+          validate: (value: any) => {
+            if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+              return 'Time must be in 24-hour HH:MM format (e.g. 09:30, 14:00).'
+            }
+            return true
+          },
+          admin: { description: '24-hour HH:MM format, interpreted in the class timezone.' },
         },
         {
           name: 'endTime',
           type: 'text',
           required: true,
+          validate: (value: any) => {
+            if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) {
+              return 'Time must be in 24-hour HH:MM format (e.g. 09:30, 14:00).'
+            }
+            return true
+          },
+          admin: { description: '24-hour HH:MM format, interpreted in the class timezone.' },
         },
       ],
     },
@@ -154,6 +201,7 @@ export const Classes: CollectionConfig = {
       type: 'select',
       required: true,
       defaultValue: 'scheduled',
+      index: true,
       options: [
         { label: 'Scheduled', value: 'scheduled' },
         { label: 'Active', value: 'active' },

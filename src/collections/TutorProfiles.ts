@@ -24,10 +24,17 @@ export const TutorProfiles: CollectionConfig = {
   slug: 'tutor-profiles',
   admin: {
     useAsTitle: 'slug',
-    defaultColumns: ['user', 'slug', 'isApproved'],
+    defaultColumns: ['user', 'slug', 'isApproved', 'backgroundCheckStatus', 'identityVerified'],
   },
   access: {
     read: () => true,
+    create: ({ req: { user } }) => Boolean(user),
+    update: ({ req: { user } }) => {
+      if (!user) return false
+      if (user.accountType === 'admin') return true
+      return { user: { equals: user.id } } as any
+    },
+    delete: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
   },
   hooks: {
     beforeValidate: [
@@ -66,13 +73,109 @@ export const TutorProfiles: CollectionConfig = {
       relationTo: 'users',
       required: true,
       hasMany: false,
+      unique: true,
+      index: true,
     },
     {
       name: 'isApproved',
       type: 'checkbox',
       defaultValue: false,
+      index: true,
       admin: {
         description: 'Check to approve this tutor profile.',
+      },
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
+    {
+      name: 'backgroundCheckStatus',
+      type: 'select',
+      defaultValue: 'none',
+      options: [
+        { label: 'Not Submitted', value: 'none' },
+        { label: 'Pending', value: 'pending' },
+        { label: 'Cleared', value: 'cleared' },
+        { label: 'Failed', value: 'failed' },
+        { label: 'Expired', value: 'expired' },
+      ],
+      index: true,
+      admin: {
+        description: 'K-12 safety: tutors should be cleared before teaching minors.',
+      },
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
+    {
+      name: 'backgroundCheckCompletedAt',
+      type: 'date',
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
+    {
+      name: 'identityVerified',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'Whether government-issued ID has been verified.',
+      },
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
+    {
+      name: 'identityDocument',
+      type: 'upload',
+      relationTo: 'media',
+      admin: {
+        description: 'Government-issued ID for identity verification (admin-reviewed).',
+      },
+      access: {
+        read: ({ req: { user }, doc }: any) => {
+          if (!user) return false
+          if (user.accountType === 'admin') return true
+          const ownerId = typeof doc?.user === 'object' ? doc?.user?.id : doc?.user
+          return ownerId === user.id
+        },
+      },
+    },
+    {
+      name: 'teachingCertifications',
+      type: 'array',
+      admin: {
+        description: 'Teaching certificates, degrees, or credentials.',
+      },
+      fields: [
+        { name: 'name', type: 'text', required: true },
+        { name: 'issuingBody', type: 'text' },
+        { name: 'issueDate', type: 'date' },
+        { name: 'expiryDate', type: 'date' },
+        { name: 'document', type: 'upload', relationTo: 'media' },
+      ],
+    },
+    {
+      name: 'gradesTaught',
+      type: 'select',
+      hasMany: true,
+      options: [
+        { label: 'Kindergarten', value: 'K' },
+        { label: 'Grade 1', value: '1' },
+        { label: 'Grade 2', value: '2' },
+        { label: 'Grade 3', value: '3' },
+        { label: 'Grade 4', value: '4' },
+        { label: 'Grade 5', value: '5' },
+        { label: 'Grade 6', value: '6' },
+        { label: 'Grade 7', value: '7' },
+        { label: 'Grade 8', value: '8' },
+        { label: 'Grade 9', value: '9' },
+        { label: 'Grade 10', value: '10' },
+        { label: 'Grade 11', value: '11' },
+        { label: 'Grade 12', value: '12' },
+      ],
+      admin: {
+        description: 'K-12 grade levels this tutor is qualified to teach.',
       },
     },
     {
@@ -167,16 +270,21 @@ export const TutorProfiles: CollectionConfig = {
     {
       name: 'minAge',
       type: 'number',
+      min: 4,
+      max: 18,
       admin: {
-        description: 'Minimum age of students the tutor teaches.',
+        description: 'Minimum age of students the tutor teaches (K-12 range).',
       },
     },
     {
       name: 'maxAge',
       type: 'number',
+      min: 4,
+      max: 18,
       admin: {
-        description: 'Maximum age of students the tutor teaches.',
+        description: 'Maximum age of students the tutor teaches (K-12 range).',
       },
     },
   ],
+  timestamps: true,
 }

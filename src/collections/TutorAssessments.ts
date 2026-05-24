@@ -86,6 +86,25 @@ export const TutorAssessments: CollectionConfig = {
     {
       name: 'dueDate',
       type: 'date',
+      index: true,
+    },
+    {
+      name: 'maxAttempts',
+      type: 'number',
+      defaultValue: 1,
+      min: 1,
+      max: 10,
+      admin: { description: 'How many times the student may submit (1 = single attempt).' },
+    },
+    {
+      name: 'attemptCount',
+      type: 'number',
+      defaultValue: 0,
+      min: 0,
+      admin: {
+        description: 'Number of submissions made so far. Updated server-side.',
+        readOnly: true,
+      },
     },
     {
       name: 'instructions',

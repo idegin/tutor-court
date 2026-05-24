@@ -23,6 +23,37 @@ export const LiveSessions: CollectionConfig = {
     },
     delete: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
   },
+  hooks: {
+    beforeChange: [
+      async ({ data, operation, req }) => {
+        if (operation !== 'create') return data
+        if (!data?.class || !data?.scheduledFor) return data
+        try {
+          const existing = await req.payload.find({
+            collection: 'live-sessions',
+            where: {
+              and: [
+                { class: { equals: typeof data.class === 'object' ? data.class.id : data.class } },
+                { scheduledFor: { equals: data.scheduledFor } },
+                { status: { not_in: ['ended', 'cancelled'] } },
+              ],
+            },
+            limit: 1,
+            depth: 0,
+            req,
+          })
+          if (existing.totalDocs > 0) {
+            throw new Error(
+              'A live session for this class is already scheduled at this exact time.',
+            )
+          }
+        } catch (err: any) {
+          if (err?.message?.includes('already scheduled')) throw err
+        }
+        return data
+      },
+    ],
+  },
   fields: [
     {
       name: 'class',
@@ -48,6 +79,7 @@ export const LiveSessions: CollectionConfig = {
     {
       name: 'scheduledFor',
       type: 'date',
+      index: true,
     },
     {
       name: 'startedAt',
@@ -62,6 +94,7 @@ export const LiveSessions: CollectionConfig = {
       type: 'select',
       required: true,
       defaultValue: 'scheduled',
+      index: true,
       options: [
         { label: 'Scheduled', value: 'scheduled' },
         { label: 'Waiting', value: 'waiting' },
@@ -75,6 +108,10 @@ export const LiveSessions: CollectionConfig = {
       type: 'relationship',
       relationTo: 'users',
       hasMany: true,
+      admin: {
+        description:
+          'Deprecated: prefer live-session-participants for per-user join/leave records. Kept for backwards compatibility.',
+      },
     },
     {
       name: 'showWhiteboard',

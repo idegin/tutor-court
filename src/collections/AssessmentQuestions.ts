@@ -10,8 +10,32 @@ export const AssessmentQuestions: CollectionConfig = {
     read: ({ req: { user } }) => Boolean(user),
     create: ({ req: { user } }) =>
       Boolean(user && (user.accountType === 'tutor' || user.accountType === 'admin')),
-    update: ({ req: { user } }) => Boolean(user),
-    delete: ({ req: { user } }) => Boolean(user),
+    update: async ({ req }) => {
+      if (!req.user) return false
+      if (req.user.accountType === 'admin') return true
+      if (req.user.accountType !== 'tutor') return false
+      const owned = await req.payload.find({
+        collection: 'assessments',
+        where: { tutor: { equals: req.user.id } },
+        limit: 1000,
+        depth: 0,
+      })
+      const ids = owned.docs.map((a: any) => a.id)
+      return { assessment: { in: ids } } as any
+    },
+    delete: async ({ req }) => {
+      if (!req.user) return false
+      if (req.user.accountType === 'admin') return true
+      if (req.user.accountType !== 'tutor') return false
+      const owned = await req.payload.find({
+        collection: 'assessments',
+        where: { tutor: { equals: req.user.id } },
+        limit: 1000,
+        depth: 0,
+      })
+      const ids = owned.docs.map((a: any) => a.id)
+      return { assessment: { in: ids } } as any
+    },
   },
   fields: [
     {
@@ -34,11 +58,22 @@ export const AssessmentQuestions: CollectionConfig = {
       type: 'select',
       required: true,
       defaultValue: 'single_choice',
+      index: true,
       options: [
         { label: 'Single Choice', value: 'single_choice' },
         { label: 'Multiple Choice', value: 'multiple_choice' },
         { label: 'True / False', value: 'true_false' },
+        { label: 'Short Answer', value: 'short_answer' },
+        { label: 'Essay', value: 'essay' },
       ],
+    },
+    {
+      name: 'image',
+      type: 'upload',
+      relationTo: 'media',
+      admin: {
+        description: 'Optional image to accompany the question (useful for younger grades).',
+      },
     },
     {
       name: 'options',
@@ -73,6 +108,7 @@ export const AssessmentQuestions: CollectionConfig = {
       type: 'number',
       required: true,
       defaultValue: 1,
+      min: 0,
     },
     {
       name: 'order',

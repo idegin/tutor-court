@@ -1,10 +1,26 @@
 import type { CollectionConfig } from 'payload'
+import crypto from 'crypto'
+
+const DEFAULT_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 export const ClassInvitations: CollectionConfig = {
   slug: 'class-invitations',
   admin: {
     useAsTitle: 'inviteeEmail',
-    defaultColumns: ['inviteeEmail', 'inviteeType', 'status', 'class'],
+    defaultColumns: ['inviteeEmail', 'inviteeType', 'status', 'class', 'expiresAt'],
+  },
+  hooks: {
+    beforeValidate: [
+      ({ data, operation }) => {
+        if (operation === 'create') {
+          if (!data?.token) data.token = crypto.randomBytes(24).toString('hex')
+          if (!data?.expiresAt) {
+            data.expiresAt = new Date(Date.now() + DEFAULT_INVITATION_TTL_MS).toISOString()
+          }
+        }
+        return data
+      },
+    ],
   },
   access: {
     read: ({ req: { user } }) => {
@@ -70,11 +86,13 @@ export const ClassInvitations: CollectionConfig = {
       type: 'select',
       required: true,
       defaultValue: 'pending',
+      index: true,
       options: [
         { label: 'Pending', value: 'pending' },
         { label: 'Accepted', value: 'accepted' },
         { label: 'Declined', value: 'declined' },
         { label: 'Expired', value: 'expired' },
+        { label: 'Revoked', value: 'revoked' },
       ],
     },
     {
@@ -85,6 +103,7 @@ export const ClassInvitations: CollectionConfig = {
     {
       name: 'expiresAt',
       type: 'date',
+      index: true,
     },
   ],
   timestamps: true,

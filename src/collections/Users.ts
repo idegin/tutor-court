@@ -200,7 +200,17 @@ export const Users: CollectionConfig = {
     {
       name: 'phoneNumber',
       type: 'text',
-      required: true,
+      required: false,
+      admin: {
+        description: 'Required for tutors and parents. Managed student accounts may not have one.',
+      },
+      validate: (value: any, { data }: any) => {
+        const t = data?.accountType
+        if ((t === 'tutor' || t === 'parent' || t === 'admin') && !value) {
+          return 'Phone number is required for tutors, parents, and admins.'
+        }
+        return true
+      },
     },
     {
       name: 'country',
@@ -218,12 +228,31 @@ export const Users: CollectionConfig = {
       relationTo: 'media',
     },
     {
+      name: 'dateOfBirth',
+      type: 'date',
+      admin: {
+        description: 'Date of birth. Used to determine if parental consent is required (K-12, COPPA).',
+        date: { pickerAppearance: 'dayOnly' },
+      },
+    },
+    {
+      name: 'isActive',
+      type: 'checkbox',
+      defaultValue: true,
+      index: true,
+      admin: {
+        description: 'Uncheck to disable account access without deleting the record.',
+      },
+    },
+    {
       name: 'parent',
       type: 'relationship',
       relationTo: 'users',
       hasMany: false,
+      index: true,
       admin: {
         description: 'For child/student accounts created by a parent.',
+        condition: (data) => data?.accountType === 'student',
       },
     },
     {
@@ -233,6 +262,16 @@ export const Users: CollectionConfig = {
       admin: {
         description:
           'True for child accounts created by a parent (auto-generated email and password).',
+        condition: (data) => data?.accountType === 'student',
+      },
+    },
+    {
+      name: 'parentalConsentGiven',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'Required for students under 13 (COPPA). Set when parent registers the child.',
+        condition: (data) => data?.accountType === 'student',
       },
     },
     {
@@ -247,13 +286,30 @@ export const Users: CollectionConfig = {
       hasMany: true,
       admin: {
         description: 'Subjects the student is interested in learning.',
+        condition: (data) => data?.accountType === 'student',
       },
     },
     {
       name: 'gradeLevel',
-      type: 'text',
+      type: 'select',
+      options: [
+        { label: 'Kindergarten', value: 'K' },
+        { label: 'Grade 1', value: '1' },
+        { label: 'Grade 2', value: '2' },
+        { label: 'Grade 3', value: '3' },
+        { label: 'Grade 4', value: '4' },
+        { label: 'Grade 5', value: '5' },
+        { label: 'Grade 6', value: '6' },
+        { label: 'Grade 7', value: '7' },
+        { label: 'Grade 8', value: '8' },
+        { label: 'Grade 9', value: '9' },
+        { label: 'Grade 10', value: '10' },
+        { label: 'Grade 11', value: '11' },
+        { label: 'Grade 12', value: '12' },
+      ],
       admin: {
-        description: 'Current grade or year of study for the student.',
+        description: 'Current K-12 grade level.',
+        condition: (data) => data?.accountType === 'student',
       },
     },
     {
@@ -261,6 +317,7 @@ export const Users: CollectionConfig = {
       type: 'textarea',
       admin: {
         description: 'What the student hopes to achieve.',
+        condition: (data) => data?.accountType === 'student',
       },
     },
   ],

@@ -1,5 +1,9 @@
 import type { CollectionConfig, FieldAccess } from 'payload'
 
+// SECURITY NOTE: generatedPassword is stored for the parent-onboarding UX
+// (parents must hand credentials to the child once). It is read-protected so
+// only the parent who owns the record or an admin can read it. Treat this as
+// technical debt — migrate to a one-time reveal + password-reset flow.
 const parentOrAdminField: FieldAccess = ({ req: { user }, doc }) => {
   if (!user) return false
   if (user.accountType === 'admin') return true
@@ -87,11 +91,31 @@ export const Students: CollectionConfig = {
       required: true,
       access: {
         read: parentOrAdminField,
+        update: parentOrAdminField,
+      },
+      admin: {
+        description:
+          'Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.',
       },
     },
     {
       name: 'gradeLevel',
-      type: 'text',
+      type: 'select',
+      options: [
+        { label: 'Kindergarten', value: 'K' },
+        { label: 'Grade 1', value: '1' },
+        { label: 'Grade 2', value: '2' },
+        { label: 'Grade 3', value: '3' },
+        { label: 'Grade 4', value: '4' },
+        { label: 'Grade 5', value: '5' },
+        { label: 'Grade 6', value: '6' },
+        { label: 'Grade 7', value: '7' },
+        { label: 'Grade 8', value: '8' },
+        { label: 'Grade 9', value: '9' },
+        { label: 'Grade 10', value: '10' },
+        { label: 'Grade 11', value: '11' },
+        { label: 'Grade 12', value: '12' },
+      ],
     },
     {
       name: 'notes',

@@ -122,7 +122,7 @@ export interface Config {
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
   fallbackLocale: null;
   globals: {};
@@ -160,31 +160,46 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
   firstName: string;
   lastName: string;
   accountType: 'admin' | 'tutor' | 'parent' | 'student';
-  phoneNumber: string;
+  /**
+   * Required for tutors and parents. Managed student accounts may not have one.
+   */
+  phoneNumber?: string | null;
   country?: string | null;
   timezone?: string | null;
-  avatar?: (string | null) | Media;
+  avatar?: (number | null) | Media;
+  /**
+   * Date of birth. Used to determine if parental consent is required (K-12, COPPA).
+   */
+  dateOfBirth?: string | null;
+  /**
+   * Uncheck to disable account access without deleting the record.
+   */
+  isActive?: boolean | null;
   /**
    * For child/student accounts created by a parent.
    */
-  parent?: (string | null) | User;
+  parent?: (number | null) | User;
   /**
    * True for child accounts created by a parent (auto-generated email and password).
    */
   isManagedAccount?: boolean | null;
+  /**
+   * Required for students under 13 (COPPA). Set when parent registers the child.
+   */
+  parentalConsentGiven?: boolean | null;
   hasCompletedOnboarding?: boolean | null;
   /**
    * Subjects the student is interested in learning.
    */
-  subjectsOfInterest?: (string | Subject)[] | null;
+  subjectsOfInterest?: (number | Subject)[] | null;
   /**
-   * Current grade or year of study for the student.
+   * Current K-12 grade level.
    */
-  gradeLevel?: string | null;
+  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
   /**
    * What the student hopes to achieve.
    */
@@ -215,7 +230,7 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
   alt: string;
   updatedAt: string;
   createdAt: string;
@@ -244,7 +259,7 @@ export interface Media {
  * via the `definition` "subjects".
  */
 export interface Subject {
-  id: string;
+  id: number;
   name: string;
   slug?: string | null;
   updatedAt: string;
@@ -255,16 +270,46 @@ export interface Subject {
  * via the `definition` "tutor-profiles".
  */
 export interface TutorProfile {
-  id: string;
+  id: number;
   /**
    * Auto-generated unique slug for the tutor profile.
    */
   slug: string;
-  user: string | User;
+  user: number | User;
   /**
    * Check to approve this tutor profile.
    */
   isApproved?: boolean | null;
+  /**
+   * K-12 safety: tutors should be cleared before teaching minors.
+   */
+  backgroundCheckStatus?: ('none' | 'pending' | 'cleared' | 'failed' | 'expired') | null;
+  backgroundCheckCompletedAt?: string | null;
+  /**
+   * Whether government-issued ID has been verified.
+   */
+  identityVerified?: boolean | null;
+  /**
+   * Government-issued ID for identity verification (admin-reviewed).
+   */
+  identityDocument?: (number | null) | Media;
+  /**
+   * Teaching certificates, degrees, or credentials.
+   */
+  teachingCertifications?:
+    | {
+        name: string;
+        issuingBody?: string | null;
+        issueDate?: string | null;
+        expiryDate?: string | null;
+        document?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * K-12 grade levels this tutor is qualified to teach.
+   */
+  gradesTaught?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12')[] | null;
   /**
    * Average rating for this tutor (0-5).
    */
@@ -291,7 +336,7 @@ export interface TutorProfile {
   /**
    * Subjects this tutor teaches.
    */
-  subjects?: (string | Subject)[] | null;
+  subjects?: (number | Subject)[] | null;
   /**
    * Hourly rate in Naira.
    */
@@ -301,11 +346,11 @@ export interface TutorProfile {
    */
   type?: ('one-on-one' | 'group')[] | null;
   /**
-   * Minimum age of students the tutor teaches.
+   * Minimum age of students the tutor teaches (K-12 range).
    */
   minAge?: number | null;
   /**
-   * Maximum age of students the tutor teaches.
+   * Maximum age of students the tutor teaches (K-12 range).
    */
   maxAge?: number | null;
   updatedAt: string;
@@ -316,11 +361,11 @@ export interface TutorProfile {
  * via the `definition` "reviews".
  */
 export interface Review {
-  id: string;
+  id: number;
   review: string;
   rating: number;
-  user: string | User;
-  tutor: string | TutorProfile;
+  user: number | User;
+  tutor: number | TutorProfile;
   tutorResponse?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -330,8 +375,8 @@ export interface Review {
  * via the `definition` "wallets".
  */
 export interface Wallet {
-  id: string;
-  user: string | User;
+  id: number;
+  user: number | User;
   currency: 'ngn' | 'usd';
   balance: number;
   creditBalance: number;
@@ -343,10 +388,10 @@ export interface Wallet {
  * via the `definition` "transactions".
  */
 export interface Transaction {
-  id: string;
-  sender: string | User;
-  receiver: string | User;
-  tutor?: (string | null) | User;
+  id: number;
+  sender: number | User;
+  receiver: number | User;
+  tutor?: (number | null) | User;
   amount: number;
   currency: 'usd' | 'ngn';
   status: 'paid' | 'pending';
@@ -358,9 +403,9 @@ export interface Transaction {
  * via the `definition` "bookings".
  */
 export interface Booking {
-  id: string;
-  tutor: string | TutorProfile;
-  student: string | User;
+  id: number;
+  tutor: number | TutorProfile;
+  student: number | User;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   /**
    * Start date of the engagement
@@ -392,14 +437,17 @@ export interface Booking {
  * via the `definition` "students".
  */
 export interface Student {
-  id: string;
-  user: string | User;
-  parent: string | User;
+  id: number;
+  user: number | User;
+  parent: number | User;
   firstName: string;
   lastName: string;
   generatedEmail: string;
+  /**
+   * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
+   */
   generatedPassword: string;
-  gradeLevel?: string | null;
+  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -409,25 +457,36 @@ export interface Student {
  * via the `definition` "classes".
  */
 export interface Class {
-  id: string;
-  tutor: string | User;
+  id: number;
+  tutor: number | User;
   title?: string | null;
-  subject: string | Subject;
+  subject: number | Subject;
   description?: string | null;
   classType: 'one-on-one' | 'group';
+  gradeLevel: 'K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+  /**
+   * IANA timezone used to interpret schedule start/end times.
+   */
+  timezone: string;
   maxStudents?: number | null;
   startDate: string;
   endDate: string;
   schedule: {
     day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+    /**
+     * 24-hour HH:MM format, interpreted in the class timezone.
+     */
     startTime: string;
+    /**
+     * 24-hour HH:MM format, interpreted in the class timezone.
+     */
     endTime: string;
     id?: string | null;
   }[];
-  students?: (string | User)[] | null;
-  parents?: (string | User)[] | null;
+  students?: (number | User)[] | null;
+  parents?: (number | User)[] | null;
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
-  whiteboard?: (string | null) | Whiteboard;
+  whiteboard?: (number | null) | Whiteboard;
   updatedAt: string;
   createdAt: string;
 }
@@ -436,11 +495,14 @@ export interface Class {
  * via the `definition` "whiteboards".
  */
 export interface Whiteboard {
-  id: string;
+  id: number;
   title: string;
-  owner: string | User;
-  class?: (string | null) | Class;
-  liveSession?: (string | null) | LiveSession;
+  owner: number | User;
+  class?: (number | null) | Class;
+  liveSession?: (number | null) | LiveSession;
+  /**
+   * Auto-generated on create. Used for public/share-link access.
+   */
   shareToken?: string | null;
   isPublic?: boolean | null;
   updatedAt: string;
@@ -451,17 +513,20 @@ export interface Whiteboard {
  * via the `definition` "live-sessions".
  */
 export interface LiveSession {
-  id: string;
-  class: string | Class;
-  tutor: string | User;
+  id: number;
+  class: number | Class;
+  tutor: number | User;
   roomId: string;
   scheduledFor?: string | null;
   startedAt?: string | null;
   endedAt?: string | null;
   status: 'scheduled' | 'waiting' | 'live' | 'ended' | 'cancelled';
-  attendees?: (string | User)[] | null;
+  /**
+   * Deprecated: prefer live-session-participants for per-user join/leave records. Kept for backwards compatibility.
+   */
+  attendees?: (number | User)[] | null;
   showWhiteboard?: boolean | null;
-  activeWhiteboard?: (string | null) | Whiteboard;
+  activeWhiteboard?: (number | null) | Whiteboard;
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
   updatedAt: string;
@@ -472,14 +537,14 @@ export interface LiveSession {
  * via the `definition` "class-invitations".
  */
 export interface ClassInvitation {
-  id: string;
-  class: string | Class;
-  inviter: string | User;
+  id: number;
+  class: number | Class;
+  inviter: number | User;
   inviteeEmail: string;
   inviteeType: 'parent' | 'student';
   token: string;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
-  acceptedBy?: (string | null) | User;
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'revoked';
+  acceptedBy?: (number | null) | User;
   expiresAt?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -489,8 +554,8 @@ export interface ClassInvitation {
  * via the `definition` "whiteboard-slides".
  */
 export interface WhiteboardSlide {
-  id: string;
-  whiteboard: string | Whiteboard;
+  id: number;
+  whiteboard: number | Whiteboard;
   order: number;
   title?: string | null;
   data?:
@@ -502,21 +567,23 @@ export interface WhiteboardSlide {
     | number
     | boolean
     | null;
-  thumbnail?: (string | null) | Media;
+  thumbnail?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
 }
 /**
+ * Aggregated attendance record per (liveSession, student). LiveSessionParticipants holds raw join/leave events; this collection is the rolled-up summary used for parent/tutor reports.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "attendance".
  */
 export interface Attendance {
-  id: string;
-  liveSession: string | LiveSession;
-  class: string | Class;
-  student: string | User;
-  parent?: (string | null) | User;
-  tutor?: (string | null) | User;
+  id: number;
+  liveSession: number | LiveSession;
+  class: number | Class;
+  student: number | User;
+  parent?: (number | null) | User;
+  tutor?: (number | null) | User;
   joinedAt: string;
   leftAt?: string | null;
   durationMinutes?: number | null;
@@ -525,14 +592,16 @@ export interface Attendance {
   createdAt: string;
 }
 /**
+ * Per-user join/leave records for a live session. Use this collection (not LiveSessions.attendees) as the source of truth for who attended.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "live-session-participants".
  */
 export interface LiveSessionParticipant {
-  id: string;
-  liveSession: string | LiveSession;
-  class: string | Class;
-  user: string | User;
+  id: number;
+  liveSession: number | LiveSession;
+  class: number | Class;
+  user: number | User;
   accountType: 'tutor' | 'student' | 'parent';
   joinedAt: string;
   leftAt?: string | null;
@@ -545,22 +614,30 @@ export interface LiveSessionParticipant {
  * via the `definition` "assessments".
  */
 export interface Assessment {
-  id: string;
+  id: number;
   title: string;
   description?: string | null;
-  subject: string | Subject;
-  tutor: string | User;
+  subject: number | Subject;
+  tutor: number | User;
   type: 'quiz' | 'flashcard' | 'practice_test' | 'homework';
   /**
-   * Optional time limit in minutes (0 = no limit)
+   * Target K-12 grade level for this assessment.
+   */
+  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  /**
+   * Instructions shown to the student before they begin.
+   */
+  instructions?: string | null;
+  /**
+   * Optional time limit in minutes (0 = no limit, max 600).
    */
   timeLimitMinutes?: number | null;
   /**
-   * Max questions (up to 100)
+   * Max questions to include (cap of 200).
    */
   maxQuestions?: number | null;
   /**
-   * Passing score percentage (0-100)
+   * Passing score percentage (0-100).
    */
   passingScore?: number | null;
   isPublished?: boolean | null;
@@ -572,13 +649,17 @@ export interface Assessment {
  * via the `definition` "assessment-questions".
  */
 export interface AssessmentQuestion {
-  id: string;
-  assessment: string | Assessment;
+  id: number;
+  assessment: number | Assessment;
   /**
    * Supports Markdown syntax
    */
   questionText: string;
-  type: 'single_choice' | 'multiple_choice' | 'true_false';
+  type: 'single_choice' | 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
+  /**
+   * Optional image to accompany the question (useful for younger grades).
+   */
+  image?: (number | null) | Media;
   /**
    * For choice-based questions. Mark one or more as correct.
    */
@@ -603,14 +684,22 @@ export interface AssessmentQuestion {
  * via the `definition` "tutor-assessments".
  */
 export interface TutorAssessment {
-  id: string;
-  assessment: string | Assessment;
-  tutor: string | User;
-  student: string | User;
-  class: string | Class;
-  selectedQuestions?: (string | AssessmentQuestion)[] | null;
+  id: number;
+  assessment: number | Assessment;
+  tutor: number | User;
+  student: number | User;
+  class: number | Class;
+  selectedQuestions?: (number | AssessmentQuestion)[] | null;
   status: 'pending' | 'in_progress' | 'completed' | 'expired';
   dueDate?: string | null;
+  /**
+   * How many times the student may submit (1 = single attempt).
+   */
+  maxAttempts?: number | null;
+  /**
+   * Number of submissions made so far. Updated server-side.
+   */
+  attemptCount?: number | null;
   instructions?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -620,13 +709,13 @@ export interface TutorAssessment {
  * via the `definition` "assessment-results".
  */
 export interface AssessmentResult {
-  id: string;
-  tutorAssessment: string | TutorAssessment;
-  student: string | User;
-  tutor: string | User;
+  id: number;
+  tutorAssessment: number | TutorAssessment;
+  student: number | User;
+  tutor: number | User;
   answers?:
     | {
-        question: string | AssessmentQuestion;
+        question: number | AssessmentQuestion;
         selectedOptions?:
           | {
               optionIndex?: number | null;
@@ -660,8 +749,8 @@ export interface AssessmentResult {
  * via the `definition` "notifications".
  */
 export interface Notification {
-  id: string;
-  recipient: string | User;
+  id: number;
+  recipient: number | User;
   type:
     | 'student_joined_class'
     | 'parent_accepted_invite'
@@ -691,7 +780,7 @@ export interface Notification {
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
-  id: string;
+  id: number;
   key: string;
   data:
     | {
@@ -708,96 +797,96 @@ export interface PayloadKv {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
       } | null)
     | ({
         relationTo: 'tutor-profiles';
-        value: string | TutorProfile;
+        value: number | TutorProfile;
       } | null)
     | ({
         relationTo: 'subjects';
-        value: string | Subject;
+        value: number | Subject;
       } | null)
     | ({
         relationTo: 'reviews';
-        value: string | Review;
+        value: number | Review;
       } | null)
     | ({
         relationTo: 'wallets';
-        value: string | Wallet;
+        value: number | Wallet;
       } | null)
     | ({
         relationTo: 'transactions';
-        value: string | Transaction;
+        value: number | Transaction;
       } | null)
     | ({
         relationTo: 'bookings';
-        value: string | Booking;
+        value: number | Booking;
       } | null)
     | ({
         relationTo: 'students';
-        value: string | Student;
+        value: number | Student;
       } | null)
     | ({
         relationTo: 'classes';
-        value: string | Class;
+        value: number | Class;
       } | null)
     | ({
         relationTo: 'class-invitations';
-        value: string | ClassInvitation;
+        value: number | ClassInvitation;
       } | null)
     | ({
         relationTo: 'whiteboards';
-        value: string | Whiteboard;
+        value: number | Whiteboard;
       } | null)
     | ({
         relationTo: 'whiteboard-slides';
-        value: string | WhiteboardSlide;
+        value: number | WhiteboardSlide;
       } | null)
     | ({
         relationTo: 'live-sessions';
-        value: string | LiveSession;
+        value: number | LiveSession;
       } | null)
     | ({
         relationTo: 'attendance';
-        value: string | Attendance;
+        value: number | Attendance;
       } | null)
     | ({
         relationTo: 'live-session-participants';
-        value: string | LiveSessionParticipant;
+        value: number | LiveSessionParticipant;
       } | null)
     | ({
         relationTo: 'assessments';
-        value: string | Assessment;
+        value: number | Assessment;
       } | null)
     | ({
         relationTo: 'assessment-questions';
-        value: string | AssessmentQuestion;
+        value: number | AssessmentQuestion;
       } | null)
     | ({
         relationTo: 'tutor-assessments';
-        value: string | TutorAssessment;
+        value: number | TutorAssessment;
       } | null)
     | ({
         relationTo: 'assessment-results';
-        value: string | AssessmentResult;
+        value: number | AssessmentResult;
       } | null)
     | ({
         relationTo: 'notifications';
-        value: string | Notification;
+        value: number | Notification;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -807,10 +896,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -830,7 +919,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -848,8 +937,11 @@ export interface UsersSelect<T extends boolean = true> {
   country?: T;
   timezone?: T;
   avatar?: T;
+  dateOfBirth?: T;
+  isActive?: T;
   parent?: T;
   isManagedAccount?: T;
+  parentalConsentGiven?: T;
   hasCompletedOnboarding?: T;
   subjectsOfInterest?: T;
   gradeLevel?: T;
@@ -913,6 +1005,21 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   slug?: T;
   user?: T;
   isApproved?: T;
+  backgroundCheckStatus?: T;
+  backgroundCheckCompletedAt?: T;
+  identityVerified?: T;
+  identityDocument?: T;
+  teachingCertifications?:
+    | T
+    | {
+        name?: T;
+        issuingBody?: T;
+        issueDate?: T;
+        expiryDate?: T;
+        document?: T;
+        id?: T;
+      };
+  gradesTaught?: T;
   rating?: T;
   totalReviews?: T;
   onboardingCompleted?: T;
@@ -1027,6 +1134,8 @@ export interface ClassesSelect<T extends boolean = true> {
   subject?: T;
   description?: T;
   classType?: T;
+  gradeLevel?: T;
+  timezone?: T;
   maxStudents?: T;
   startDate?: T;
   endDate?: T;
@@ -1150,6 +1259,8 @@ export interface AssessmentsSelect<T extends boolean = true> {
   subject?: T;
   tutor?: T;
   type?: T;
+  gradeLevel?: T;
+  instructions?: T;
   timeLimitMinutes?: T;
   maxQuestions?: T;
   passingScore?: T;
@@ -1165,6 +1276,7 @@ export interface AssessmentQuestionsSelect<T extends boolean = true> {
   assessment?: T;
   questionText?: T;
   type?: T;
+  image?: T;
   options?:
     | T
     | {
@@ -1190,6 +1302,8 @@ export interface TutorAssessmentsSelect<T extends boolean = true> {
   selectedQuestions?: T;
   status?: T;
   dueDate?: T;
+  maxAttempts?: T;
+  attemptCount?: T;
   instructions?: T;
   updatedAt?: T;
   createdAt?: T;

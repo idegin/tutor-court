@@ -5,6 +5,32 @@ export const LiveSessionParticipants: CollectionConfig = {
   admin: {
     useAsTitle: 'id',
     defaultColumns: ['liveSession', 'user', 'accountType', 'joinedAt', 'leftAt', 'durationSeconds'],
+    description:
+      'Per-user join/leave records for a live session. Use this collection (not LiveSessions.attendees) as the source of truth for who attended.',
+  },
+  hooks: {
+    beforeChange: [
+      async ({ data, operation, originalDoc, req }) => {
+        if (operation !== 'create' || !data) return data
+        const userId = typeof data.user === 'object' ? data.user?.id : data.user
+        const sessionId =
+          typeof data.liveSession === 'object' ? data.liveSession?.id : data.liveSession
+        if (!userId || !sessionId) return data
+        const existing = await req.payload.find({
+          collection: 'live-session-participants',
+          where: {
+            and: [{ liveSession: { equals: sessionId } }, { user: { equals: userId } }],
+          },
+          limit: 1,
+          depth: 0,
+          req,
+        })
+        if (existing.totalDocs > 0) {
+          throw new Error('Participant record already exists for this user in this session.')
+        }
+        return data
+      },
+    ],
   },
   access: {
     read: ({ req: { user } }) => {
@@ -60,6 +86,7 @@ export const LiveSessionParticipants: CollectionConfig = {
       name: 'joinedAt',
       type: 'date',
       required: true,
+      index: true,
     },
     {
       name: 'leftAt',
