@@ -154,15 +154,33 @@ export async function seedData() {
       createdStudents.push(user)
     }
 
-    await payload.create({
+    const existingWallet = await payload.find({
       collection: 'wallets',
-      data: {
-        user: user.id,
-        currency: isTutor ? 'usd' : 'ngn',
-        balance: faker.number.int({ min: 100, max: 5000 }),
-        creditBalance: 0,
-      } as any,
+      where: { user: { equals: user.id } },
+      limit: 1,
     })
+
+    if (existingWallet.docs.length > 0) {
+      await payload.update({
+        collection: 'wallets',
+        id: existingWallet.docs[0].id,
+        data: {
+          currency: isTutor ? 'usd' : 'ngn',
+          balance: faker.number.int({ min: 100, max: 5000 }),
+          creditBalance: 0,
+        } as any,
+      })
+    } else {
+      await payload.create({
+        collection: 'wallets',
+        data: {
+          user: user.id,
+          currency: isTutor ? 'usd' : 'ngn',
+          balance: faker.number.int({ min: 100, max: 5000 }),
+          creditBalance: 0,
+        } as any,
+      })
+    }
 
     for (let j = 0; j < 3; j++) {
       await payload.create({

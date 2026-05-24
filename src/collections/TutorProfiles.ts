@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 
-const generateUniqueSlug = async (payload: any, baseSlug: string, count = 0): Promise<string> => {
+const generateUniqueSlug = async (payload: any, baseSlug: string, count = 0, req?: any): Promise<string> => {
   const customId = Math.random().toString(36).substring(2, 7);
   const newSlug = count === 0 ? baseSlug : `${baseSlug}-${customId}`;
   
@@ -11,10 +11,11 @@ const generateUniqueSlug = async (payload: any, baseSlug: string, count = 0): Pr
         equals: newSlug,
       },
     },
+    req,
   });
 
   if (existingProfiles.totalDocs > 0) {
-    return generateUniqueSlug(payload, baseSlug, count + 1);
+    return generateUniqueSlug(payload, baseSlug, count + 1, req);
   }
 
   return newSlug;
@@ -44,11 +45,12 @@ export const TutorProfiles: CollectionConfig = {
             const user = await req.payload.findByID({
               collection: 'users',
               id: data.user,
+              req,
             });
             
             if (user && user.firstName && user.lastName) {
               const baseSlug = `${user.firstName}-${user.lastName}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-              data.slug = await generateUniqueSlug(req.payload, baseSlug);
+              data.slug = await generateUniqueSlug(req.payload, baseSlug, 0, req);
             }
           }
         }
