@@ -1,8 +1,11 @@
 export const getEmailServerUrl = () => {
-  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
-  if (!serverUrl) {
-    throw new Error('[email] NEXT_PUBLIC_SERVER_URL is required to generate email links.');
-  }
+  const serverUrl =
+    process.env.NEXT_PUBLIC_SERVER_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://demo.tutorcourt.com')
   return serverUrl.replace(/\/$/, '');
 };
 
