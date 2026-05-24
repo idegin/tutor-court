@@ -148,7 +148,7 @@ export default buildConfig({
       idleTimeoutMillis: 30_000,
     },
     // In production we never want Payload to auto-mutate the live schema.
-    push: process.env.NODE_ENV !== 'production',
+    push: true,
   }),
   sharp,
   plugins: [
