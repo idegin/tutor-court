@@ -73,12 +73,13 @@ export default async function ParentClassDetailsPage(props: PageProps) {
     }
   })
 
-  const tutorName = cls.tutor ? `${cls.tutor.firstName} ${cls.tutor.lastName}` : 'Tutor'
+  const tutorDoc = cls.tutor as any
+  const tutorName = tutorDoc ? `${tutorDoc.firstName} ${tutorDoc.lastName}` : 'Tutor'
   const subjectName = typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')
 
   return (
     <ParentClassDetailsClient
-      classId={cls.id}
+      classId={String(cls.id)}
       classTitle={cls.title || 'Live Class'}
       classDescription={cls.description || ''}
       classSchedule={cls.schedule || []}
@@ -88,9 +89,9 @@ export default async function ParentClassDetailsPage(props: PageProps) {
       classType={cls.classType}
       maxStudents={cls.maxStudents || 0}
       enrolledStudentsCount={currentEnrolledStudentIds.length}
-      subjectName={subjectName}
+      subjectName={String(subjectName)}
       tutorName={tutorName}
-      tutorEmail={cls.tutor?.email || ''}
+      tutorEmail={tutorDoc?.email || ''}
       enrolledChildren={enrolledChildren}
       unenrolledChildren={unenrolledChildren}
     />

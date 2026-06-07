@@ -99,8 +99,8 @@ export default async function ClassInvitePage(props: PageProps) {
   return (
     <ClassInviteClient
       token={token}
-      invitationId={invitation.id}
-      classId={classDoc?.id || ''}
+      invitationId={String(invitation.id)}
+      classId={classDoc?.id ? String(classDoc.id) : ''}
       inviteeEmail={invitation.inviteeEmail}
       inviteeType={invitation.inviteeType}
       classTitle={classDoc?.title || 'Live Class'}
