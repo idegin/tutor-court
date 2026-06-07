@@ -145,17 +145,23 @@ function ClassCard({ cls, muted }: { cls: any; muted?: boolean }) {
 
   return (
     <div
-      className={`group flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-md ${
-        muted ? 'opacity-80' : ''
-      }`}
+      className={`group relative flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-md ${
+        canEnter ? 'hover:border-tutor-purple-200' : ''
+      } ${muted ? 'opacity-80' : ''}`}
     >
-      <div className="flex items-start justify-between gap-3">
+      {canEnter && (
+        <Link
+          href={`/classroom/${cls.id}`}
+          className="absolute inset-0 z-0 rounded-2xl"
+        />
+      )}
+      <div className="flex items-start justify-between gap-3 relative z-10">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-tutor-purple-100 text-tutor-purple-700">
             <HiOutlineBookOpen className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold leading-tight text-foreground">{cls.title}</h3>
+            <h3 className="text-base font-bold leading-tight text-foreground group-hover:text-tutor-purple-600 transition-colors">{cls.title}</h3>
             <p className="text-xs text-muted-foreground">{subjectName}</p>
           </div>
         </div>
@@ -167,10 +173,10 @@ function ClassCard({ cls, muted }: { cls: any; muted?: boolean }) {
       </div>
 
       {cls.description && (
-        <p className="line-clamp-2 text-sm text-muted-foreground">{cls.description}</p>
+        <p className="line-clamp-2 text-sm text-muted-foreground relative z-10">{cls.description}</p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 text-xs">
+      <div className="grid grid-cols-2 gap-3 text-xs relative z-10">
         <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
           <HiOutlineCalendarDays className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium text-foreground">{days || 'No schedule'}</span>
@@ -181,7 +187,7 @@ function ClassCard({ cls, muted }: { cls: any; muted?: boolean }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t pt-4">
+      <div className="flex items-center justify-between border-t pt-4 relative z-10">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-tutor-purple-50 text-xs font-bold text-tutor-purple-700">
             {tutorInitials}
@@ -192,16 +198,12 @@ function ClassCard({ cls, muted }: { cls: any; muted?: boolean }) {
           </div>
         </div>
         {canEnter ? (
-          <Button
-            asChild
-            size="sm"
-            className="cursor-pointer bg-tutor-purple-600 font-semibold text-white hover:bg-tutor-purple-700"
+          <div
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-tutor-purple-600 px-3 text-xs font-semibold text-white group-hover:bg-tutor-purple-700 transition-colors"
           >
-            <Link href={`/classroom/${cls.id}`} className="flex items-center gap-1.5">
-              <HiOutlineVideoCamera className="h-4 w-4" />
-              Enter classroom
-            </Link>
-          </Button>
+            <HiOutlineVideoCamera className="h-4 w-4" />
+            Enter classroom
+          </div>
         ) : (
           <span className="text-xs text-muted-foreground">No actions available</span>
         )}

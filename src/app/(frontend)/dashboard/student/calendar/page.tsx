@@ -6,11 +6,11 @@ import config from '@payload-config'
 import { DashboardCalendar } from '@/components/dashboard/dashboard-calendar'
 
 export const metadata = {
-  title: 'Calendar | Tutor Dashboard',
-  description: 'Manage your tutoring schedule',
+  title: 'Calendar | Student Dashboard',
+  description: 'View your scheduled tutoring classes',
 }
 
-function generateRecurringEvents(classes: any[], tutorName: string) {
+function generateRecurringEvents(classes: any[]) {
   const events: any[] = []
 
   const dayIndexMap: Record<string, number> = {
@@ -35,7 +35,6 @@ function generateRecurringEvents(classes: any[], tutorName: string) {
       const [startH, startM] = item.startTime.split(':').map(Number)
       const [endH, endM] = item.endTime.split(':').map(Number)
 
-      // Loop dates
       const current = new Date(start)
       while (current <= end) {
         if (current.getDay() === targetDay) {
@@ -45,30 +44,21 @@ function generateRecurringEvents(classes: any[], tutorName: string) {
           const eventEnd = new Date(current)
           eventEnd.setHours(endH, endM, 0, 0)
 
-          const studentNames =
-            cls.students && cls.students.length > 0
-              ? cls.students.map((s: any) => `${s.firstName} ${s.lastName}`).join(', ')
-              : 'No students'
+          const tutorName =
+            cls.tutor && typeof cls.tutor === 'object'
+              ? `${cls.tutor.firstName} ${cls.tutor.lastName}`
+              : 'Tutor'
 
           const subjectName = typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')
           
-          let eventTitle = ''
-          if (cls.classType === 'one-on-one') {
-            const firstStudent = cls.students && cls.students.length > 0 ? `${cls.students[0].firstName} ${cls.students[0].lastName}` : 'No Student'
-            eventTitle = `${subjectName} with ${firstStudent}`
-          } else {
-            const studentCount = cls.students ? cls.students.length : 0
-            eventTitle = `${subjectName} (Group - ${studentCount} Student${studentCount !== 1 ? 's' : ''})`
-          }
-
           events.push({
             id: `${cls.id}-${current.toISOString().slice(0, 10)}`,
             classId: cls.id,
-            title: eventTitle,
+            title: `${subjectName} with ${tutorName}`,
             subject: subjectName,
             start: eventStart.toISOString(),
             end: eventEnd.toISOString(),
-            student: studentNames,
+            student: 'You',
             tutorName,
             status: cls.status === 'active' ? 'confirmed' : 'pending',
             description: cls.description,
@@ -83,31 +73,29 @@ function generateRecurringEvents(classes: any[], tutorName: string) {
   return events
 }
 
-export default async function TutorCalendarPage() {
+export default async function StudentCalendarPage() {
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
 
-  if (!user || user.accountType !== 'tutor') {
+  if (!user || user.accountType !== 'student') {
     redirect('/auth/login')
   }
 
   const classesRes = await payload.find({
     collection: 'classes',
     where: {
-      tutor: { equals: user.id },
+      students: { contains: user.id },
     },
     limit: 100,
     depth: 2,
   })
 
-  // Only show classes that have students in them
   const classesWithStudents = classesRes.docs.filter(
     (cls) => Array.isArray(cls.students) && cls.students.length > 0
   )
 
-  const tutorName = `${user.firstName} ${user.lastName}`
-  const events = generateRecurringEvents(classesWithStudents, tutorName)
+  const events = generateRecurringEvents(classesWithStudents)
 
-  return <DashboardCalendar userRole="tutor" initialEvents={events} />
+  return <DashboardCalendar userRole="student" initialEvents={events} />
 }

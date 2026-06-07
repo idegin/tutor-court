@@ -10,22 +10,25 @@ import {
     CartesianGrid,
 } from "recharts"
 
-const data = [
-    { name: "Week 1", score: 75 },
-    { name: "Week 2", score: 78 },
-    { name: "Week 3", score: 76 },
-    { name: "Week 4", score: 82 },
-    { name: "Week 5", score: 85 },
-    { name: "Week 6", score: 89 },
-    { name: "Week 7", score: 87 },
-    { name: "Week 8", score: 92 },
-]
+interface ScoreChartProps {
+    data?: { name: string; score: number }[];
+}
 
-export function ScoreChart() {
+export function ScoreChart({ data }: ScoreChartProps) {
+    const chartData = data && data.length > 0 ? data : [
+        { name: "Wk 1", score: 80 },
+        { name: "Wk 2", score: 80 },
+        { name: "Wk 3", score: 80 },
+        { name: "Wk 4", score: 80 },
+        { name: "Wk 5", score: 80 },
+        { name: "Wk 6", score: 80 },
+        { name: "Wk 7", score: 80 },
+        { name: "Wk 8", score: 80 },
+    ];
     return (
         <div className="h-[250px] w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis 
                         dataKey="name" 

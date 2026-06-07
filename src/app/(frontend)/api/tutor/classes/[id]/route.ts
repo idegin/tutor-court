@@ -56,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       collection: 'classes',
       id,
       data: {
-        subject,
+        subject: Number(subject),
         description,
         classType: classType || 'one-on-one',
         maxStudents: classType === 'group' ? Number(maxStudents) : 1,

@@ -54,6 +54,24 @@ export async function POST(request: Request) {
     const classIdVal = typeof session.class === 'object' ? session.class.id : session.class
     const tutorIdVal = typeof session.tutor === 'object' ? session.tutor.id : session.tutor
 
+    // Authorization Check: only class tutor or enrolled students can join
+    const cls = await payload.findByID({
+      collection: 'classes',
+      id: classIdVal,
+      depth: 0,
+    })
+
+    if (!cls) {
+      return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
+    }
+
+    const classTutorId = typeof cls.tutor === 'object' ? (cls.tutor as any).id : cls.tutor
+    const studentIds = cls.students ? cls.students.map((s: any) => typeof s === 'object' ? s.id : s) : []
+
+    if (user.id !== classTutorId && !studentIds.includes(user.id)) {
+      return NextResponse.json({ error: 'You are not enrolled in this class.' }, { status: 403 })
+    }
+
     const currentAttendees = session.attendees
       ? session.attendees.map((a: any) => (typeof a === 'object' ? a.id : a))
       : []

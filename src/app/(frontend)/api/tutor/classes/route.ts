@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       collection: 'classes',
       data: {
         tutor: user.id,
-        subject,
+        subject: Number(subject),
         description,
         classType: classType || 'one-on-one',
         maxStudents: maxStudents ? Number(maxStudents) : 1,

@@ -19,8 +19,8 @@ import {
     HiOutlineUserGroup,
     HiOutlineUser,
     HiOutlineDocumentText,
-    HiPlus,
     HiOutlineTv,
+    HiOutlineExclamationCircle,
 } from 'react-icons/hi2';
 import { MeetingProvider, useMeeting, useParticipant, usePubSub } from '@videosdk.live/react-sdk';
 
@@ -46,51 +46,65 @@ function LocalMediaPreview({
     const videoRef = useRef<HTMLVideoElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [permissionError, setPermissionError] = useState(false);
+    const streamRef = useRef<MediaStream | null>(null);
 
     useEffect(() => {
-        let activeStream: MediaStream | null = null;
+        let isCurrent = true;
 
-        async function getStream() {
+        async function getMedia() {
             try {
                 setPermissionError(false);
+
+                // Stop any previous stream tracks first
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop());
+                    streamRef.current = null;
+                }
+
+                // If both are disabled, do not request any media stream
+                if (!camEnabled && !micEnabled) {
+                    if (isCurrent) {
+                        setStream(null);
+                        if (videoRef.current) {
+                            videoRef.current.srcObject = null;
+                        }
+                    }
+                    return;
+                }
+
                 const mediaStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true,
+                    video: camEnabled,
+                    audio: micEnabled,
                 });
-                activeStream = mediaStream;
+
+                if (!isCurrent) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    return;
+                }
+
+                streamRef.current = mediaStream;
                 setStream(mediaStream);
-                if (videoRef.current) {
+                if (videoRef.current && camEnabled) {
                     videoRef.current.srcObject = mediaStream;
                 }
             } catch (err) {
-                console.warn("Error accessing media devices for preview:", err);
-                setPermissionError(true);
+                if (isCurrent) {
+                    console.warn("Error accessing media devices for preview:", err);
+                    setPermissionError(true);
+                }
             }
         }
 
-        if (camEnabled) {
-            getStream();
-        } else {
-            if (videoRef.current) {
-                videoRef.current.srcObject = null;
-            }
-        }
+        getMedia();
 
         return () => {
-            if (activeStream) {
-                activeStream.getTracks().forEach(track => track.stop());
+            isCurrent = false;
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
             }
         };
-    }, [camEnabled]);
-
-    useEffect(() => {
-        if (stream) {
-            const audioTrack = stream.getAudioTracks()[0];
-            if (audioTrack) {
-                audioTrack.enabled = micEnabled;
-            }
-        }
-    }, [micEnabled, stream]);
+    }, [camEnabled, micEnabled]);
 
     return (
         <div className="w-full h-full min-h-[320px] rounded-2xl bg-card border border-border flex flex-col items-center justify-center relative overflow-hidden shadow-lg group">
@@ -163,6 +177,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [session, setSession] = useState<any>(initialSession);
     const [isLive, setIsLive] = useState(initialSession?.status === 'live');
     const [isLoading, setIsLoading] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
 
     // Call controls initial state
     const [micEnabled, setMicEnabled] = useState(true);
@@ -177,6 +192,9 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Collapsible side tabs panel
     const [activeTab, setActiveTab] = useState<'chat' | 'participants' | 'tools'>('chat');
     const [isPanelOpen, setIsPanelOpen] = useState(true);
+
+    const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
+    const [activeStudentsCount, setActiveStudentsCount] = useState(0);
 
     const toggleTab = (tab: 'chat' | 'participants' | 'tools') => {
         if (isPanelOpen && activeTab === tab) {
@@ -269,7 +287,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         if (isLive && session?.id) {
             const joinSession = async () => {
                 try {
-                    await fetch('/api/live-sessions/join', {
+                    const res = await fetch('/api/live-sessions/join', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -277,13 +295,23 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                             sessionId: session.id,
                         }),
                     });
-                } catch (err) {
+
+                    if (!res.ok) {
+                        const data = await res.json();
+                        if (res.status === 403) {
+                            setAuthError(data.error || 'Access Denied: You are not enrolled in this class.');
+                            return;
+                        }
+                        throw new Error(data.error || 'Failed to join live session');
+                    }
+                } catch (err: any) {
                     console.error('Error joining live session and registering attendance:', err);
+                    toast.error(err.message || 'Error joining classroom.');
                 }
             };
             joinSession();
         }
-    }, [isLive, session?.id, cls.id]);
+    }, [isLive, session?.id, cls.id, isTutor, router]);
 
     const sessionRef = useRef(session);
     useEffect(() => {
@@ -291,30 +319,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     }, [session]);
 
     // End session when tutor leaves page or closes tab
-    useEffect(() => {
-        if (!isTutor) return;
-
-        const handleUnload = () => {
-            const currentSession = sessionRef.current;
-            if (currentSession?.id && currentSession?.status !== 'ended') {
-                fetch(`/api/live-sessions/${currentSession.id}/end`, {
-                    method: 'POST',
-                    keepalive: true,
-                });
-            }
-        };
-
-        window.addEventListener('beforeunload', handleUnload);
-        return () => {
-            window.removeEventListener('beforeunload', handleUnload);
-            const currentSession = sessionRef.current;
-            if (currentSession?.id && currentSession?.status !== 'ended') {
-                fetch(`/api/live-sessions/${currentSession.id}/end`, {
-                    method: 'POST',
-                });
-            }
-        };
-    }, [isTutor]);
+    // (Removed automatic end session on tab close to prevent accidental termination)
 
     // Track leave duration analytics for everyone
     useEffect(() => {
@@ -344,21 +349,33 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/live-sessions/${session.id}/status`);
+                const res = await fetch(`/api/live-sessions/${session.id}/status?activeStudentsCount=${activeStudentsCount}`);
                 if (res.ok) {
                     const data = await res.json();
                     
+                    if (typeof data.remainingCredits === 'number') {
+                        setRemainingCredits(data.remainingCredits);
+                    }
+
                     // Handle session ended
                     if (data?.status === 'ended') {
                         clearInterval(interval);
                         if (isTutor) {
                             if (!tutorAlertedRef.current) {
                                 tutorAlertedRef.current = true;
-                                alert("This live classroom session has ended.");
+                                if (data.remainingCredits <= 0) {
+                                    toast.error('The class has ended automatically because you have run out of credits.');
+                                } else {
+                                    toast.info('The live classroom session has ended.');
+                                }
                                 router.push(`/dashboard/tutor/classes/${cls.id}`);
                             }
                         } else {
-                            toast.info('The tutor has ended this live session.');
+                            if (data.remainingCredits <= 0) {
+                                toast.error('The class has ended automatically because the tutor has run out of credits.');
+                            } else {
+                                toast.info('The tutor has ended this live session.');
+                            }
                             router.push('/dashboard/student');
                         }
                         return;
@@ -383,7 +400,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [isTutor, isLive, session?.id, router, cls.id, whiteboards]);
+    }, [isTutor, isLive, session?.id, router, cls.id, whiteboards, activeStudentsCount]);
 
     const handleStartSession = async () => {
         setIsLoading(true);
@@ -459,6 +476,28 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
             toast.error('Failed to create whiteboard');
         }
     };
+
+    if (authError) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-muted/10 text-foreground p-4">
+                <Card className="w-full max-w-md bg-card border border-border shadow-2xl p-8 rounded-2xl text-center space-y-6">
+                    <div className="mx-auto h-16 w-16 rounded-full bg-red-100 flex items-center justify-center text-red-600 animate-pulse">
+                        <HiOutlineExclamationCircle className="h-10 w-10" />
+                    </div>
+                    <div className="space-y-2">
+                        <h2 className="text-2xl font-bold tracking-tight text-foreground">Classroom Unauthorized</h2>
+                        <p className="text-sm text-muted-foreground">{authError}</p>
+                    </div>
+                    <Button
+                        onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : '/dashboard/student')}
+                        className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold cursor-pointer py-2.5 rounded-lg border-0"
+                    >
+                        Go Back to Dashboard
+                    </Button>
+                </Card>
+            </div>
+        );
+    }
 
     // Render Waiting Room for Student or Pre-start screen for Tutor
     if (!isLive) {
@@ -551,7 +590,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 micEnabled: micEnabled,
                 webcamEnabled: camEnabled,
                 name: `${currentUser.firstName} ${currentUser.lastName}`,
-                participantId: currentUser.id,
+                participantId: String(currentUser.id),
                 debugMode: false,
             }}
         >
@@ -573,6 +612,8 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 toggleTab={toggleTab}
                 isPanelOpen={isPanelOpen}
                 syncWhiteboardStateToDB={syncWhiteboardStateToDB}
+                remainingCredits={remainingCredits}
+                setActiveStudentsCount={setActiveStudentsCount}
             />
         </MeetingProvider>
     );
@@ -617,6 +658,8 @@ function ClassroomMeetingView({
     toggleTab,
     isPanelOpen,
     syncWhiteboardStateToDB,
+    remainingCredits,
+    setActiveStudentsCount,
 }: ClassroomMeetingViewProps) {
     const router = useRouter();
     const {
@@ -657,6 +700,62 @@ function ClassroomMeetingView({
     const localParticipantStats = useParticipant(localParticipant?.id || '');
     const isMicEnabled = localParticipant ? localParticipantStats?.micOn : true;
     const isCamEnabled = localParticipant ? localParticipantStats?.webcamOn : true;
+
+    // Filter out duplicate or ghost participants
+    const uniqueParticipants = React.useMemo(() => {
+        return Array.from(participants.values()).reduce((acc: any[], current: any) => {
+            const currentId = String(current.id);
+            const isDuplicate = acc.some(p => {
+                const pId = String(p.id);
+                const namesMatch = p.displayName && current.displayName && p.displayName === current.displayName;
+                const idsMatch = pId === currentId || (pId.split('-')[0] === currentId.split('-')[0]);
+                return namesMatch || idsMatch;
+            });
+
+            if (isDuplicate) {
+                // Prefer local or active streams
+                if (current.local || current.webcamOn || current.micOn) {
+                    return acc.filter(p => {
+                        const pId = String(p.id);
+                        const namesMatch = p.displayName && current.displayName && p.displayName === current.displayName;
+                        const idsMatch = pId === currentId || (pId.split('-')[0] === currentId.split('-')[0]);
+                        return !(namesMatch || idsMatch);
+                    }).concat([current]);
+                }
+                return acc;
+            }
+            return [...acc, current];
+        }, []);
+    }, [participants]);
+
+    // Ensure camera/microphone tracks are fully stopped when muted
+    useEffect(() => {
+        if (localParticipantStats) {
+            const { webcamStream, webcamOn, micStream, micOn } = localParticipantStats;
+
+            if (!webcamOn && webcamStream) {
+                webcamStream.getTracks().forEach((track: any) => {
+                    if (track.readyState === 'live') {
+                        track.stop();
+                    }
+                });
+            }
+
+            if (!micOn && micStream) {
+                micStream.getTracks().forEach((track: any) => {
+                    if (track.readyState === 'live') {
+                        track.stop();
+                    }
+                });
+            }
+        }
+    }, [localParticipantStats?.webcamOn, localParticipantStats?.webcamStream, localParticipantStats?.micOn, localParticipantStats?.micStream]);
+
+    // Sync active student/parent count to the parent ClassroomClient
+    useEffect(() => {
+        const studentCount = uniqueParticipants.filter(p => String(p.id) !== String(tutorId)).length;
+        setActiveStudentsCount(studentCount);
+    }, [uniqueParticipants, setActiveStudentsCount, tutorId]);
 
     // Real-time Chat using VideoSDK PubSub
     const { publish, messages } = usePubSub("CHAT");
@@ -740,6 +839,11 @@ function ClassroomMeetingView({
                     <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">
                         {typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')}
                     </Badge>
+                    {remainingCredits !== null && (
+                        <Badge variant="outline" className={`text-[10px] font-bold py-0.5 px-2 rounded-full ${remainingCredits < 10 ? 'bg-red-500/10 border-red-500/25 text-red-500' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-500'}`}>
+                            {remainingCredits === 1 ? '1 credit' : `${remainingCredits} credits`} left
+                        </Badge>
+                    )}
 
                     {/* Whiteboard Sync Toggle */}
                     <div className="flex items-center gap-2 border-l border-border pl-3 ml-3">
@@ -820,37 +924,9 @@ function ClassroomMeetingView({
                         <div className="flex-1 flex flex-col min-h-0 relative">
                             {/* Small Video Avatars at top */}
                             <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
-                                {isParticipantJoined(tutorId) ? (
-                                    <SmallParticipantVideoView participantId={tutorId} />
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <Avatar className="h-7 w-7 border border-border border-dashed">
-                                            <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
-                                                {tutorInfo?.firstName?.[0] || 'T'}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <span className="text-[10px] text-muted-foreground font-medium">Tutor ({tutorInfo?.firstName || 'Offline'})</span>
-                                    </div>
-                                )}
-                                {expectedStudents.map((student: any) => (
-                                    <div key={student.id} className="border-l border-border pl-2">
-                                        {isParticipantJoined(student.id) ? (
-                                            <SmallParticipantVideoView participantId={student.id} />
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Avatar className="h-7 w-7 border border-border border-dashed">
-                                                    <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
-                                                        {student.firstName?.[0] || 'S'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-[10px] text-muted-foreground font-medium">{student.firstName} (Offline)</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                {guestParticipantIds.map((guestId) => (
-                                    <div key={guestId} className="border-l border-border pl-2">
-                                        <SmallParticipantVideoView participantId={guestId} />
+                                {uniqueParticipants.map((p: any, idx: number) => (
+                                    <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
+                                        <SmallParticipantVideoView participantId={p.id} />
                                     </div>
                                 ))}
                             </div>
@@ -861,37 +937,9 @@ function ClassroomMeetingView({
                         <div className="flex-1 flex flex-col min-h-0 relative">
                             {/* Small Video Avatars at top */}
                             <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
-                                {isParticipantJoined(tutorId) ? (
-                                    <SmallParticipantVideoView participantId={tutorId} />
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <Avatar className="h-7 w-7 border border-border border-dashed">
-                                            <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
-                                                {tutorInfo?.firstName?.[0] || 'T'}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <span className="text-[10px] text-muted-foreground font-medium">Tutor ({tutorInfo?.firstName || 'Offline'})</span>
-                                    </div>
-                                )}
-                                {expectedStudents.map((student: any) => (
-                                    <div key={student.id} className="border-l border-border pl-2">
-                                        {isParticipantJoined(student.id) ? (
-                                            <SmallParticipantVideoView participantId={student.id} />
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Avatar className="h-7 w-7 border border-border border-dashed">
-                                                    <AvatarFallback className="text-[10px] bg-muted text-muted-foreground font-bold">
-                                                        {student.firstName?.[0] || 'S'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-[10px] text-muted-foreground font-medium">{student.firstName} (Offline)</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                {guestParticipantIds.map((guestId) => (
-                                    <div key={guestId} className="border-l border-border pl-2">
-                                        <SmallParticipantVideoView participantId={guestId} />
+                                {uniqueParticipants.map((p: any, idx: number) => (
+                                    <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
+                                        <SmallParticipantVideoView participantId={p.id} />
                                     </div>
                                 ))}
                             </div>
@@ -908,52 +956,19 @@ function ClassroomMeetingView({
                     ) : (
                         /* Standard Grid Video Mode */
                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 items-center justify-center p-4">
-                            {/* Tutor Video Screen */}
-                            {isParticipantJoined(tutorId) ? (
-                                <ParticipantVideoView
-                                    participantId={tutorId}
-                                    displayName={`${tutorInfo?.firstName || 'Tutor'} ${tutorInfo?.lastName || ''}`}
-                                    isTutorUser={true}
-                                    avatarInitials={tutorInfo?.firstName?.[0] || 'T'}
-                                />
-                            ) : (
-                                <OfflineParticipantView
-                                    displayName={`${tutorInfo?.firstName || 'Tutor'} ${tutorInfo?.lastName || ''}`}
-                                    isTutorUser={true}
-                                    avatarInitials={tutorInfo?.firstName?.[0] || 'T'}
-                                />
-                            )}
-
-                            {/* Student(s) Video Screen */}
-                            {expectedStudents.map((student: any) => (
-                                <React.Fragment key={student.id}>
-                                    {isParticipantJoined(student.id) ? (
-                                        <ParticipantVideoView
-                                            participantId={student.id}
-                                            displayName={`${student.firstName} ${student.lastName}`}
-                                            isTutorUser={false}
-                                            avatarInitials={student.firstName?.[0] || 'S'}
-                                        />
-                                    ) : (
-                                        <OfflineParticipantView
-                                            displayName={`${student.firstName} ${student.lastName}`}
-                                            isTutorUser={false}
-                                            avatarInitials={student.firstName?.[0] || 'S'}
-                                        />
-                                    )}
-                                </React.Fragment>
-                            ))}
-
-                            {/* Guest Video Screen */}
-                            {guestParticipantIds.map((guestId) => (
-                                <ParticipantVideoView
-                                    key={guestId}
-                                    participantId={guestId}
-                                    displayName="Guest User"
-                                    isTutorUser={false}
-                                    avatarInitials="G"
-                                />
-                            ))}
+                            {uniqueParticipants.map((p: any) => {
+                                const isParticipantTutor = String(p.id) === String(tutorId);
+                                const initials = p.displayName?.[0] || (isParticipantTutor ? 'T' : 'S');
+                                return (
+                                    <ParticipantVideoView
+                                        key={p.id}
+                                        participantId={p.id}
+                                        displayName={p.displayName}
+                                        isTutorUser={isParticipantTutor}
+                                        avatarInitials={initials}
+                                    />
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -1008,11 +1023,11 @@ function ClassroomMeetingView({
                             <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
                                 <div className="border-b border-border pb-3 flex items-center justify-between">
                                     <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                        <HiOutlineUserGroup className="h-4 w-4 text-muted-foreground" /> Participants ({participantIds.length})
+                                        <HiOutlineUserGroup className="h-4 w-4 text-muted-foreground" /> Participants ({uniqueParticipants.length})
                                     </h3>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                                    {Array.from(participants.values()).map((p: any) => {
+                                    {uniqueParticipants.map((p: any) => {
                                         const isParticipantTutor = p.id === tutorId;
                                         return (
                                             <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/40">
@@ -1371,6 +1386,7 @@ function PresenterScreenShare({ presenterId }: { presenterId: string }) {
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className="w-full h-full object-contain"
             />
             <span className="absolute bottom-3 left-3 bg-background/90 border border-border px-2 py-0.5 rounded text-xs text-foreground font-semibold flex items-center gap-1.5 z-10">

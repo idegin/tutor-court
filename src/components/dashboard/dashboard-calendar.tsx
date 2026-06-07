@@ -110,11 +110,12 @@ const CustomEvent = ({ event }: EventProps<any>) => {
     );
 };
 
-interface CalendarClientProps {
+interface DashboardCalendarProps {
     initialEvents: any[];
+    userRole: 'tutor' | 'student' | 'parent';
 }
 
-export default function CalendarClient({ initialEvents }: CalendarClientProps) {
+export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendarProps) {
     const router = useRouter();
     const [view, setView] = useState<any>('week');
     const [date, setDate] = useState<Date>(new Date());
@@ -136,6 +137,7 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
         setIsLoadingClassInfo(true);
         setClassInfo(null);
         try {
+            // Check class details via normal public endpoints or specific api routes
             const res = await fetch(`/api/classes/${event.classId}`);
             if (res.ok) {
                 const data = await res.json();
@@ -158,6 +160,7 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
               border-radius: calc(var(--radius) + 2px);
               overflow: hidden;
               background-color: var(--background);
+              min-height: 650px;
             }
             .rbc-header {
               padding: 12px 0;
@@ -326,11 +329,25 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
                                     </div>
                                 </div>
 
+                                {selectedEvent.tutorName && (
+                                    <div className="flex items-start gap-3">
+                                        <HiOutlineUser className="h-5 w-5 text-muted-foreground mt-0.5" />
+                                        <div>
+                                            <h5 className="text-xs font-semibold text-muted-foreground">Tutor</h5>
+                                            <p className="text-sm font-medium text-foreground mt-0.5">{selectedEvent.tutorName}</p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex items-start gap-3">
                                     <HiOutlineUsers className="h-5 w-5 text-muted-foreground mt-0.5" />
                                     <div>
-                                        <h5 className="text-xs font-semibold text-muted-foreground">Student(s)</h5>
-                                        <p className="text-sm font-medium text-foreground mt-0.5">{selectedEvent.student}</p>
+                                        <h5 className="text-xs font-semibold text-muted-foreground">
+                                            {userRole === 'tutor' ? 'Student(s)' : userRole === 'student' ? 'Student' : 'Student(s)'}
+                                        </h5>
+                                        <p className="text-sm font-medium text-foreground mt-0.5">
+                                            {userRole === 'student' ? 'You' : selectedEvent.student}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -387,24 +404,28 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
                             </div>
 
                             <div className="pt-4 border-t flex flex-col gap-2">
-                                <Button
-                                    onClick={() => {
-                                        setIsSheetOpen(false);
-                                        router.push(`/classroom/${selectedEvent.classId}`);
-                                    }}
-                                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold cursor-pointer"
-                                >
-                                    Join Live Classroom
-                                </Button>
-                                <Button
-                                    onClick={() => {
-                                        setIsSheetOpen(false);
-                                        router.push(`/dashboard/tutor/classes/${selectedEvent.classId}`);
-                                    }}
-                                    className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-semibold cursor-pointer"
-                                >
-                                    Open Class Details
-                                </Button>
+                                {userRole !== 'parent' && (
+                                    <Button
+                                        onClick={() => {
+                                            setIsSheetOpen(false);
+                                            router.push(`/classroom/${selectedEvent.classId}`);
+                                        }}
+                                        className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold cursor-pointer"
+                                    >
+                                        Join Live Classroom
+                                    </Button>
+                                )}
+                                {userRole === 'tutor' && (
+                                    <Button
+                                        onClick={() => {
+                                            setIsSheetOpen(false);
+                                            router.push(`/dashboard/tutor/classes/${selectedEvent.classId}`);
+                                        }}
+                                        className="w-full bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white font-semibold cursor-pointer"
+                                    >
+                                        Open Class Details
+                                    </Button>
+                                )}
                                 <Button
                                     variant="outline"
                                     onClick={() => setIsSheetOpen(false)}

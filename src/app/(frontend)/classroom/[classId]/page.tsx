@@ -10,10 +10,12 @@ import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 
 interface PageProps {
   params: Promise<{ classId: string }>
+  searchParams: Promise<{ sessionId?: string }>
 }
 
 export default async function ClassroomPage(props: PageProps) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
@@ -23,6 +25,8 @@ export default async function ClassroomPage(props: PageProps) {
   }
 
   const { classId } = params
+  const numericClassId = /^\d+$/.test(classId) ? Number(classId) : classId
+  const sessionId = searchParams.sessionId
 
   if (!isVideoSdkAvailable()) {
     return <LiveClassUnavailable accountType={user.accountType} />
@@ -31,7 +35,7 @@ export default async function ClassroomPage(props: PageProps) {
   try {
     const cls = await payload.findByID({
       collection: 'classes',
-      id: classId,
+      id: numericClassId,
       depth: 2,
     })
 
@@ -52,21 +56,38 @@ export default async function ClassroomPage(props: PageProps) {
       return redirect('/dashboard')
     }
 
-    // Find active live session
-    const activeSessionsRes = await payload.find({
-      collection: 'live-sessions',
-      where: {
-        and: [{ class: { equals: classId } }, { status: { equals: 'live' } }],
-      },
-      limit: 1,
-      depth: 0,
-    })
-    const activeSession = activeSessionsRes.docs[0] || null
+    // Resolve active live session
+    let activeSession = null
+    if (sessionId) {
+      const numericSessionId = /^\d+$/.test(sessionId) ? Number(sessionId) : sessionId
+      try {
+        activeSession = await payload.findByID({
+          collection: 'live-sessions',
+          id: numericSessionId,
+          depth: 0,
+        })
+      } catch (err) {
+        console.warn(`Could not find live-session with ID ${sessionId}:`, err)
+      }
+    }
+
+    if (!activeSession) {
+      // Find active live session as fallback
+      const activeSessionsRes = await payload.find({
+        collection: 'live-sessions',
+        where: {
+          and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }],
+        },
+        limit: 1,
+        depth: 0,
+      })
+      activeSession = activeSessionsRes.docs[0] || null
+    }
 
     // Fetch existing whiteboards
     const whiteboardsRes = await payload.find({
       collection: 'whiteboards',
-      where: { class: { equals: classId } },
+      where: { class: { equals: numericClassId } },
       sort: '-createdAt',
       limit: 100,
       depth: 0,
@@ -94,7 +115,7 @@ export default async function ClassroomPage(props: PageProps) {
         data: {
           title: 'Main Board',
           owner: tutorId,
-          class: classId,
+          class: numericClassId,
           liveSession: activeSession?.id || undefined,
           isPublic: false,
           shareToken: crypto.randomBytes(16).toString('hex'),

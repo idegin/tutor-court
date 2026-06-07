@@ -105,7 +105,17 @@ export function SiteHeader() {
                                     </div>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-foreground h-[2px]" />
-                                <DropdownMenuItem onClick={() => router.push('/dashboard')} >
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        if (user?.accountType === 'admin') {
+                                            router.push('/admin')
+                                        } else if (user?.accountType) {
+                                            router.push(`/dashboard/${user.accountType}`)
+                                        } else {
+                                            router.push('/dashboard')
+                                        }
+                                    }}
+                                >
                                     Dashboard
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => router.push(`/dashboard/${user.accountType}/settings`)} >

@@ -1021,7 +1021,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                 <HiOutlineVideoCamera className="h-5 w-5" /> Live Classroom
                             </CardTitle>
                             <CardDescription>
-                                Start or join VideoSDK live calls with whiteboards.
+                                Start or join live class.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">

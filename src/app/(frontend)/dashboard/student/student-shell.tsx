@@ -7,6 +7,10 @@ import {
   HiAcademicCap,
   HiOutlineClipboardDocumentList,
   HiClipboardDocumentList,
+  HiOutlineCalendar,
+  HiCalendar,
+  HiOutlineBell,
+  HiBell,
 } from 'react-icons/hi2'
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout'
@@ -29,6 +33,18 @@ const studentNavItems = [
     href: '/dashboard/student/assessments',
     icon: HiOutlineClipboardDocumentList,
     activeIcon: HiClipboardDocumentList,
+  },
+  {
+    name: 'Calendar',
+    href: '/dashboard/student/calendar',
+    icon: HiOutlineCalendar,
+    activeIcon: HiCalendar,
+  },
+  {
+    name: 'Notifications',
+    href: '/dashboard/student/notifications',
+    icon: HiOutlineBell,
+    activeIcon: HiBell,
   },
 ]
 

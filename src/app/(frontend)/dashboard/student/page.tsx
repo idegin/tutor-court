@@ -208,50 +208,48 @@ export default async function StudentOverviewPage() {
                 const time = cls.schedule?.[0] ? `${cls.schedule[0].startTime}` : null
                 const statusClass = STATUS_STYLES[cls.status] || 'bg-secondary text-secondary-foreground'
                 return (
-                  <li
-                    key={cls.id}
-                    className="flex flex-col gap-3 px-6 py-4 transition-colors hover:bg-muted/10 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-tutor-purple-100 text-tutor-purple-700">
-                        <HiOutlineBookOpen className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground">{cls.title}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {subjectName} · with {tutorName}
-                        </p>
-                        <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1">
-                            <HiOutlineCalendarDays className="h-3 w-3" />
-                            {days || 'No days set'}
-                          </span>
-                          {time && (
+                  <li key={cls.id} className="relative group border-b last:border-b-0">
+                    <Link
+                      href={`/classroom/${cls.id}`}
+                      className="flex flex-col gap-3 px-6 py-4 transition-colors hover:bg-muted/10 sm:flex-row sm:items-center sm:justify-between w-full"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-tutor-purple-100 text-tutor-purple-700">
+                          <HiOutlineBookOpen className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground group-hover:text-tutor-purple-600 transition-colors">{cls.title}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {subjectName} · with {tutorName}
+                          </p>
+                          <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
-                              <HiOutlineClock className="h-3 w-3" />
-                              {time}
+                              <HiOutlineCalendarDays className="h-3 w-3" />
+                              {days || 'No days set'}
                             </span>
-                          )}
-                        </p>
+                            {time && (
+                              <span className="inline-flex items-center gap-1">
+                                <HiOutlineClock className="h-3 w-3" />
+                                {time}
+                              </span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusClass}`}
-                      >
-                        {cls.status}
-                      </span>
-                      <Button
-                        asChild
-                        size="sm"
-                        className="flex cursor-pointer items-center gap-1.5 bg-tutor-purple-600 font-semibold text-white hover:bg-tutor-purple-700"
-                      >
-                        <Link href={`/classroom/${cls.id}`}>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${statusClass}`}
+                        >
+                          {cls.status}
+                        </span>
+                        <div
+                          className="flex h-8 items-center gap-1.5 rounded-lg bg-tutor-purple-600 px-3 text-xs font-semibold text-white group-hover:bg-tutor-purple-700 transition-colors"
+                        >
                           <HiOutlineVideoCamera className="h-4 w-4" />
                           Enter
-                        </Link>
-                      </Button>
-                    </div>
+                        </div>
+                      </div>
+                    </Link>
                   </li>
                 )
               })}

@@ -162,7 +162,15 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Could not complete onboarding.')
       }
-      router.push('/dashboard/parent')
+
+      // Check for stored invitation token
+      const inviteToken = typeof window !== 'undefined' ? sessionStorage.getItem('invite_token') : null
+      if (inviteToken) {
+        sessionStorage.removeItem('invite_token')
+        router.push(`/class-invite/${inviteToken}`)
+      } else {
+        router.push('/dashboard/parent')
+      }
       router.refresh()
     } catch (err: any) {
       toast.error(err.message)
@@ -199,71 +207,9 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
           <p className="text-sm font-semibold text-secondary">Welcome, {parentName.split(' ')[0]}</p>
           <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Complete your registration</h1>
           <p className="max-w-2xl text-muted-foreground">
-            Accept invitations from tutors and create login accounts for your children. Save the credentials shown after each child is added so they can log in.
+            Create login accounts for your children to get started. Save the credentials shown after each child is added so they can log in.
           </p>
         </div>
-
-        {/* Invitations Panel */}
-        {invitations.length > 0 && (
-          <section className="mt-8 rounded-xl border bg-card p-6 md:p-8">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
-                <HiOutlineEnvelopeOpen className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Tutor Invitations</h2>
-                <p className="text-sm text-muted-foreground">
-                  You have pending invites to join tutor classes. Accept them to link your account.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {invitations.map((inv) => (
-                <div key={inv.id} className="flex flex-col justify-between p-4 border rounded-xl bg-background shadow-sm">
-                  <div>
-                    <h3 className="font-bold text-foreground text-sm">{inv.className}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">Invited by: {inv.tutorName}</p>
-                  </div>
-                  <Button
-                    onClick={() => onAcceptInvitation(inv.id)}
-                    className="mt-4 w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs h-8 cursor-pointer font-semibold"
-                  >
-                    Accept Invite
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Already-enrolled classes (auto-accepted on registration) */}
-        {initialEnrolledClasses.length > 0 && invitations.length === 0 && (
-          <section className="mt-8 rounded-xl border bg-green-50/60 border-green-200 p-6 md:p-8">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-700">
-                <HiOutlineCheckCircle className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-green-900">You&apos;ve been enrolled in {initialEnrolledClasses.length === 1 ? 'a class' : 'classes'}</h2>
-                <p className="text-sm text-green-700">
-                  Your account was automatically linked when you registered. Add your child below to enrol them too.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {initialEnrolledClasses.map((cls, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-green-200">
-                  <HiOutlineCheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{cls.className}</p>
-                    <p className="text-xs text-muted-foreground">Tutor: {cls.tutorName}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-5">
           <section className="lg:col-span-3">

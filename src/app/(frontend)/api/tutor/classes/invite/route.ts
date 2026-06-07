@@ -78,7 +78,7 @@ export async function POST(request: Request) {
         [fieldKey]: [...existingIds, inviteUser.id],
       }
 
-      // When adding an existing parent, also enrol all of their existing children
+      // When adding an existing parent, only enrol their child if they have exactly one child.
       if (inviteeType === 'parent') {
         const childStudents = await payload.find({
           collection: 'students',
@@ -86,17 +86,18 @@ export async function POST(request: Request) {
           depth: 1,
           limit: 50,
         })
-        const existingStudentIds = (classDoc.students || []).map((s: any) =>
-          typeof s === 'object' ? s.id : s,
-        )
-        for (const childDoc of childStudents.docs) {
+        if (childStudents.docs.length === 1) {
+          const existingStudentIds = (classDoc.students || []).map((s: any) =>
+            typeof s === 'object' ? s.id : s,
+          )
+          const childDoc = childStudents.docs[0]
           const childUserId =
             typeof childDoc.user === 'object' ? (childDoc.user as any).id : childDoc.user
           if (childUserId && !existingStudentIds.includes(childUserId)) {
             existingStudentIds.push(childUserId)
           }
+          updatedClassData.students = existingStudentIds
         }
-        updatedClassData.students = existingStudentIds
       }
 
       await payload.update({
@@ -107,11 +108,14 @@ export async function POST(request: Request) {
 
       // Send email to existing user
       const serverUrl = getEmailServerUrl(headers)
+      const redirectPath = inviteUser.accountType === 'parent'
+        ? `/dashboard/parent/classes/${classDoc.id}`
+        : `/dashboard/${inviteUser.accountType}`;
       const emailContent = `
         <p class="text">Hi ${inviteUser.firstName || 'there'},</p>
         <p class="text">Tutor <strong>${user.firstName} ${user.lastName}</strong> has added you to their class <strong>"${classDoc.title || 'Live Class'}"</strong>.</p>
         <div class="btn-container">
-          <a href="${serverUrl}/dashboard/${inviteUser.accountType}" class="btn">Go to Dashboard</a>
+          <a href="${serverUrl}${redirectPath}" class="btn">View Class Details</a>
         </div>
       `
       const emailHtml = getBaseEmailLayout(

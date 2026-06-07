@@ -212,6 +212,10 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             setIsOpen(false);
             resetForm();
             router.refresh();
+
+            if (!editingClassId && data.classId) {
+                router.push(`/dashboard/tutor/classes/${data.classId}`);
+            }
         } catch (error: any) {
             toast.error(error.message || 'An error occurred.');
         } finally {

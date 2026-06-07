@@ -56,25 +56,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
     }
 
-    // Add parent to class and backfill their existing children into cls.students
+    // Add parent to class
     const currentParents = (cls.parents || []).map((p: any) => typeof p === 'object' ? p.id : p)
     if (!currentParents.includes(user.id)) {
       currentParents.push(user.id)
-    }
-
-    const currentStudents = (cls.students || []).map((s: any) => typeof s === 'object' ? s.id : s)
-    const childStudents = await payload.find({
-      collection: 'students',
-      where: { parent: { equals: user.id } },
-      depth: 1,
-      limit: 50,
-    })
-    for (const childDoc of childStudents.docs) {
-      const childUserId =
-        typeof childDoc.user === 'object' ? (childDoc.user as any).id : childDoc.user
-      if (childUserId && !currentStudents.includes(childUserId)) {
-        currentStudents.push(childUserId)
-      }
     }
 
     await payload.update({
@@ -82,7 +67,6 @@ export async function POST(request: Request) {
       id: classId,
       data: {
         parents: currentParents,
-        students: currentStudents,
       } as any,
     })
 
@@ -106,7 +90,7 @@ export async function POST(request: Request) {
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
         <p class="text">Great news! Parent <strong>${user.firstName} ${user.lastName}</strong> has accepted your invitation to join the class <strong>"${cls.title}"</strong>.</p>
-        <p class="text">Their existing children have been enrolled in the class automatically. Any new children they add will also be enrolled.</p>
+        <p class="text">They are now managing their children's enrollment for this class.</p>
         <div class="btn-container">
           <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
         </div>

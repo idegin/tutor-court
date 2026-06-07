@@ -7,6 +7,12 @@ import {
   HiWallet,
   HiOutlineUsers,
   HiUsers,
+  HiOutlineCalendar,
+  HiCalendar,
+  HiOutlineBell,
+  HiBell,
+  HiOutlineAcademicCap,
+  HiAcademicCap,
 } from 'react-icons/hi2'
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout'
@@ -25,10 +31,28 @@ const parentNavItems = [
     activeIcon: HiUsers,
   },
   {
+    name: 'Classes',
+    href: '/dashboard/parent/classes',
+    icon: HiOutlineAcademicCap,
+    activeIcon: HiAcademicCap,
+  },
+  {
     name: 'Wallet',
     href: '/dashboard/parent/wallet',
     icon: HiOutlineWallet,
     activeIcon: HiWallet,
+  },
+  {
+    name: 'Calendar',
+    href: '/dashboard/parent/calendar',
+    icon: HiOutlineCalendar,
+    activeIcon: HiCalendar,
+  },
+  {
+    name: 'Notifications',
+    href: '/dashboard/parent/notifications',
+    icon: HiOutlineBell,
+    activeIcon: HiBell,
   },
 ]
 
