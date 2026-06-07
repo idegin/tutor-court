@@ -639,6 +639,8 @@ interface ClassroomMeetingViewProps {
     toggleTab: (tab: 'chat' | 'participants' | 'tools') => void;
     isPanelOpen: boolean;
     syncWhiteboardStateToDB: (show: boolean, wbId: string | null) => Promise<void>;
+    remainingCredits: number | null;
+    setActiveStudentsCount: (count: number) => void;
 }
 
 function ClassroomMeetingView({
