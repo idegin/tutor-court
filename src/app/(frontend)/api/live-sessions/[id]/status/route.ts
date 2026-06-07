@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
-import { createActivityLogs } from '@/lib/activity-log-service'
+import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 
 function deriveEngagementFlag(
@@ -341,7 +341,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         const classIdForLink =
           typeof session.class === 'object' ? (session.class as any).id : session.class
 
-        const entries = studentParticipants.map((p) => ({
+        const entries: ActivityLogEntry[] = studentParticipants.map((p) => ({
           subjectId: p.user,
           actorId: tutorIdVal,
           type: 'class_ended',
