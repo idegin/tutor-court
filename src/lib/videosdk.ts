@@ -49,7 +49,7 @@ export function generateVideoSdkToken(expirationSeconds: number = 3600 * 2): str
   }
   const payload = {
     apikey: apiKey,
-    permissions: ['allow_join', 'allow_mod', 'ask_join'],
+    permissions: ['allow_join', 'allow_mod', 'ask_join', 'allow_screenshare'],
     version: 2,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expirationSeconds,

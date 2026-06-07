@@ -21,6 +21,9 @@ import {
     HiOutlineDocumentText,
     HiOutlineTv,
     HiOutlineExclamationCircle,
+    HiPlus,
+    HiOutlineArrowsPointingOut,
+    HiOutlineArrowsPointingIn,
 } from 'react-icons/hi2';
 import { MeetingProvider, useMeeting, useParticipant, usePubSub } from '@videosdk.live/react-sdk';
 
@@ -141,11 +144,10 @@ function LocalMediaPreview({
                     size="icon"
                     variant={micEnabled ? 'outline' : 'destructive'}
                     onClick={() => setMicEnabled(!micEnabled)}
-                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${
-                        micEnabled 
-                            ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105' 
-                            : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
-                    }`}
+                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${micEnabled
+                        ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105'
+                        : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
+                        }`}
                     title={micEnabled ? 'Mute Microphone' : 'Unmute Microphone'}
                 >
                     <HiOutlineMicrophone className="h-5 w-5" />
@@ -154,11 +156,10 @@ function LocalMediaPreview({
                     size="icon"
                     variant={camEnabled ? 'outline' : 'destructive'}
                     onClick={() => setCamEnabled(!camEnabled)}
-                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${
-                        camEnabled 
-                            ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105' 
-                            : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
-                    }`}
+                    className={`h-11 w-11 rounded-full shadow-md cursor-pointer transition-all ${camEnabled
+                        ? 'bg-background/90 hover:bg-background border-border text-foreground hover:scale-105'
+                        : 'bg-red-600 hover:bg-red-700 text-white hover:scale-105 border-0'
+                        }`}
                     title={camEnabled ? 'Turn off Camera' : 'Turn on Camera'}
                 >
                     <HiOutlineVideoCamera className="h-5 w-5" />
@@ -352,7 +353,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 const res = await fetch(`/api/live-sessions/${session.id}/status?activeStudentsCount=${activeStudentsCount}`);
                 if (res.ok) {
                     const data = await res.json();
-                    
+
                     if (typeof data.remainingCredits === 'number') {
                         setRemainingCredits(data.remainingCredits);
                     }
@@ -662,6 +663,12 @@ function ClassroomMeetingView({
     setActiveStudentsCount,
 }: ClassroomMeetingViewProps) {
     const router = useRouter();
+    const [isWhiteboardFullScreen, setIsWhiteboardFullScreen] = useState(false);
+    // Get expected tutor/students info from DB to build the grid
+    const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor;
+    const tutorInfo = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor : null;
+    const expectedStudents = cls.students || [];
+
     const {
         join,
         leave,
@@ -695,7 +702,7 @@ function ClassroomMeetingView({
     // Track active participants list
     const participantIds = Array.from(participants.keys());
     const localParticipant = Array.from(participants.values()).find(p => p.local);
-    
+
     // Resolve active state based on WebRTC track states
     const localParticipantStats = useParticipant(localParticipant?.id || '');
     const isMicEnabled = localParticipant ? localParticipantStats?.micOn : true;
@@ -728,28 +735,6 @@ function ClassroomMeetingView({
         }, []);
     }, [participants]);
 
-    // Ensure camera/microphone tracks are fully stopped when muted
-    useEffect(() => {
-        if (localParticipantStats) {
-            const { webcamStream, webcamOn, micStream, micOn } = localParticipantStats;
-
-            if (!webcamOn && webcamStream) {
-                webcamStream.getTracks().forEach((track: any) => {
-                    if (track.readyState === 'live') {
-                        track.stop();
-                    }
-                });
-            }
-
-            if (!micOn && micStream) {
-                micStream.getTracks().forEach((track: any) => {
-                    if (track.readyState === 'live') {
-                        track.stop();
-                    }
-                });
-            }
-        }
-    }, [localParticipantStats?.webcamOn, localParticipantStats?.webcamStream, localParticipantStats?.micOn, localParticipantStats?.micStream]);
 
     // Sync active student/parent count to the parent ClassroomClient
     useEffect(() => {
@@ -812,10 +797,7 @@ function ClassroomMeetingView({
         setNewWbTitle('');
     };
 
-    // Get expected tutor/students info from DB to build the grid
-    const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor;
-    const tutorInfo = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor : null;
-    const expectedStudents = cls.students || [];
+
 
     // Helper to check if a specific database user ID is in the current VideoSDK participants Map
     const isParticipantJoined = (userId: string) => participants.has(userId);
@@ -836,9 +818,6 @@ function ClassroomMeetingView({
                     <h1 className="text-sm font-bold tracking-tight max-w-[200px] sm:max-w-xs truncate text-foreground">
                         {cls.title} <span className="text-muted-foreground font-normal">| Live Classroom</span>
                     </h1>
-                    <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">
-                        {typeof cls.subject === 'object' && cls.subject ? cls.subject.name : (cls.subject || 'No Subject')}
-                    </Badge>
                     {remainingCredits !== null && (
                         <Badge variant="outline" className={`text-[10px] font-bold py-0.5 px-2 rounded-full ${remainingCredits < 10 ? 'bg-red-500/10 border-red-500/25 text-red-500' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-500'}`}>
                             {remainingCredits === 1 ? '1 credit' : `${remainingCredits} credits`} left
@@ -859,9 +838,8 @@ function ClassroomMeetingView({
                                     }), { persist: true });
                                     syncWhiteboardStateToDB(nextState, selectedWhiteboard?.id || null);
                                 }}
-                                className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${
-                                    showWhiteboard ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground" : "border-border text-foreground"
-                                }`}
+                                className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${showWhiteboard ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground" : "border-border text-foreground"
+                                    }`}
                             >
                                 <HiOutlineDocumentText className="h-4 w-4 mr-1.5" />
                                 {showWhiteboard ? "Close Whiteboard for All" : "Share Whiteboard with Class"}
@@ -934,18 +912,40 @@ function ClassroomMeetingView({
                         </div>
                     ) : showWhiteboard && selectedWhiteboard ? (
                         /* Share Whiteboard Mode */
-                        <div className="flex-1 flex flex-col min-h-0 relative">
+                        <div className={`flex-1 flex flex-col min-h-0 relative ${isWhiteboardFullScreen ? 'fixed inset-0 z-50 bg-background p-4' : ''}`}>
                             {/* Small Video Avatars at top */}
-                            <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
-                                {uniqueParticipants.map((p: any, idx: number) => (
-                                    <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
-                                        <SmallParticipantVideoView participantId={p.id} />
-                                    </div>
-                                ))}
-                            </div>
+                            {!isWhiteboardFullScreen && (
+                                <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
+                                    {uniqueParticipants.map((p: any, idx: number) => (
+                                        <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
+                                            <SmallParticipantVideoView participantId={p.id} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Full Screen Toggle Button */}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIsWhiteboardFullScreen(!isWhiteboardFullScreen)}
+                                className="absolute top-4 right-4 z-30 bg-background/90 border border-border hover:bg-muted text-foreground flex items-center gap-1.5 shadow-sm"
+                            >
+                                {isWhiteboardFullScreen ? (
+                                    <>
+                                        <HiOutlineArrowsPointingIn className="h-4 w-4" />
+                                        <span>Exit Full Screen</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <HiOutlineArrowsPointingOut className="h-4 w-4" />
+                                        <span>Full Screen</span>
+                                    </>
+                                )}
+                            </Button>
 
                             {/* Whiteboard Canvas */}
-                            <div className="flex-1 min-h-0 text-foreground pt-14">
+                            <div className={`flex-1 min-h-0 text-foreground ${isWhiteboardFullScreen ? 'pt-16' : 'pt-14'}`}>
                                 <WhiteboardCanvas
                                     whiteboardId={selectedWhiteboard.id}
                                     isTutor={isTutor}
@@ -1365,12 +1365,15 @@ function OfflineParticipantView({ displayName, isTutorUser, avatarInitials }: Of
 
 // Presenter Screen Share View Component
 function PresenterScreenShare({ presenterId }: { presenterId: string }) {
-    const { screenShareStream, screenShareOn, displayName } = useParticipant(presenterId);
+    const participantObj = useParticipant(presenterId);
+    const screenShareStream = participantObj?.screenShareStream;
+    const screenShareOn = participantObj?.screenShareOn;
+    const displayName = participantObj?.displayName;
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
         if (videoRef.current) {
-            if (screenShareOn && screenShareStream) {
+            if (screenShareOn && screenShareStream?.track) {
                 const mediaStream = new MediaStream([screenShareStream.track]);
                 videoRef.current.srcObject = mediaStream;
                 videoRef.current.play().catch((err) => console.error("Presenter screen share play failed:", err));

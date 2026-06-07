@@ -1,5 +1,4 @@
 # Todo
-1. update the tutor class details page such that they can view the assessment and see the performace of each student in that particular assessment. So you'll need to create the page/component for viewing assessment performace details.
-2. Update the student assessment page to show all the assessments they have and the ones they haven't taken. Keep in mind that a tutor assessment can be given to multiple students, and a student can have multiple tutor assessments.
-3. Update the student assessment page such that the student is able to take the assessment and see their performacne. Once a student is done with thier assessment we create a notification in the DB for the tutor to let them know that a student has completed their assessment.
-4. 
+1. Create a const that holds the min credit the tutor has to have on the live classroom to show them a shadcn alert popup when they are flow on credits.
+2. once the tutor's credit has finished, we unmount the class room and how them a message that the credit has run out and they and the students have been disconnected from the class room.
+3. for the students, when the tutor's credit has run out, we unmount the class room and how them a message that the tutor's credit has run out and they and the tutor have been disconnected from the class room.

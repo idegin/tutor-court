@@ -108,36 +108,6 @@ export default async function ClassroomPage(props: PageProps) {
       })
     }
 
-    // If no whiteboards exist, create a default one
-    if (whiteboardsWithSlides.length === 0) {
-      const newWb = await payload.create({
-        collection: 'whiteboards',
-        data: {
-          title: 'Main Board',
-          owner: tutorId,
-          class: numericClassId,
-          liveSession: activeSession?.id || undefined,
-          isPublic: false,
-          shareToken: crypto.randomBytes(16).toString('hex'),
-        } as any,
-      })
-
-      // Create slide 1
-      const defaultSlide = await payload.create({
-        collection: 'whiteboard-slides',
-        data: {
-          whiteboard: newWb.id,
-          order: 0,
-          title: 'Slide 1',
-          data: { lines: [] },
-        } as any,
-      })
-
-      whiteboardsWithSlides.push({
-        ...newWb,
-        slides: [defaultSlide],
-      })
-    }
 
     return (
       <ClassroomClient
