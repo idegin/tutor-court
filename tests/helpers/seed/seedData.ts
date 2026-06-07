@@ -235,7 +235,7 @@ export async function seedData() {
         lastName: childLastName,
         generatedEmail,
         generatedPassword,
-        gradeLevel: 'Grade 6',
+        gradeLevel: '6',
       } as any,
     })
 

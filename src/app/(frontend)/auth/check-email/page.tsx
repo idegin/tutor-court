@@ -1,6 +1,7 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next13-progressbar';
+import { useSearchParams } from "next/navigation";
 import * as React from 'react'
 import { AuthLayout, CheckEmailCard } from '@/components/auth'
 import { toast } from 'sonner'
@@ -33,8 +34,8 @@ function CheckEmailContent() {
     }
 
     return (
-        <CheckEmailCard 
-            onContinueClick={() => router.push('/auth/login')} 
+        <CheckEmailCard
+            onContinueClick={() => router.push('/auth/login')}
             onResendClick={handleResend}
         />
     )
@@ -58,7 +59,7 @@ export default function CheckEmailPage() {
                 </div>
             }
         >
-            <React.Suspense fallback={<CheckEmailCard onContinueClick={() => {}} />}>
+            <React.Suspense fallback={<CheckEmailCard onContinueClick={() => { }} />}>
                 <CheckEmailContent />
             </React.Suspense>
         </AuthLayout>
