@@ -5,7 +5,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 
 // Force NODE_ENV to development for the duration of this script.
 // This forces Payload to push/initialize the database schema even in production/Vercel build environments.
-process.env.NODE_ENV = 'development'
+;(process.env as any).NODE_ENV = 'development'
 
 async function init() {
   console.log('Starting database schema push/initialization...')
