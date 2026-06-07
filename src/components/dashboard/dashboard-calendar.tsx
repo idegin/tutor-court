@@ -5,7 +5,7 @@ import { Calendar, dateFnsLocalizer, EventProps, ToolbarProps } from 'react-big-
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineClock, HiOutlineUsers, HiOutlineCalendar, HiOutlineDocumentText } from 'react-icons/hi2';
+import { HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlineClock, HiOutlineUsers, HiOutlineCalendar, HiOutlineDocumentText, HiOutlineUser } from 'react-icons/hi2';
 import { useRouter } from 'next/navigation';
 import {
     Sheet,
