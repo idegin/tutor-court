@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       collection: 'classes',
       id: classId,
       data: { students: currentStudents } as any,
+      overrideAccess: true,
     })
 
     await payload.update({
@@ -80,6 +81,7 @@ export async function POST(request: Request) {
         status: 'accepted',
         acceptedBy: user.id,
       } as any,
+      overrideAccess: true,
     })
 
     const tutor = cls.tutor

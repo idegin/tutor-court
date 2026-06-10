@@ -36,6 +36,7 @@ export async function PATCH(request: Request) {
           mimetype: photo.type,
           size: photo.size,
         },
+        overrideAccess: true,
       })
       avatarId = media.id
     }
@@ -55,6 +56,7 @@ export async function PATCH(request: Request) {
       collection: 'users',
       id: user.id,
       data: updateData,
+      overrideAccess: true,
     })
 
     if (isTutorOnboarding) {
@@ -65,6 +67,7 @@ export async function PATCH(request: Request) {
             equals: user.id,
           },
         },
+        overrideAccess: true,
       })
 
       if (existingProfile.totalDocs === 0) {
@@ -74,6 +77,7 @@ export async function PATCH(request: Request) {
             user: user.id,
             isApproved: false,
           } as any,
+          overrideAccess: true,
         })
       }
     }

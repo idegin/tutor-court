@@ -68,6 +68,7 @@ export async function POST(request: Request) {
       data: {
         parents: currentParents,
       } as any,
+      overrideAccess: true,
     })
 
     // Update invitation status
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
         status: 'accepted',
         acceptedBy: user.id,
       } as any,
+      overrideAccess: true,
     })
 
     // Send email notification to tutor

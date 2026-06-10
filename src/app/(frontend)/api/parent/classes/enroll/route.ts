@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       data: {
         students: currentStudents,
       } as any,
+      overrideAccess: true,
     })
 
     // 7. Send email to class tutor

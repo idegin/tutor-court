@@ -38,6 +38,7 @@ export async function POST(request: Request) {
           collection: 'notifications',
           id: n.id,
           data: { isRead: true } as any,
+          overrideAccess: true,
         }),
       ),
     )
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
     collection: 'notifications',
     id: notificationId,
     data: { isRead: true } as any,
+    overrideAccess: true,
   })
 
   return NextResponse.json({ success: true })

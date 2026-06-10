@@ -56,6 +56,7 @@ export async function POST(request: Request) {
         students: [],
         parents: [],
       } as any,
+      overrideAccess: true,
     })
 
     return NextResponse.json({ success: true, classId: newClass.id })

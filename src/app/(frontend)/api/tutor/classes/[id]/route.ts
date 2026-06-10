@@ -68,6 +68,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           endTime: s.endTime,
         })),
       } as any,
+      overrideAccess: true,
     })
 
     return NextResponse.json({ success: true, class: updatedClass })

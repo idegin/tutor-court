@@ -20,6 +20,7 @@ export async function PATCH(request: Request) {
             collection: 'tutor-profiles',
             where: { user: { equals: user.id } },
             limit: 1,
+            overrideAccess: true,
         })
 
         const updateData: any = {}
@@ -40,6 +41,7 @@ export async function PATCH(request: Request) {
                 collection: 'tutor-profiles',
                 id: existingProfiles[0].id,
                 data: updateData,
+                overrideAccess: true,
             })
         } else {
             tutorProfile = await payload.create({
@@ -48,6 +50,7 @@ export async function PATCH(request: Request) {
                     user: user.id,
                     ...updateData
                 },
+                overrideAccess: true,
             })
         }
 
@@ -59,6 +62,7 @@ export async function PATCH(request: Request) {
                 data: {
                     accountType: 'tutor'
                 },
+                overrideAccess: true,
             })
         }
 

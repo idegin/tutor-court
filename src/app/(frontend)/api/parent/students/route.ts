@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       hasCompletedOnboarding: true,
       _verified: true,
     } as any,
+    overrideAccess: true,
   })
 
   const student = await payload.create({
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
       gradeLevel,
       notes,
     } as any,
+    overrideAccess: true,
   })
 
   // Handle Class Invitations for this parent
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
       ],
     },
     limit: 50,
+    overrideAccess: true,
   })
 
   for (const invitation of invitations.docs) {
@@ -96,6 +99,7 @@ export async function POST(request: Request) {
       collection: 'classes',
       id: classId,
       depth: 1,
+      overrideAccess: true,
     })
 
     if (cls) {
@@ -118,6 +122,7 @@ export async function POST(request: Request) {
           students: currentStudents,
           parents: currentParents,
         } as any,
+        overrideAccess: true,
       })
 
       await payload.update({
@@ -127,6 +132,7 @@ export async function POST(request: Request) {
           status: 'accepted',
           acceptedBy: user.id,
         } as any,
+        overrideAccess: true,
       })
 
       const tutor = cls.tutor
@@ -174,6 +180,7 @@ export async function POST(request: Request) {
       parents: { equals: user.id },
     },
     limit: 50,
+    overrideAccess: true,
   })
 
   for (const cls of directClasses.docs) {
@@ -187,6 +194,7 @@ export async function POST(request: Request) {
         data: {
           students: currentStudents,
         } as any,
+        overrideAccess: true,
       })
 
       const tutor = cls.tutor

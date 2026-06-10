@@ -210,7 +210,9 @@ export const Users: CollectionConfig = {
       admin: {
         description: 'Required for tutors and parents. Managed student accounts may not have one.',
       },
-      validate: (value: any, { data }: any) => {
+      validate: (value: any, { data, operation }: any) => {
+        // Only enforce on create to avoid blocking accountType transitions (e.g. student → tutor)
+        if (operation !== 'create') return true
         const t = data?.accountType
         if ((t === 'tutor' || t === 'parent' || t === 'admin') && !value) {
           return 'Phone number is required for tutors, parents, and admins.'

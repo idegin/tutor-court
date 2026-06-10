@@ -34,6 +34,7 @@ export async function POST(req: Request) {
         const tutorProfile = await payload.findByID({
             collection: 'tutor-profiles',
             id: parsed.tutorId,
+            overrideAccess: true,
         });
 
         if (!tutorProfile) {
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
                 },
                 limit: 1,
                 depth: 0,
+                overrideAccess: true,
             })
             if (match.docs[0]) subjectIds.push(match.docs[0].id)
         }
@@ -90,7 +92,8 @@ export async function POST(req: Request) {
                 message: parsed.message || '',
                 price: totalPrice,
                 status: 'pending',
-            }
+            },
+            overrideAccess: true,
         } as any);
 
         // Email the tutor
@@ -98,8 +101,8 @@ export async function POST(req: Request) {
         if (typeof tutorProfile.user === 'object' && tutorProfile.user?.email) {
             tutorEmail = tutorProfile.user.email;
         } else if (typeof tutorProfile.user === 'string') {
-            const tutorUser = await payload.findByID({ collection: 'users', id: tutorProfile.user });
-            tutorEmail = tutorUser?.email || '';
+            const tutorUser = await payload.findByID({ collection: 'users', id: tutorProfile.user, overrideAccess: true })
+            tutorEmail = tutorUser?.email || ''
         }
 
         if (tutorEmail) {

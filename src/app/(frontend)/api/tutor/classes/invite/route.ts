@@ -104,6 +104,7 @@ export async function POST(request: Request) {
         collection: 'classes',
         id: classId,
         data: updatedClassData as any,
+        overrideAccess: true,
       })
 
       // Send email to existing user
@@ -162,6 +163,7 @@ export async function POST(request: Request) {
           status: 'pending',
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         } as any,
+        overrideAccess: true,
       })
 
       const serverUrl = getEmailServerUrl(headers)
@@ -228,6 +230,7 @@ export async function DELETE(request: Request) {
     await payload.delete({
       collection: 'class-invitations',
       id: invitationId,
+      overrideAccess: true,
     })
 
     return NextResponse.json({ success: true })
