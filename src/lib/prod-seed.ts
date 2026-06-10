@@ -8,15 +8,8 @@ export async function runProdSeed(payload: Payload): Promise<void> {
 
   console.log('[prod-seed] No users found — seeding default data...')
 
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@tutorcourt.com'
-  const adminPassword = process.env.ADMIN_PASSWORD
-
-  if (!adminPassword) {
-    console.error(
-      '[prod-seed] ADMIN_PASSWORD env var is not set. Skipping seed to avoid an insecure default.',
-    )
-    return
-  }
+  const adminEmail = 'admin@tutorcourt.com'
+  const adminPassword = 'Superman6625*'
 
   await payload.create({
     collection: 'users',
