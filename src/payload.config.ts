@@ -90,7 +90,9 @@ const trustedOrigins = Array.from(new Set([SERVER_URL, ...extraOrigins]))
 
 export default buildConfig({
   onInit: async (payload) => {
-    await runProdSeed(payload)
+    runProdSeed(payload).catch((err) =>
+      console.error('[prod-seed] Unhandled error in onInit:', err),
+    )
   },
   serverURL: SERVER_URL,
   cors: trustedOrigins,
@@ -173,4 +175,55 @@ export default buildConfig({
       },
     }),
   ],
+  async onInit(payload) {
+    try {
+      const users = await payload.find({
+        collection: 'users',
+        limit: 1,
+        overrideAccess: true,
+      })
+
+      if (users.totalDocs === 0) {
+        payload.logger.info('No users found. Running production database seeding...')
+
+        // Create Admin
+        await payload.create({
+          collection: 'users',
+          data: {
+            email: 'admin@tutorcourt.com',
+            password: 'Superman6625*',
+            firstName: 'Super',
+            lastName: 'Admin',
+            phoneNumber: '+1234567890',
+            accountType: 'admin',
+            _verified: true,
+          },
+          disableVerificationEmail: true,
+          overrideAccess: true,
+        })
+        payload.logger.info('Admin account (admin@tutorcourt.com) created successfully.')
+
+        // Create Math and English subjects
+        const subjectsToCreate = ['Mathematics', 'English']
+        for (const subjectName of subjectsToCreate) {
+          const existing = await payload.find({
+            collection: 'subjects',
+            where: { name: { equals: subjectName } },
+            limit: 1,
+            overrideAccess: true,
+          })
+          if (existing.totalDocs === 0) {
+            await payload.create({
+              collection: 'subjects',
+              data: { name: subjectName },
+              overrideAccess: true,
+            })
+            payload.logger.info(`Subject "${subjectName}" created successfully.`)
+          }
+        }
+      }
+    } catch (err) {
+      payload.logger.error('Error during auto-seeding:', err)
+    }
+  },
 })
