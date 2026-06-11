@@ -30,7 +30,6 @@ import { TutorAssessments } from './collections/TutorAssessments'
 import { AssessmentResults } from './collections/AssessmentResults'
 import { Notifications } from './collections/Notifications'
 import { ActivityLogs } from './collections/ActivityLogs'
-import { runProdSeed } from './lib/prod-seed'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -89,13 +88,6 @@ const extraOrigins = (process.env.PAYLOAD_ALLOWED_ORIGINS || '')
 const trustedOrigins = Array.from(new Set([SERVER_URL, ...extraOrigins]))
 
 export default buildConfig({
-  onInit: async (payload) => {
-    // Seeds reference data only (subjects). The first admin account is created
-    // via Payload's built-in "create first user" screen at /admin.
-    await runProdSeed(payload).catch((err) =>
-      console.error('[prod-seed] Unhandled error in onInit:', err),
-    )
-  },
   serverURL: SERVER_URL,
   cors: trustedOrigins,
   csrf: trustedOrigins,
