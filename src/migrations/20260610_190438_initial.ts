@@ -1,6 +1,19 @@
 import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
 
 export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
+  // Guard: if the schema was already created via Payload's push mode (pre-migration era),
+  // the types and tables already exist. Skip the CREATE statements rather than erroring.
+  const result = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'users'
+    ) AS exists
+  `)
+  if ((result.rows[0] as any)?.exists === true) {
+    payload.logger.info('[migration] Schema already exists — marking initial migration as applied without re-running DDL.')
+    return
+  }
+
   await db.execute(sql`
    CREATE TYPE "public"."enum_users_account_type" AS ENUM('admin', 'tutor', 'parent', 'student');
   CREATE TYPE "public"."enum_users_grade_level" AS ENUM('K', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12');
