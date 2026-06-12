@@ -54,19 +54,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'title, subject, and type are required.' }, { status: 400 })
   }
 
-  const assessment = await payload.create({
-    collection: 'assessments',
-    data: {
-      title,
-      description: description || '',
-      subject,
-      tutor: user.id,
-      type,
-      timeLimitMinutes: timeLimitMinutes || 0,
-      passingScore: passingScore ?? 70,
-      isPublished: false,
-    } as any,
-  })
+  // Postgres relationship IDs are numeric — coerce the incoming subject id so the
+  // relationship write doesn't blow up with an unhandled (non-JSON) 500.
+  const subjectId = /^\d+$/.test(String(subject)) ? Number(subject) : subject
 
-  return NextResponse.json({ success: true, assessment })
+  try {
+    const assessment = await payload.create({
+      collection: 'assessments',
+      data: {
+        title,
+        description: description || '',
+        subject: subjectId,
+        tutor: user.id,
+        type,
+        timeLimitMinutes: timeLimitMinutes || 0,
+        passingScore: passingScore ?? 70,
+        isPublished: false,
+      } as any,
+    })
+
+    return NextResponse.json({ success: true, assessment })
+  } catch (error: any) {
+    console.error('[assessments] Failed to create assessment:', error)
+    return NextResponse.json(
+      { error: error?.message || 'Failed to create assessment.' },
+      { status: 500 },
+    )
+  }
 }

@@ -84,9 +84,23 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     }
 
     if (session.status === 'ended') {
+      // Report the tutor's ACTUAL remaining balance (not a hardcoded 0) so the
+      // client can tell a manual "tutor ended the class" apart from an automatic
+      // "out of credits" shutdown. The auto-close path drains the wallet to 0,
+      // while a manual end leaves whatever credits remain.
+      const endedWallets = await payload.find({
+        collection: 'wallets',
+        where: { user: { equals: session.tutor } },
+        limit: 1,
+        depth: 0,
+      })
+      const endedRemainingCredits = endedWallets.docs[0]
+        ? Math.max(0, (endedWallets.docs[0].creditBalance as number) || 0)
+        : 0
+
       return NextResponse.json({
         status: 'ended',
-        remainingCredits: 0,
+        remainingCredits: endedRemainingCredits,
         showWhiteboard: false,
         activeWhiteboard: null,
         startedAt: session.startedAt,

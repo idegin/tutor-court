@@ -9,6 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
+import { createPortal } from 'react-dom';
 import { WhiteboardCanvas } from './whiteboard-canvas';
 import {
     HiOutlineMicrophone,
@@ -40,11 +44,13 @@ function LocalMediaPreview({
     setMicEnabled,
     camEnabled,
     setCamEnabled,
+    onPermissionChange,
 }: {
     micEnabled: boolean
     setMicEnabled: (val: boolean) => void
     camEnabled: boolean
     setCamEnabled: (val: boolean) => void
+    onPermissionChange?: (denied: boolean) => void
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -57,6 +63,7 @@ function LocalMediaPreview({
         async function getMedia() {
             try {
                 setPermissionError(false);
+                onPermissionChange?.(false);
 
                 // Stop any previous stream tracks first
                 if (streamRef.current) {
@@ -94,6 +101,7 @@ function LocalMediaPreview({
                 if (isCurrent) {
                     console.warn("Error accessing media devices for preview:", err);
                     setPermissionError(true);
+                    onPermissionChange?.(true);
                 }
             }
         }
@@ -183,6 +191,9 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Call controls initial state
     const [micEnabled, setMicEnabled] = useState(true);
     const [camEnabled, setCamEnabled] = useState(true);
+    // True when the browser denied/blocked camera & mic access during preview — used
+    // to warn the tutor that the video SDK won't work before they start the class.
+    const [mediaDenied, setMediaDenied] = useState(false);
 
     // Sidebar and Whiteboards
     const [whiteboards, setWhiteboards] = useState<any[]>(initialWhiteboards);
@@ -354,7 +365,8 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 if (res.ok) {
                     const data = await res.json();
 
-                    if (typeof data.remainingCredits === 'number') {
+                    // Only the tutor should ever see/track their own credit balance.
+                    if (isTutor && typeof data.remainingCredits === 'number') {
                         setRemainingCredits(data.remainingCredits);
                     }
 
@@ -372,10 +384,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                                 router.push(`/dashboard/tutor/classes/${cls.id}`);
                             }
                         } else {
+                            // remainingCredits is the tutor's actual balance: 0 means the
+                            // session auto-closed because they ran out of credits; anything
+                            // above 0 means the tutor deliberately ended the class.
                             if (data.remainingCredits <= 0) {
-                                toast.error('The class has ended automatically because the tutor has run out of credits.');
+                                toast.error('The class has ended because the tutor ran out of credits.');
                             } else {
-                                toast.info('The tutor has ended this live session.');
+                                toast.info('The tutor has ended the class.');
                             }
                             router.push('/dashboard/student');
                         }
@@ -455,7 +470,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }
     };
 
-    const handleCreateWhiteboard = async (title: string) => {
+    const handleCreateWhiteboard = async (title: string): Promise<any | null> => {
         try {
             const res = await fetch('/api/whiteboards', {
                 method: 'POST',
@@ -472,9 +487,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 setSelectedWhiteboard(data.whiteboard);
                 setShowWhiteboard(true);
                 toast.success('New whiteboard created!');
+                return data.whiteboard;
             }
+            toast.error(data.error || 'Failed to create whiteboard');
+            return null;
         } catch (err) {
             toast.error('Failed to create whiteboard');
+            return null;
         }
     };
 
@@ -513,6 +532,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                                 setMicEnabled={setMicEnabled}
                                 camEnabled={camEnabled}
                                 setCamEnabled={setCamEnabled}
+                                onPermissionChange={setMediaDenied}
                             />
                         </div>
 
@@ -547,12 +567,20 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                             <div className="border-t border-border pt-6 space-y-4">
                                 {isTutor ? (
                                     <div className="space-y-3">
+                                        {mediaDenied && (
+                                            <div className="flex items-start gap-3 text-sm bg-red-50/70 dark:bg-red-950/20 border border-red-200/60 dark:border-red-900/30 p-4 rounded-xl">
+                                                <HiOutlineExclamationCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                                <p className="font-medium text-red-700 dark:text-red-400">
+                                                    Camera and microphone access is blocked, so the live class video won&apos;t work. Allow access in your browser, then try again.
+                                                </p>
+                                            </div>
+                                        )}
                                         <Button
                                             onClick={handleStartSession}
-                                            disabled={isLoading}
-                                            className="w-full bg-secondary hover:bg-secondary/95 text-secondary-foreground font-semibold py-3 rounded-xl cursor-pointer text-sm shadow-md transition-all active:scale-[0.98]"
+                                            disabled={isLoading || mediaDenied}
+                                            className="w-full bg-secondary hover:bg-secondary/95 text-secondary-foreground font-semibold py-3 rounded-xl cursor-pointer text-sm shadow-md transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
                                         >
-                                            {isLoading ? 'Starting Class...' : 'Start Live Classroom'}
+                                            {isLoading ? 'Starting Class...' : mediaDenied ? 'Enable Camera & Mic to Start' : 'Start Live Classroom'}
                                         </Button>
                                     </div>
                                 ) : (
@@ -632,7 +660,7 @@ interface ClassroomMeetingViewProps {
     showWhiteboard: boolean;
     setShowWhiteboard: (show: boolean) => void;
     handleLeaveSession: () => void;
-    handleCreateWhiteboard: (title: string) => Promise<void>;
+    handleCreateWhiteboard: (title: string) => Promise<any | null>;
     newWbTitle: string;
     setNewWbTitle: (title: string) => void;
     activeTab: 'chat' | 'participants' | 'tools';
@@ -666,6 +694,8 @@ function ClassroomMeetingView({
 }: ClassroomMeetingViewProps) {
     const router = useRouter();
     const [isWhiteboardFullScreen, setIsWhiteboardFullScreen] = useState(false);
+    const [createWbOpen, setCreateWbOpen] = useState(false);
+    const [creatingWb, setCreatingWb] = useState(false);
     // Get expected tutor/students info from DB to build the grid
     const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor;
     const tutorInfo = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor : null;
@@ -678,6 +708,9 @@ function ClassroomMeetingView({
         toggleWebcam,
         toggleScreenShare,
         localScreenShareOn,
+        localParticipant,
+        localMicOn,
+        localWebcamOn,
         presenterId,
         participants
     } = useMeeting({
@@ -693,26 +726,37 @@ function ClassroomMeetingView({
         }
     });
 
-    // Auto-join meeting on load
+    // Auto-join the meeting on mount, and leave on unmount. The deps MUST stay
+    // empty: VideoSDK returns fresh join/leave references on every render, so
+    // depending on them (the previous behaviour) re-ran this effect constantly,
+    // tearing down and rebuilding the room on each render. That silently broke
+    // chat, mic/camera toggling, and made each user only ever see themselves.
     useEffect(() => {
         join();
         return () => {
             leave();
         };
-    }, [join, leave]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Track active participants list
     const participantIds = Array.from(participants.keys());
-    const localParticipant = Array.from(participants.values()).find(p => p.local);
 
-    // Resolve active state based on WebRTC track states
-    const localParticipantStats = useParticipant(localParticipant?.id || '');
-    const isMicEnabled = localParticipant ? localParticipantStats?.micOn : true;
-    const isCamEnabled = localParticipant ? localParticipantStats?.webcamOn : true;
+    // Local mic/camera state comes straight from the meeting (the local user is
+    // not always present in the `participants` map), so the header toggles
+    // always reflect — and control — the real device state.
+    const isMicEnabled = localMicOn;
+    const isCamEnabled = localWebcamOn;
 
-    // Filter out duplicate or ghost participants
+    // Filter out duplicate or ghost participants. The local participant is not
+    // guaranteed to appear in the `participants` map, so include it explicitly
+    // to make sure the current user always shows up alongside everyone else.
     const uniqueParticipants = React.useMemo(() => {
-        return Array.from(participants.values()).reduce((acc: any[], current: any) => {
+        const source = Array.from(participants.values());
+        if (localParticipant && !participants.has(localParticipant.id)) {
+            source.unshift(localParticipant);
+        }
+        return source.reduce((acc: any[], current: any) => {
             const currentId = String(current.id);
             const isDuplicate = acc.some(p => {
                 const pId = String(p.id);
@@ -735,7 +779,7 @@ function ClassroomMeetingView({
             }
             return [...acc, current];
         }, []);
-    }, [participants]);
+    }, [participants, localParticipant]);
 
 
     // Sync active student/parent count to the parent ClassroomClient
@@ -790,13 +834,25 @@ function ClassroomMeetingView({
         }
     };
 
-    const handleFormCreateWhiteboard = (e: React.FormEvent) => {
+    const handleFormCreateWhiteboard = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newWbTitle.trim()) return;
-        handleCreateWhiteboard(newWbTitle.trim()).then(() => {
-            // Creation notifies others via handleCreateWhiteboard's integration with PubSub if tutor
-        });
-        setNewWbTitle('');
+        const title = newWbTitle.trim();
+        if (!title || creatingWb) return;
+        setCreatingWb(true);
+        const wb = await handleCreateWhiteboard(title);
+        setCreatingWb(false);
+        if (wb) {
+            // Immediately share the freshly created whiteboard with the whole class.
+            if (isTutor) {
+                publishWhiteboard(JSON.stringify({
+                    showWhiteboard: true,
+                    whiteboardId: wb.id,
+                }), { persist: true });
+                syncWhiteboardStateToDB(true, wb.id);
+            }
+            setNewWbTitle('');
+            setCreateWbOpen(false);
+        }
     };
 
 
@@ -820,7 +876,7 @@ function ClassroomMeetingView({
                     <h1 className="text-sm font-bold tracking-tight max-w-[200px] sm:max-w-xs truncate text-foreground">
                         {cls.title} <span className="text-muted-foreground font-normal">| Live Classroom</span>
                     </h1>
-                    {remainingCredits !== null && (
+                    {isTutor && remainingCredits !== null && (
                         <Badge variant="outline" className={`text-[10px] font-bold py-0.5 px-2 rounded-full ${remainingCredits < 10 ? 'bg-red-500/10 border-red-500/25 text-red-500' : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-500'}`}>
                             {remainingCredits === 1 ? '1 credit' : `${remainingCredits} credits`} left
                         </Badge>
@@ -833,12 +889,17 @@ function ClassroomMeetingView({
                                 size="sm"
                                 variant={showWhiteboard ? "default" : "outline"}
                                 onClick={() => {
-                                    const nextState = !showWhiteboard;
-                                    publishWhiteboard(JSON.stringify({
-                                        showWhiteboard: nextState,
-                                        whiteboardId: selectedWhiteboard?.id
-                                    }), { persist: true });
-                                    syncWhiteboardStateToDB(nextState, selectedWhiteboard?.id || null);
+                                    if (showWhiteboard) {
+                                        // Currently sharing → stop sharing for everyone.
+                                        publishWhiteboard(JSON.stringify({
+                                            showWhiteboard: false,
+                                            whiteboardId: selectedWhiteboard?.id
+                                        }), { persist: true });
+                                        syncWhiteboardStateToDB(false, selectedWhiteboard?.id || null);
+                                    } else {
+                                        // Not sharing → open the create-whiteboard popup.
+                                        setCreateWbOpen(true);
+                                    }
                                 }}
                                 className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${showWhiteboard ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground" : "border-border text-foreground"
                                     }`}
@@ -913,48 +974,64 @@ function ClassroomMeetingView({
                             <PresenterScreenShare presenterId={presenterId} />
                         </div>
                     ) : showWhiteboard && selectedWhiteboard ? (
-                        /* Share Whiteboard Mode */
-                        <div className={`flex-1 flex flex-col min-h-0 relative ${isWhiteboardFullScreen ? 'fixed inset-0 z-50 bg-background p-4' : ''}`}>
-                            {/* Small Video Avatars at top */}
-                            {!isWhiteboardFullScreen && (
-                                <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
-                                    {uniqueParticipants.map((p: any, idx: number) => (
-                                        <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
-                                            <SmallParticipantVideoView participantId={p.id} />
+                        /* Share Whiteboard Mode. When full screen, render through a
+                           portal on document.body so it reliably covers the whole
+                           viewport (escaping the overflow-hidden flex layout), and
+                           remount the canvas via `key` so it re-measures to the new
+                           full-screen size. */
+                        (() => {
+                            const board = (
+                                <div className={isWhiteboardFullScreen
+                                    ? 'fixed inset-0 z-[100] bg-background p-4 flex flex-col'
+                                    : 'flex-1 flex flex-col min-h-0 relative'}>
+                                    {/* Small Video Avatars at top */}
+                                    {!isWhiteboardFullScreen && (
+                                        <div className="flex gap-2 mb-2 bg-card/95 border border-border p-2 rounded-lg absolute top-4 left-4 z-20 shadow-md">
+                                            {uniqueParticipants.map((p: any, idx: number) => (
+                                                <div key={p.id} className={idx > 0 ? "border-l border-border pl-2" : ""}>
+                                                    <SmallParticipantVideoView participantId={p.id} />
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {/* Full Screen Toggle Button */}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setIsWhiteboardFullScreen(!isWhiteboardFullScreen)}
+                                        className="absolute top-4 right-4 z-30 bg-background/90 border border-border hover:bg-muted text-foreground flex items-center gap-1.5 shadow-sm"
+                                    >
+                                        {isWhiteboardFullScreen ? (
+                                            <>
+                                                <HiOutlineArrowsPointingIn className="h-4 w-4" />
+                                                <span>Exit Full Screen</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <HiOutlineArrowsPointingOut className="h-4 w-4" />
+                                                <span>Full Screen</span>
+                                            </>
+                                        )}
+                                    </Button>
+
+                                    {/* Whiteboard Canvas */}
+                                    <div className={`flex-1 min-h-0 text-foreground ${isWhiteboardFullScreen ? 'pt-16' : 'pt-14'}`}>
+                                        <WhiteboardCanvas
+                                            key={isWhiteboardFullScreen ? 'whiteboard-fullscreen' : 'whiteboard-inline'}
+                                            whiteboardId={selectedWhiteboard.id}
+                                            isTutor={isTutor}
+                                            initialSlides={selectedWhiteboard.slides}
+                                        />
+                                    </div>
                                 </div>
-                            )}
+                            );
 
-                            {/* Full Screen Toggle Button */}
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setIsWhiteboardFullScreen(!isWhiteboardFullScreen)}
-                                className="absolute top-4 right-4 z-30 bg-background/90 border border-border hover:bg-muted text-foreground flex items-center gap-1.5 shadow-sm"
-                            >
-                                {isWhiteboardFullScreen ? (
-                                    <>
-                                        <HiOutlineArrowsPointingIn className="h-4 w-4" />
-                                        <span>Exit Full Screen</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <HiOutlineArrowsPointingOut className="h-4 w-4" />
-                                        <span>Full Screen</span>
-                                    </>
-                                )}
-                            </Button>
-
-                            {/* Whiteboard Canvas */}
-                            <div className={`flex-1 min-h-0 text-foreground ${isWhiteboardFullScreen ? 'pt-16' : 'pt-14'}`}>
-                                <WhiteboardCanvas
-                                    whiteboardId={selectedWhiteboard.id}
-                                    isTutor={isTutor}
-                                    initialSlides={selectedWhiteboard.slides}
-                                />
-                            </div>
-                        </div>
+                            if (isWhiteboardFullScreen && typeof document !== 'undefined') {
+                                return createPortal(board, document.body);
+                            }
+                            return board;
+                        })()
                     ) : (
                         /* Standard Grid Video Mode */
                         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 items-center justify-center p-4">
@@ -1030,7 +1107,7 @@ function ClassroomMeetingView({
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
                                     {uniqueParticipants.map((p: any) => {
-                                        const isParticipantTutor = p.id === tutorId;
+                                        const isParticipantTutor = String(p.id) === String(tutorId);
                                         return (
                                             <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/40">
                                                 <div className="flex items-center gap-2">
@@ -1140,23 +1217,13 @@ function ClassroomMeetingView({
 
                                     {isTutor && (
                                         <div className="border-t border-border pt-3 mt-3">
-                                            <h4 className="text-[11px] font-semibold text-muted-foreground mb-2">Create Whiteboard</h4>
-                                            <form onSubmit={handleFormCreateWhiteboard} className="space-y-2">
-                                                <Input
-                                                    value={newWbTitle}
-                                                    onChange={(e) => setNewWbTitle(e.target.value)}
-                                                    placeholder="Whiteboard title..."
-                                                    className="h-8 bg-background border-border text-xs text-foreground animate-none"
-                                                    required
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs cursor-pointer flex items-center justify-center gap-1 font-semibold"
-                                                >
-                                                    <HiPlus className="h-3.5 w-3.5" /> Create
-                                                </Button>
-                                            </form>
+                                            <Button
+                                                size="sm"
+                                                onClick={() => setCreateWbOpen(true)}
+                                                className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs cursor-pointer flex items-center justify-center gap-1 font-semibold"
+                                            >
+                                                <HiPlus className="h-3.5 w-3.5" /> Add Whiteboard
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -1199,6 +1266,49 @@ function ClassroomMeetingView({
                     </button>
                 </div>
             </div>
+
+            {/* Create Whiteboard Popup — opened from the header "Share Whiteboard
+                with Class" button and from the Tools panel "Add Whiteboard" button. */}
+            <Dialog open={createWbOpen} onOpenChange={(open) => { if (!creatingWb) setCreateWbOpen(open); }}>
+                <DialogContent className="max-w-md">
+                    <form onSubmit={handleFormCreateWhiteboard}>
+                        <DialogHeader>
+                            <DialogTitle>Create Whiteboard</DialogTitle>
+                            <DialogDescription>
+                                Give your whiteboard a title. It will open and be shared with the class right away.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Input
+                                value={newWbTitle}
+                                onChange={(e) => setNewWbTitle(e.target.value)}
+                                placeholder="e.g. Lesson 1 — Sentence Structure"
+                                autoFocus
+                                required
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setCreateWbOpen(false)}
+                                disabled={creatingWb}
+                                className="cursor-pointer"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={creatingWb || !newWbTitle.trim()}
+                                className="bg-secondary hover:bg-secondary/90 text-secondary-foreground cursor-pointer gap-1"
+                            >
+                                <HiPlus className="h-4 w-4" />
+                                {creatingWb ? 'Creating…' : 'Create & Share'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

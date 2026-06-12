@@ -543,7 +543,7 @@ export default function TutorAssessmentsPage() {
                 <Label>Subject *</Label>
                 <Select value={form.subject} onValueChange={v => setForm(f => ({ ...f, subject: v }))}>
                   <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
-                  <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-3">
