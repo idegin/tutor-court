@@ -77,7 +77,7 @@ export function StudentOnboardingClient({
   const [stepIndex, setStepIndex] = React.useState(0)
   const currentStep = steps[stepIndex]
 
-  const [gradeLevel, setGradeLevel] = React.useState(initialGradeLevel || 'junior_high_school')
+  const [gradeLevel, setGradeLevel] = React.useState(initialGradeLevel || 'grade_7')
   const [country, setCountry] = React.useState(initialCountry)
   const [learningGoals, setLearningGoals] = React.useState('')
 

@@ -203,7 +203,24 @@ export interface User {
   /**
    * Current Nigerian grade level.
    */
-  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
+  gradeLevel?:
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )
+    | null;
   /**
    * What the student hopes to achieve.
    */
@@ -293,7 +310,22 @@ export interface Subject {
    * Nigerian grade levels this subject applies to (optional filter).
    */
   gradeLevels?:
-    | ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school')[]
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )[]
     | null;
   slug?: string | null;
   updatedAt: string;
@@ -355,7 +387,22 @@ export interface TutorProfile {
    * Nigerian grade levels this tutor is qualified to teach.
    */
   gradesTaught?:
-    | ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school')[]
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )[]
     | null;
   /**
    * Average rating for this tutor (0-5).
@@ -444,7 +491,21 @@ export interface Class {
   subject: number | Subject;
   description?: string | null;
   classType: 'one-on-one' | 'group';
-  gradeLevel: 'early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school';
+  gradeLevel:
+    | 'kindergarten'
+    | 'grade_1'
+    | 'grade_2'
+    | 'grade_3'
+    | 'grade_4'
+    | 'grade_5'
+    | 'grade_6'
+    | 'grade_7'
+    | 'grade_8'
+    | 'grade_9'
+    | 'grade_10'
+    | 'grade_11'
+    | 'grade_12'
+    | 'others';
   /**
    * IANA timezone used to interpret schedule start/end times.
    */
@@ -545,7 +606,24 @@ export interface Booking {
   /**
    * Student's Nigerian grade level at time of booking.
    */
-  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
+  gradeLevel?:
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )
+    | null;
   /**
    * Total price for this booking
    */
@@ -635,7 +713,24 @@ export interface Student {
    * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
    */
   generatedPassword: string;
-  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
+  gradeLevel?:
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )
+    | null;
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -739,7 +834,24 @@ export interface Assessment {
   /**
    * Target Nigerian grade level for this assessment.
    */
-  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
+  gradeLevel?:
+    | (
+        | 'kindergarten'
+        | 'grade_1'
+        | 'grade_2'
+        | 'grade_3'
+        | 'grade_4'
+        | 'grade_5'
+        | 'grade_6'
+        | 'grade_7'
+        | 'grade_8'
+        | 'grade_9'
+        | 'grade_10'
+        | 'grade_11'
+        | 'grade_12'
+        | 'others'
+      )
+    | null;
   /**
    * Instructions shown to the student before they begin.
    */

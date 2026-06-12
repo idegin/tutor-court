@@ -12,12 +12,10 @@ import type {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i
 
-const PASSWORD_POLICY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,128}$/
-
 import { isPossiblePhoneNumber } from 'react-phone-number-input'
 
 export const PASSWORD_POLICY_TEXT =
-  'Use 8 to 128 characters with uppercase, lowercase, number, and symbol.'
+  'Password must be at least 6 characters.'
 
 export function sanitizeText(value: string): string {
   return value.trim().replace(/\s{2,}/g, ' ')
@@ -32,7 +30,7 @@ export function isValidEmail(value: string): boolean {
 }
 
 export function isStrongPassword(value: string): boolean {
-  return PASSWORD_POLICY_REGEX.test(value)
+  return value.length >= 6
 }
 
 export function validateLogin(values: LoginValues): FieldErrors<LoginField> {

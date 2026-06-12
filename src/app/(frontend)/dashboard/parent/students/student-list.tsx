@@ -53,7 +53,7 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
   // Form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('junior_high_school')
+  const [gradeLevel, setGradeLevel] = React.useState('grade_7')
   const [notes, setNotes] = React.useState('')
 
   const copy = async (value: string, label: string) => {
