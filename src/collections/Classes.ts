@@ -94,7 +94,7 @@ export const Classes: CollectionConfig = {
       type: 'select',
       required: true,
       options: NIGERIAN_GRADES as any,
-      defaultValue: 'primary_1',
+      defaultValue: 'lower_primary',
       index: true,
     },
     {

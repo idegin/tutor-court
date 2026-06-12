@@ -73,7 +73,7 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
   // Child form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('jss_1')
+  const [gradeLevel, setGradeLevel] = React.useState('junior_high_school')
   const [notes, setNotes] = React.useState('')
 
   // Password Options
@@ -146,7 +146,7 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
       setCredentialModalChild(newChild)
       setFirstName('')
       setLastName('')
-      setGradeLevel('jss_1')
+      setGradeLevel('junior_high_school')
       setNotes('')
       setPasswordMode('auto')
       setCustomPassword('')

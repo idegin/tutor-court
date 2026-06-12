@@ -105,7 +105,7 @@ export function ParentClassDetailsClient({
   const [showAddForm, setShowAddForm] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [gradeLevel, setGradeLevel] = useState('jss_1')
+  const [gradeLevel, setGradeLevel] = useState('junior_high_school')
   const [isAddingChild, setIsAddingChild] = useState(false)
 
   // New child credentials presentation modal
@@ -180,7 +180,7 @@ export function ParentClassDetailsClient({
 
       setFirstName('')
       setLastName('')
-      setGradeLevel('jss_1')
+      setGradeLevel('junior_high_school')
       setShowAddForm(false)
       toast.success('Child profile created successfully!')
       router.refresh()

@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { NIGERIAN_GRADES } from '@/lib/constants'
 
 type Child = {
   id: string
@@ -52,7 +53,7 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
   // Form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('jss_1')
+  const [gradeLevel, setGradeLevel] = React.useState('junior_high_school')
   const [notes, setNotes] = React.useState('')
 
   const copy = async (value: string, label: string) => {
@@ -170,21 +171,11 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="nursery_1">Nursery 1</SelectItem>
-                    <SelectItem value="nursery_2">Nursery 2</SelectItem>
-                    <SelectItem value="nursery_3">Nursery 3</SelectItem>
-                    <SelectItem value="primary_1">Primary 1</SelectItem>
-                    <SelectItem value="primary_2">Primary 2</SelectItem>
-                    <SelectItem value="primary_3">Primary 3</SelectItem>
-                    <SelectItem value="primary_4">Primary 4</SelectItem>
-                    <SelectItem value="primary_5">Primary 5</SelectItem>
-                    <SelectItem value="primary_6">Primary 6</SelectItem>
-                    <SelectItem value="jss_1">JSS 1</SelectItem>
-                    <SelectItem value="jss_2">JSS 2</SelectItem>
-                    <SelectItem value="jss_3">JSS 3</SelectItem>
-                    <SelectItem value="sss_1">SSS 1</SelectItem>
-                    <SelectItem value="sss_2">SSS 2</SelectItem>
-                    <SelectItem value="sss_3">SSS 3</SelectItem>
+                    {NIGERIAN_GRADES.map((g) => (
+                      <SelectItem key={g.value} value={g.value}>
+                        {g.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

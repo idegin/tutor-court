@@ -40,20 +40,10 @@ export function coinsToNaira(credits: number): number {
 }
 
 export const NIGERIAN_GRADES = [
-  { label: 'Nursery 1', value: 'nursery_1' },
-  { label: 'Nursery 2', value: 'nursery_2' },
-  { label: 'Nursery 3', value: 'nursery_3' },
-  { label: 'Primary 1', value: 'primary_1' },
-  { label: 'Primary 2', value: 'primary_2' },
-  { label: 'Primary 3', value: 'primary_3' },
-  { label: 'Primary 4', value: 'primary_4' },
-  { label: 'Primary 5', value: 'primary_5' },
-  { label: 'Primary 6', value: 'primary_6' },
-  { label: 'JSS 1', value: 'jss_1' },
-  { label: 'JSS 2', value: 'jss_2' },
-  { label: 'JSS 3', value: 'jss_3' },
-  { label: 'SSS 1', value: 'sss_1' },
-  { label: 'SSS 2', value: 'sss_2' },
-  { label: 'SSS 3', value: 'sss_3' },
+  { label: 'Early years', value: 'early_years' },
+  { label: 'Lower Primary', value: 'lower_primary' },
+  { label: 'Upper Primary', value: 'upper_primary' },
+  { label: 'Junior High School', value: 'junior_high_school' },
+  { label: 'Senior High School', value: 'senior_high_school' },
 ] as const
 

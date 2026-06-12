@@ -203,25 +203,7 @@ export interface User {
   /**
    * Current Nigerian grade level.
    */
-  gradeLevel?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )
-    | null;
+  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
   /**
    * What the student hopes to achieve.
    */
@@ -311,23 +293,7 @@ export interface Subject {
    * Nigerian grade levels this subject applies to (optional filter).
    */
   gradeLevels?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )[]
+    | ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school')[]
     | null;
   slug?: string | null;
   updatedAt: string;
@@ -389,23 +355,7 @@ export interface TutorProfile {
    * Nigerian grade levels this tutor is qualified to teach.
    */
   gradesTaught?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )[]
+    | ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school')[]
     | null;
   /**
    * Average rating for this tutor (0-5).
@@ -494,22 +444,7 @@ export interface Class {
   subject: number | Subject;
   description?: string | null;
   classType: 'one-on-one' | 'group';
-  gradeLevel:
-    | 'nursery_1'
-    | 'nursery_2'
-    | 'nursery_3'
-    | 'primary_1'
-    | 'primary_2'
-    | 'primary_3'
-    | 'primary_4'
-    | 'primary_5'
-    | 'primary_6'
-    | 'jss_1'
-    | 'jss_2'
-    | 'jss_3'
-    | 'sss_1'
-    | 'sss_2'
-    | 'sss_3';
+  gradeLevel: 'early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school';
   /**
    * IANA timezone used to interpret schedule start/end times.
    */
@@ -610,25 +545,7 @@ export interface Booking {
   /**
    * Student's Nigerian grade level at time of booking.
    */
-  gradeLevel?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )
-    | null;
+  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
   /**
    * Total price for this booking
    */
@@ -718,25 +635,7 @@ export interface Student {
    * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
    */
   generatedPassword: string;
-  gradeLevel?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )
-    | null;
+  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -840,25 +739,7 @@ export interface Assessment {
   /**
    * Target Nigerian grade level for this assessment.
    */
-  gradeLevel?:
-    | (
-        | 'nursery_1'
-        | 'nursery_2'
-        | 'nursery_3'
-        | 'primary_1'
-        | 'primary_2'
-        | 'primary_3'
-        | 'primary_4'
-        | 'primary_5'
-        | 'primary_6'
-        | 'jss_1'
-        | 'jss_2'
-        | 'jss_3'
-        | 'sss_1'
-        | 'sss_2'
-        | 'sss_3'
-      )
-    | null;
+  gradeLevel?: ('early_years' | 'lower_primary' | 'upper_primary' | 'junior_high_school' | 'senior_high_school') | null;
   /**
    * Instructions shown to the student before they begin.
    */
