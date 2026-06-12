@@ -43,25 +43,49 @@ export async function seedData() {
     disableVerificationEmail: true,
   })
 
+  console.log('Seeding subject categories...')
+  const categoriesData = [
+    { name: 'Mathematics', slug: 'mathematics' },
+    { name: 'Language Arts / English', slug: 'language-arts-english' },
+    { name: 'Science', slug: 'science' },
+    { name: 'Social Studies', slug: 'social-studies' },
+    { name: 'Computing', slug: 'computing' },
+    { name: 'Arts', slug: 'arts' },
+  ]
+
+  const categoryMap: Record<string, any> = {}
+
+  for (const cat of categoriesData) {
+    const createdCat = await payload.create({
+      collection: 'subject-categories',
+      data: cat,
+    })
+    categoryMap[cat.name] = createdCat.id
+  }
+
   console.log('Seeding subjects...')
   const subjectsData = [
-    'Mathematics',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'Computer Science',
-    'English',
-    'History',
-    'Geography',
-    'Economics',
-    'Art',
+    { name: 'Mathematics', category: 'Mathematics' },
+    { name: 'Physics', category: 'Science' },
+    { name: 'Chemistry', category: 'Science' },
+    { name: 'Biology', category: 'Science' },
+    { name: 'Computer Science', category: 'Computing' },
+    { name: 'English', category: 'Language Arts / English' },
+    { name: 'History', category: 'Social Studies' },
+    { name: 'Geography', category: 'Social Studies' },
+    { name: 'Economics', category: 'Social Studies' },
+    { name: 'Art', category: 'Arts' },
   ]
   const subjects = []
 
-  for (const subjectName of subjectsData) {
+  for (const sub of subjectsData) {
+    const catId = categoryMap[sub.category]
     const subject = await payload.create({
       collection: 'subjects',
-      data: { name: subjectName },
+      data: {
+        name: sub.name,
+        category: catId,
+      },
     })
     subjects.push(subject.id)
   }
