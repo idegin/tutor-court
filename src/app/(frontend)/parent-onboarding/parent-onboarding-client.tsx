@@ -28,6 +28,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { NIGERIAN_GRADES } from '@/lib/constants'
 
 type Child = {
   id: string
@@ -65,7 +73,7 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
   // Child form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('')
+  const [gradeLevel, setGradeLevel] = React.useState('jss_1')
   const [notes, setNotes] = React.useState('')
 
   // Password Options
@@ -138,7 +146,7 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
       setCredentialModalChild(newChild)
       setFirstName('')
       setLastName('')
-      setGradeLevel('')
+      setGradeLevel('jss_1')
       setNotes('')
       setPasswordMode('auto')
       setCustomPassword('')
@@ -251,14 +259,19 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="gradeLevel">Grade level (optional)</Label>
-                  <Input
-                    id="gradeLevel"
-                    value={gradeLevel}
-                    onChange={(e) => setGradeLevel(e.target.value)}
-                    placeholder="Grade 7"
-                    autoComplete="off"
-                  />
+                  <Label>Grade level</Label>
+                  <Select value={gradeLevel} onValueChange={setGradeLevel}>
+                    <SelectTrigger className="bg-card border-border">
+                      <SelectValue placeholder="Select grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIGERIAN_GRADES.map((g) => (
+                        <SelectItem key={g.value} value={g.value}>
+                          {g.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Student password option</Label>
@@ -360,7 +373,7 @@ export function ParentOnboardingClient({ parentName, initialChildren, initialInv
                               {child.firstName} {child.lastName}
                             </p>
                             {child.gradeLevel ? (
-                              <p className="text-xs text-muted-foreground">{child.gradeLevel}</p>
+                              <p className="text-xs text-muted-foreground capitalize">{child.gradeLevel.replace(/_/g, ' ').replace(/-/g, ' ')}</p>
                             ) : null}
                           </div>
                         </div>

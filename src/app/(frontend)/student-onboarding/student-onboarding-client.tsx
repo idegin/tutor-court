@@ -21,6 +21,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { NIGERIAN_GRADES } from '@/lib/constants'
 
 type Subject = { id: string; name: string }
 
@@ -69,7 +77,7 @@ export function StudentOnboardingClient({
   const [stepIndex, setStepIndex] = React.useState(0)
   const currentStep = steps[stepIndex]
 
-  const [gradeLevel, setGradeLevel] = React.useState(initialGradeLevel)
+  const [gradeLevel, setGradeLevel] = React.useState(initialGradeLevel || 'jss_1')
   const [country, setCountry] = React.useState(initialCountry)
   const [learningGoals, setLearningGoals] = React.useState('')
 
@@ -405,15 +413,21 @@ function ProfileStep({
     >
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="gradeLevel">
+          <Label>
             Grade level <span className="text-tutor-purple-600">*</span>
           </Label>
-          <Input
-            id="gradeLevel"
-            value={gradeLevel}
-            onChange={(e) => onChangeGrade(e.target.value)}
-            placeholder="e.g. Grade 9 or 2nd year university"
-          />
+          <Select value={gradeLevel} onValueChange={onChangeGrade}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select grade" />
+            </SelectTrigger>
+            <SelectContent>
+              {NIGERIAN_GRADES.map((g) => (
+                <SelectItem key={g.value} value={g.value}>
+                  {g.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="country">Country (optional)</Label>

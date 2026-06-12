@@ -188,7 +188,7 @@ export default async function ParentStudentDetailPage(props: PageProps) {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <HiOutlineAcademicCap className="h-4 w-4" />
-                  {student.gradeLevel?.replace('-', ' ') || 'Grade not set'}
+                  {student.gradeLevel?.replace(/_/g, ' ').replace(/-/g, ' ') || 'Grade not set'}
                 </span>
                 <span className="text-muted-foreground/50">·</span>
                 <Badge className="bg-white text-tutor-purple-700 hover:bg-white border border-tutor-purple-200 capitalize font-semibold shadow-none">

@@ -1,11 +1,10 @@
 import type { CollectionConfig } from 'payload'
-import { NIGERIAN_GRADES } from '../lib/constants'
 
-export const Subjects: CollectionConfig = {
-  slug: 'subjects',
+export const SubjectCategories: CollectionConfig = {
+  slug: 'subject-categories',
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'category', 'slug'],
+    defaultColumns: ['name', 'slug'],
   },
   access: {
     read: () => true,
@@ -19,22 +18,6 @@ export const Subjects: CollectionConfig = {
       type: 'text',
       required: true,
       unique: true,
-    },
-    {
-      name: 'category',
-      type: 'relationship',
-      relationTo: 'subject-categories',
-      required: true,
-      index: true,
-    },
-    {
-      name: 'gradeLevels',
-      type: 'select',
-      hasMany: true,
-      admin: {
-        description: 'Nigerian grade levels this subject applies to (optional filter).',
-      },
-      options: NIGERIAN_GRADES as any,
     },
     {
       name: 'slug',
@@ -51,7 +34,7 @@ export const Subjects: CollectionConfig = {
               return data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
             }
             if (operation === 'update' && data?.name && !value) {
-                return data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+              return data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
             }
             return value
           },

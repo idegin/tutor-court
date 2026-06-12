@@ -30,6 +30,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { NIGERIAN_GRADES } from '@/lib/constants'
 
 type Child = {
   id: string
@@ -80,7 +88,7 @@ export function ClassInviteClient({
   const [showAddForm, setShowAddForm] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [gradeLevel, setGradeLevel] = useState('')
+  const [gradeLevel, setGradeLevel] = useState('jss_1')
   const [isAddingChild, setIsAddingChild] = useState(false)
   
   // Credentials modal for newly added child
@@ -227,7 +235,7 @@ export function ClassInviteClient({
       
       setFirstName('')
       setLastName('')
-      setGradeLevel('')
+      setGradeLevel('jss_1')
       setShowAddForm(false)
       toast.success('Child profile created successfully!')
     } catch (err: any) {
@@ -462,14 +470,19 @@ export function ClassInviteClient({
                           />
                         </div>
                         <div className="space-y-1.5 sm:col-span-2">
-                          <Label htmlFor="gradeLevel" className="text-xs">Grade level (optional)</Label>
-                          <Input
-                            id="gradeLevel"
-                            value={gradeLevel}
-                            onChange={(e) => setGradeLevel(e.target.value)}
-                            placeholder="e.g. Grade 8"
-                            className="bg-card border-border"
-                          />
+                          <Label className="text-xs">Grade level</Label>
+                          <Select value={gradeLevel} onValueChange={setGradeLevel}>
+                            <SelectTrigger className="bg-card border-border">
+                              <SelectValue placeholder="Select grade" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NIGERIAN_GRADES.map((g) => (
+                                <SelectItem key={g.value} value={g.value}>
+                                  {g.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 

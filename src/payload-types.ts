@@ -71,6 +71,7 @@ export interface Config {
     media: Media;
     'tutor-profiles': TutorProfile;
     subjects: Subject;
+    'subject-categories': SubjectCategory;
     reviews: Review;
     wallets: Wallet;
     transactions: Transaction;
@@ -100,6 +101,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'tutor-profiles': TutorProfilesSelect<false> | TutorProfilesSelect<true>;
     subjects: SubjectsSelect<false> | SubjectsSelect<true>;
+    'subject-categories': SubjectCategoriesSelect<false> | SubjectCategoriesSelect<true>;
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
@@ -199,9 +201,27 @@ export interface User {
    */
   subjectsOfInterest?: (number | Subject)[] | null;
   /**
-   * Current K-12 grade level.
+   * Current Nigerian grade level.
    */
-  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  gradeLevel?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )
+    | null;
   /**
    * What the student hopes to achieve.
    */
@@ -286,24 +306,40 @@ export interface Media {
 export interface Subject {
   id: number;
   name: string;
-  category?:
-    | (
-        | 'math'
-        | 'science'
-        | 'language_arts'
-        | 'social_studies'
-        | 'world_languages'
-        | 'computing'
-        | 'arts'
-        | 'pe_health'
-        | 'test_prep'
-        | 'other'
-      )
-    | null;
+  category: number | SubjectCategory;
   /**
-   * K-12 grade levels this subject applies to (optional filter).
+   * Nigerian grade levels this subject applies to (optional filter).
    */
-  gradeLevels?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12')[] | null;
+  gradeLevels?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )[]
+    | null;
+  slug?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subject-categories".
+ */
+export interface SubjectCategory {
+  id: number;
+  name: string;
   slug?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -350,9 +386,27 @@ export interface TutorProfile {
       }[]
     | null;
   /**
-   * K-12 grade levels this tutor is qualified to teach.
+   * Nigerian grade levels this tutor is qualified to teach.
    */
-  gradesTaught?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12')[] | null;
+  gradesTaught?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )[]
+    | null;
   /**
    * Average rating for this tutor (0-5).
    */
@@ -440,7 +494,22 @@ export interface Class {
   subject: number | Subject;
   description?: string | null;
   classType: 'one-on-one' | 'group';
-  gradeLevel: 'K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12';
+  gradeLevel:
+    | 'nursery_1'
+    | 'nursery_2'
+    | 'nursery_3'
+    | 'primary_1'
+    | 'primary_2'
+    | 'primary_3'
+    | 'primary_4'
+    | 'primary_5'
+    | 'primary_6'
+    | 'jss_1'
+    | 'jss_2'
+    | 'jss_3'
+    | 'sss_1'
+    | 'sss_2'
+    | 'sss_3';
   /**
    * IANA timezone used to interpret schedule start/end times.
    */
@@ -539,9 +608,27 @@ export interface Booking {
   daysOfWeek: ('monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday')[];
   subjects: (number | Subject)[];
   /**
-   * Student's K-12 grade level at time of booking.
+   * Student's Nigerian grade level at time of booking.
    */
-  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  gradeLevel?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )
+    | null;
   /**
    * Total price for this booking
    */
@@ -631,7 +718,25 @@ export interface Student {
    * Plaintext for parent hand-off only. Read access restricted to owning parent / admin. Plan: replace with one-time reveal + reset flow.
    */
   generatedPassword: string;
-  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  gradeLevel?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )
+    | null;
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -733,9 +838,27 @@ export interface Assessment {
   tutor: number | User;
   type: 'quiz' | 'flashcard' | 'practice_test' | 'homework';
   /**
-   * Target K-12 grade level for this assessment.
+   * Target Nigerian grade level for this assessment.
    */
-  gradeLevel?: ('K' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | '11' | '12') | null;
+  gradeLevel?:
+    | (
+        | 'nursery_1'
+        | 'nursery_2'
+        | 'nursery_3'
+        | 'primary_1'
+        | 'primary_2'
+        | 'primary_3'
+        | 'primary_4'
+        | 'primary_5'
+        | 'primary_6'
+        | 'jss_1'
+        | 'jss_2'
+        | 'jss_3'
+        | 'sss_1'
+        | 'sss_2'
+        | 'sss_3'
+      )
+    | null;
   /**
    * Instructions shown to the student before they begin.
    */
@@ -984,6 +1107,10 @@ export interface PayloadLockedDocument {
         value: number | Subject;
       } | null)
     | ({
+        relationTo: 'subject-categories';
+        value: number | SubjectCategory;
+      } | null)
+    | ({
         relationTo: 'reviews';
         value: number | Review;
       } | null)
@@ -1228,6 +1355,16 @@ export interface SubjectsSelect<T extends boolean = true> {
   name?: T;
   category?: T;
   gradeLevels?: T;
+  slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "subject-categories_select".
+ */
+export interface SubjectCategoriesSelect<T extends boolean = true> {
+  name?: T;
   slug?: T;
   updatedAt?: T;
   createdAt?: T;

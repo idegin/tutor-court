@@ -52,7 +52,7 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
   // Form states
   const [firstName, setFirstName] = React.useState('')
   const [lastName, setLastName] = React.useState('')
-  const [gradeLevel, setGradeLevel] = React.useState('grade-9')
+  const [gradeLevel, setGradeLevel] = React.useState('jss_1')
   const [notes, setNotes] = React.useState('')
 
   const copy = async (value: string, label: string) => {
@@ -170,12 +170,21 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="grade-7">Grade 7 / JSS 1</SelectItem>
-                    <SelectItem value="grade-8">Grade 8 / JSS 2</SelectItem>
-                    <SelectItem value="grade-9">Grade 9 / JSS 3</SelectItem>
-                    <SelectItem value="grade-10">Grade 10 / SSS 1</SelectItem>
-                    <SelectItem value="grade-11">Grade 11 / SSS 2</SelectItem>
-                    <SelectItem value="grade-12">Grade 12 / SSS 3</SelectItem>
+                    <SelectItem value="nursery_1">Nursery 1</SelectItem>
+                    <SelectItem value="nursery_2">Nursery 2</SelectItem>
+                    <SelectItem value="nursery_3">Nursery 3</SelectItem>
+                    <SelectItem value="primary_1">Primary 1</SelectItem>
+                    <SelectItem value="primary_2">Primary 2</SelectItem>
+                    <SelectItem value="primary_3">Primary 3</SelectItem>
+                    <SelectItem value="primary_4">Primary 4</SelectItem>
+                    <SelectItem value="primary_5">Primary 5</SelectItem>
+                    <SelectItem value="primary_6">Primary 6</SelectItem>
+                    <SelectItem value="jss_1">JSS 1</SelectItem>
+                    <SelectItem value="jss_2">JSS 2</SelectItem>
+                    <SelectItem value="jss_3">JSS 3</SelectItem>
+                    <SelectItem value="sss_1">SSS 1</SelectItem>
+                    <SelectItem value="sss_2">SSS 2</SelectItem>
+                    <SelectItem value="sss_3">SSS 3</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -232,7 +241,7 @@ export function StudentList({ initialChildren }: { initialChildren: Child[] }) {
                       {child.firstName} {child.lastName}
                     </p>
                     <p className="text-xs text-muted-foreground capitalize">
-                      {child.gradeLevel?.replace('-', ' ') || 'No grade set'}
+                      {child.gradeLevel?.replace(/_/g, ' ').replace(/-/g, ' ') || 'No grade set'}
                     </p>
                   </div>
                 </div>

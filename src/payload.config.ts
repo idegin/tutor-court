@@ -12,6 +12,7 @@ import { Users } from './collections/Users'
 import { Media } from './collections/Media'
 import { TutorProfiles } from './collections/TutorProfiles'
 import { Subjects } from './collections/Subjects'
+import { SubjectCategories } from './collections/SubjectCategories'
 import { Reviews } from './collections/Reviews'
 import { Wallets } from './collections/Wallets'
 import { Transactions } from './collections/Transactions'
@@ -109,6 +110,7 @@ export default buildConfig({
     Media,
     TutorProfiles,
     Subjects,
+    SubjectCategories,
     Reviews,
     Wallets,
     Transactions,

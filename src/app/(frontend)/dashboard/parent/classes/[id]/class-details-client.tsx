@@ -33,6 +33,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { NIGERIAN_GRADES } from '@/lib/constants'
 
 type Child = {
   id: string
@@ -97,7 +105,7 @@ export function ParentClassDetailsClient({
   const [showAddForm, setShowAddForm] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [gradeLevel, setGradeLevel] = useState('')
+  const [gradeLevel, setGradeLevel] = useState('jss_1')
   const [isAddingChild, setIsAddingChild] = useState(false)
 
   // New child credentials presentation modal
@@ -172,7 +180,7 @@ export function ParentClassDetailsClient({
 
       setFirstName('')
       setLastName('')
-      setGradeLevel('')
+      setGradeLevel('jss_1')
       setShowAddForm(false)
       toast.success('Child profile created successfully!')
       router.refresh()
@@ -265,8 +273,8 @@ export function ParentClassDetailsClient({
                           <p className="font-semibold text-sm text-foreground">
                             {child.firstName} {child.lastName}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            Grade: {child.gradeLevel} · Login: {child.email}
+                          <p className="text-xs text-muted-foreground capitalize">
+                            Grade: {child.gradeLevel?.replace(/_/g, ' ').replace(/-/g, ' ')} · Login: {child.email}
                           </p>
                         </div>
                       </div>
@@ -337,8 +345,8 @@ export function ParentClassDetailsClient({
                             {child.firstName} {child.lastName}
                           </span>
                         </div>
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                          Grade {child.gradeLevel}
+                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider capitalize">
+                          {child.gradeLevel?.replace(/_/g, ' ').replace(/-/g, ' ')}
                         </span>
                       </label>
                     ))}
@@ -399,14 +407,19 @@ export function ParentClassDetailsClient({
                           />
                         </div>
                         <div className="space-y-1.5 sm:col-span-2">
-                          <Label htmlFor="gradeLevel" className="text-xs">Grade level (optional)</Label>
-                          <Input
-                            id="gradeLevel"
-                            value={gradeLevel}
-                            onChange={(e) => setGradeLevel(e.target.value)}
-                            placeholder="e.g. Grade 8"
-                            className="bg-card border-border"
-                          />
+                          <Label className="text-xs">Grade level</Label>
+                          <Select value={gradeLevel} onValueChange={setGradeLevel}>
+                            <SelectTrigger className="bg-card border-border">
+                              <SelectValue placeholder="Select grade" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {NIGERIAN_GRADES.map((g) => (
+                                <SelectItem key={g.value} value={g.value}>
+                                  {g.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 

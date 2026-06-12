@@ -8,13 +8,49 @@ import type { Payload } from 'payload'
  * Idempotent: safe to run on every init; it skips anything that already exists.
  */
 export async function runProdSeed(payload: Payload): Promise<void> {
+  const defaultCategories = [
+    { name: 'Mathematics' },
+    { name: 'Language Arts / English' },
+  ]
+
+  const categoryMap: Record<string, string> = {}
+
+  for (const cat of defaultCategories) {
+    try {
+      const existing = await payload.find({
+        collection: 'subject-categories',
+        where: { name: { equals: cat.name } },
+        limit: 1,
+        overrideAccess: true,
+      })
+      let catId: string
+      if (existing.totalDocs === 0) {
+        const created = await payload.create({
+          collection: 'subject-categories',
+          data: cat as any,
+          overrideAccess: true,
+        })
+        catId = String(created.id)
+        console.log(`[prod-seed] Subject Category created: ${cat.name}`)
+      } else {
+        catId = String(existing.docs[0].id)
+      }
+      categoryMap[cat.name] = catId
+    } catch (err) {
+      console.error(`[prod-seed] Failed to create subject category "${cat.name}":`, err)
+    }
+  }
+
   const defaultSubjects = [
-    { name: 'Mathematics', category: 'math' },
-    { name: 'English', category: 'language_arts' },
+    { name: 'Mathematics', categoryName: 'Mathematics' },
+    { name: 'English', categoryName: 'Language Arts / English' },
   ]
 
   for (const subject of defaultSubjects) {
     try {
+      const catId = categoryMap[subject.categoryName]
+      if (!catId) continue
+
       const existing = await payload.find({
         collection: 'subjects',
         where: { name: { equals: subject.name } },
@@ -24,7 +60,10 @@ export async function runProdSeed(payload: Payload): Promise<void> {
       if (existing.totalDocs === 0) {
         await payload.create({
           collection: 'subjects',
-          data: subject as any,
+          data: {
+            name: subject.name,
+            category: catId,
+          } as any,
           overrideAccess: true,
         })
         console.log(`[prod-seed] Subject created: ${subject.name}`)
