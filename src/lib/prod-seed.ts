@@ -9,8 +9,16 @@ import type { Payload } from 'payload'
  */
 export async function runProdSeed(payload: Payload): Promise<void> {
   const defaultCategories = [
-    { name: 'Mathematics' },
-    { name: 'Language Arts / English' },
+    { name: 'Mathematics', slug: 'mathematics' },
+    { name: 'Language Arts / English', slug: 'language-arts-english' },
+    { name: 'Science', slug: 'science' },
+    { name: 'Social Studies', slug: 'social-studies' },
+    { name: 'World Languages', slug: 'world-languages' },
+    { name: 'Computing', slug: 'computing' },
+    { name: 'Arts', slug: 'arts' },
+    { name: 'Physical Education / Health', slug: 'physical-education-health' },
+    { name: 'Test Prep', slug: 'test-prep' },
+    { name: 'Other', slug: 'other' },
   ]
 
   const categoryMap: Record<string, string> = {}
@@ -19,7 +27,12 @@ export async function runProdSeed(payload: Payload): Promise<void> {
     try {
       const existing = await payload.find({
         collection: 'subject-categories',
-        where: { name: { equals: cat.name } },
+        where: {
+          or: [
+            { name: { equals: cat.name } },
+            { slug: { equals: cat.slug } }
+          ]
+        },
         limit: 1,
         overrideAccess: true,
       })

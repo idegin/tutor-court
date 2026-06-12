@@ -14,7 +14,7 @@ import { useAuth } from '@/components/providers/auth-provider'
 import { useOptions } from '@/components/providers/options-provider'
 
 const teachingProfileSchema = z.object({
-    subjects: z.array(z.string()).min(1, 'Please select at least one subject'),
+    subjects: z.array(z.union([z.string(), z.number()])).min(1, 'Please select at least one subject'),
     yearsOfExperience: z.number().min(0, 'Years of experience must be 0 or more').max(100),
     hourlyRate: z.number().min(500, 'Minimum hourly rate is 500 NGN'),
     bio: z.string().min(10, 'Your bio is too short.').max(500, 'Bio must be at most 500 characters'),
@@ -31,7 +31,7 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
     const queryClient = useQueryClient()
 
     const [values, setValues] = useState<{
-        subjects: string[],
+        subjects: (string | number)[],
         yearsOfExperience: number | '',
         hourlyRate: number | '',
         bio: string
@@ -105,7 +105,7 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
         }
     }
 
-    const handleRemoveSubject = (idToRemove: string) => {
+    const handleRemoveSubject = (idToRemove: string | number) => {
         handleChange('subjects', values.subjects.filter(id => id !== idToRemove));
     }
 
@@ -158,7 +158,7 @@ export function TeachingProfileStep({ onNext, onBack }: TeachingProfileStepProps
                     {values.subjects.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-3">
                             {values.subjects.map(subjectId => {
-                                const subjectInfo = subjects.find(s => s.id === subjectId)
+                                const subjectInfo = subjects.find(s => String(s.id) === String(subjectId))
                                 return (
                                     <div key={subjectId} className="flex items-center gap-2 bg-secondary/10 text-secondary px-3 py-1.5 rounded-full text-sm font-semibold">
                                         <span>{subjectInfo?.name || subjectId}</span>
