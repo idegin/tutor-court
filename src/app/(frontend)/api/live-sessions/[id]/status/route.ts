@@ -1,3 +1,4 @@
+import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -70,7 +71,13 @@ async function getActiveVideoSdkParticipants(roomId: string): Promise<string[] |
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
   const payload = await getPayload({ config })
+  const headers = await getHeaders()
+  const { user } = await payload.auth({ headers })
   const { id } = params
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+  }
 
   try {
     const session = await payload.findByID({
@@ -82,6 +89,40 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     if (!session) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
+
+    // Authorization: only the session's tutor or an enrolled student/parent may
+    // read status. This endpoint has heavy side effects (billing, auto-close,
+    // attendance reconciliation), so it must never be callable by arbitrary users.
+    const sessionTutorId =
+      typeof session.tutor === 'object' ? (session.tutor as any).id : session.tutor
+    const sessionClassId =
+      typeof session.class === 'object' ? (session.class as any).id : session.class
+
+    let isAuthorized = user.accountType === 'admin' || user.id === sessionTutorId
+    if (!isAuthorized && sessionClassId) {
+      const cls = await payload.findByID({
+        collection: 'classes',
+        id: sessionClassId,
+        depth: 0,
+      })
+      if (cls) {
+        const studentIds = (cls.students || []).map((s: any) =>
+          typeof s === 'object' ? s.id : s,
+        )
+        const parentIds = ((cls as any).parents || []).map((p: any) =>
+          typeof p === 'object' ? p.id : p,
+        )
+        isAuthorized = studentIds.includes(user.id) || parentIds.includes(user.id)
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
+
+    // Only the tutor (the wallet owner) ever needs the credit balance computed
+    // and the auto-close side effects driven from their own polling loop.
+    const isSessionTutor = user.id === sessionTutorId || user.accountType === 'admin'
 
     if (session.status === 'ended') {
       // Report the tutor's ACTUAL remaining balance (not a hardcoded 0) so the
@@ -103,6 +144,20 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         remainingCredits: endedRemainingCredits,
         showWhiteboard: false,
         activeWhiteboard: null,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+      })
+    }
+
+    // Non-tutor (student/parent) pollers only need the lightweight state to know
+    // when to join the room or show the whiteboard. They must NOT drive
+    // attendance reconciliation, wallet billing, or auto-close — those are the
+    // tutor's responsibility and the wallet is the tutor's.
+    if (!isSessionTutor) {
+      return NextResponse.json({
+        status: session.status,
+        showWhiteboard: session.showWhiteboard || false,
+        activeWhiteboard: session.activeWhiteboard || null,
         startedAt: session.startedAt,
         endedAt: session.endedAt,
       })

@@ -12,6 +12,11 @@ import {
     HiOutlineSparkles,
 } from 'react-icons/hi2';
 
+// Points are stored NORMALIZED to the 0..1 range relative to the canvas size,
+// so a drawing made on the tutor's 1200px-wide canvas renders at the same
+// relative position on a student's 700px canvas and after fullscreen/resize.
+// (Legacy slides may contain absolute pixel coordinates > 1; the renderer
+// detects and falls back to drawing those raw so old boards aren't corrupted.)
 interface Point {
     x: number;
     y: number;
@@ -22,6 +27,10 @@ interface Line {
     color: string;
     width: number;
 }
+
+// Treat any coordinate above this as a legacy absolute pixel value rather than
+// a 0..1 fraction. Normalized values never exceed 1.
+const NORMALIZED_MAX = 1.0001;
 
 interface WhiteboardCanvasProps {
     whiteboardId: string;
@@ -39,6 +48,20 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         initialSlides && initialSlides.length > 0 ? initialSlides[0].data?.lines || [] : []
     );
     const [isDrawing, setIsDrawing] = useState(false);
+
+    // Always-current copy of `lines` so save-on-pointer-up persists the latest
+    // strokes regardless of React's batched state timing.
+    const linesRef = useRef<Line[]>(lines);
+    useEffect(() => {
+        linesRef.current = lines;
+    }, [lines]);
+
+    // Mirror of `isDrawing` so the polling interval (created with a stale closure)
+    // can read the live value and never overwrite an in-progress stroke.
+    const isDrawingRef = useRef(isDrawing);
+    useEffect(() => {
+        isDrawingRef.current = isDrawing;
+    }, [isDrawing]);
 
     // Tools
     const [color, setColor] = useState('#000000');
@@ -98,14 +121,13 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             const data = await res.json();
             if (data.slides && data.slides[currentSlideIndex]) {
                 const polledLines = data.slides[currentSlideIndex].data?.lines || [];
-                // Only update if lines count or point length changed to prevent flickering while drawing
-                const currentTotalPoints = lines.reduce((acc, l) => acc + l.points.length, 0);
-                const polledTotalPoints = polledLines.reduce((acc: number, l: any) => acc + l.points.length, 0);
-
-                if (currentTotalPoints !== polledTotalPoints && !isDrawing) {
+                // Compare full content (not just point counts) so erases and
+                // redraws that keep the same number of points still sync. Skip
+                // while actively drawing to avoid clobbering the local stroke.
+                if (!isDrawingRef.current && JSON.stringify(polledLines) !== JSON.stringify(linesRef.current)) {
                     setLines(polledLines);
                 }
-                
+
                 // Keep slide meta in sync
                 setSlides(data.slides);
             }
@@ -158,6 +180,10 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             ctx.stroke();
         }
 
+        // Map a stored coordinate to a device pixel. Normalized values (0..1)
+        // scale to the canvas; legacy absolute values (>1) are drawn as-is.
+        const toPx = (v: number, dim: number) => (v <= NORMALIZED_MAX ? v * dim : v);
+
         // Draw user lines
         lines.forEach(line => {
             if (line.points.length < 2) return;
@@ -167,9 +193,9 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
 
-            ctx.moveTo(line.points[0].x, line.points[0].y);
+            ctx.moveTo(toPx(line.points[0].x, canvas.width), toPx(line.points[0].y, canvas.height));
             for (let i = 1; i < line.points.length; i++) {
-                ctx.lineTo(line.points[i].x, line.points[i].y);
+                ctx.lineTo(toPx(line.points[i].x, canvas.width), toPx(line.points[i].y, canvas.height));
             }
             ctx.stroke();
         });
@@ -211,10 +237,28 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             clientY = e.clientY;
         }
 
+        // Normalize to 0..1 of the canvas so the stroke is size-independent.
         return {
-            x: clientX - rect.left,
-            y: clientY - rect.top,
+            x: rect.width > 0 ? (clientX - rect.left) / rect.width : 0,
+            y: rect.height > 0 ? (clientY - rect.top) / rect.height : 0,
         };
+    };
+
+    // Remove any line that passes within ~2% of the eraser point. This is a real
+    // erase (it deletes stroke data) rather than painting white over the board.
+    const ERASE_RADIUS = 0.025;
+    const eraseAt = (coords: Point) => {
+        setLines(prev =>
+            prev.filter(line => {
+                const isNormalized = line.points.every(p => p.x <= NORMALIZED_MAX && p.y <= NORMALIZED_MAX);
+                if (!isNormalized) return true; // can't reliably hit-test legacy absolute lines
+                return !line.points.some(p => {
+                    const dx = p.x - coords.x;
+                    const dy = p.y - coords.y;
+                    return Math.sqrt(dx * dx + dy * dy) <= ERASE_RADIUS;
+                });
+            }),
+        );
     };
 
     const handleStartDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -223,10 +267,16 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         if (!coords) return;
 
         setIsDrawing(true);
+
+        if (tool === 'eraser') {
+            eraseAt(coords);
+            return;
+        }
+
         const newLine: Line = {
             points: [coords],
-            color: tool === 'eraser' ? '#ffffff' : color,
-            width: tool === 'eraser' ? 20 : width,
+            color,
+            width,
         };
 
         setLines(prev => [...prev, newLine]);
@@ -237,20 +287,26 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         const coords = getCoordinates(e);
         if (!coords) return;
 
+        if (tool === 'eraser') {
+            eraseAt(coords);
+            return;
+        }
+
         setLines(prev => {
-            const updated = [...prev];
-            const currentLine = updated[updated.length - 1];
-            if (currentLine) {
-                currentLine.points = [...currentLine.points, coords];
-            }
-            return updated;
+            if (prev.length === 0) return prev;
+            const last = prev[prev.length - 1];
+            // Immutable update: replace the last line with a new object rather
+            // than mutating it in place, so React always sees a fresh reference.
+            const updatedLast: Line = { ...last, points: [...last.points, coords] };
+            return [...prev.slice(0, -1), updatedLast];
         });
     };
 
     const handleStopDrawing = () => {
         if (!isTutor || !isDrawing) return;
         setIsDrawing(false);
-        saveCurrentSlideData(lines);
+        // Persist the latest strokes via the ref (closure `lines` may be stale).
+        saveCurrentSlideData(linesRef.current);
     };
 
     const handleClear = () => {

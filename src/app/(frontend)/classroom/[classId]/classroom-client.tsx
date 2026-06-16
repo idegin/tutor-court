@@ -245,6 +245,39 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }
     }, [searchParams, whiteboards]);
 
+    // Refetch the whiteboard list for this class. Needed because students load a
+    // static list at page render; if the tutor shares a board created afterwards,
+    // it won't be in that list and would otherwise never display. Returns the
+    // fresh list so callers can resolve a board immediately (setState is async).
+    const refreshWhiteboards = async (): Promise<any[]> => {
+        try {
+            const res = await fetch(`/api/whiteboards?classId=${cls.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.whiteboards)) {
+                    setWhiteboards(data.whiteboards);
+                    return data.whiteboards;
+                }
+            }
+        } catch (err) {
+            console.error('Failed to refresh whiteboards:', err);
+        }
+        return whiteboards;
+    };
+
+    // Resolve a shared whiteboard by id, refetching the list once if it's not
+    // already known locally.
+    const resolveAndSelectWhiteboard = async (wbId: string) => {
+        let found = whiteboards.find(w => w.id === wbId);
+        if (!found) {
+            const refreshed = await refreshWhiteboards();
+            found = refreshed.find(w => w.id === wbId);
+        }
+        if (found) {
+            setSelectedWhiteboard(found);
+        }
+    };
+
     // Sync whiteboard helper
     const syncWhiteboardStateToDB = async (show: boolean, wbId: string | null) => {
         const currentSession = sessionRef.current;
@@ -278,10 +311,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                         // Sync whiteboard state immediately
                         setShowWhiteboard(data.showWhiteboard || false);
                         if (data.activeWhiteboard) {
-                            const found = whiteboards.find(w => w.id === data.activeWhiteboard);
-                            if (found) {
-                                setSelectedWhiteboard(found);
-                            }
+                            resolveAndSelectWhiteboard(data.activeWhiteboard);
                         }
                         toast.success('Your tutor has started the class! Joining room...');
                     }
@@ -403,10 +433,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                             setShowWhiteboard(data.showWhiteboard);
                         }
                         if (data.activeWhiteboard) {
-                            const found = whiteboards.find(w => w.id === data.activeWhiteboard);
-                            if (found) {
-                                setSelectedWhiteboard(found);
-                            }
+                            resolveAndSelectWhiteboard(data.activeWhiteboard);
                         }
                     }
                 }
@@ -633,6 +660,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 setSelectedWhiteboard={setSelectedWhiteboard}
                 showWhiteboard={showWhiteboard}
                 setShowWhiteboard={setShowWhiteboard}
+                resolveAndSelectWhiteboard={resolveAndSelectWhiteboard}
                 handleLeaveSession={handleLeaveSession}
                 handleCreateWhiteboard={handleCreateWhiteboard}
                 newWbTitle={newWbTitle}
@@ -659,6 +687,7 @@ interface ClassroomMeetingViewProps {
     setSelectedWhiteboard: (wb: any) => void;
     showWhiteboard: boolean;
     setShowWhiteboard: (show: boolean) => void;
+    resolveAndSelectWhiteboard: (wbId: string) => Promise<void>;
     handleLeaveSession: () => void;
     handleCreateWhiteboard: (title: string) => Promise<any | null>;
     newWbTitle: string;
@@ -681,6 +710,7 @@ function ClassroomMeetingView({
     setSelectedWhiteboard,
     showWhiteboard,
     setShowWhiteboard,
+    resolveAndSelectWhiteboard,
     handleLeaveSession,
     handleCreateWhiteboard,
     newWbTitle,
@@ -748,38 +778,29 @@ function ClassroomMeetingView({
     const isMicEnabled = localMicOn;
     const isCamEnabled = localWebcamOn;
 
-    // Filter out duplicate or ghost participants. The local participant is not
-    // guaranteed to appear in the `participants` map, so include it explicitly
-    // to make sure the current user always shows up alongside everyone else.
+    // De-duplicate by participant id ONLY. The previous version also merged
+    // anyone who shared a display name, which made two different people with the
+    // same first/display name (e.g. two "John"s) collapse into one — one of them
+    // would vanish from the grid and participant list. Identity is the id; the
+    // local participant is included explicitly because it's not guaranteed to be
+    // present in the `participants` map.
     const uniqueParticipants = React.useMemo(() => {
-        const source = Array.from(participants.values());
-        if (localParticipant && !participants.has(localParticipant.id)) {
-            source.unshift(localParticipant);
+        const byId = new Map<string, any>();
+        if (localParticipant) {
+            byId.set(String(localParticipant.id), localParticipant);
         }
-        return source.reduce((acc: any[], current: any) => {
-            const currentId = String(current.id);
-            const isDuplicate = acc.some(p => {
-                const pId = String(p.id);
-                const namesMatch = p.displayName && current.displayName && p.displayName === current.displayName;
-                const idsMatch = pId === currentId || (pId.split('-')[0] === currentId.split('-')[0]);
-                return namesMatch || idsMatch;
-            });
-
-            if (isDuplicate) {
-                // Prefer local or active streams
-                if (current.local || current.webcamOn || current.micOn) {
-                    return acc.filter(p => {
-                        const pId = String(p.id);
-                        const namesMatch = p.displayName && current.displayName && p.displayName === current.displayName;
-                        const idsMatch = pId === currentId || (pId.split('-')[0] === currentId.split('-')[0]);
-                        return !(namesMatch || idsMatch);
-                    }).concat([current]);
-                }
-                return acc;
-            }
-            return [...acc, current];
-        }, []);
+        for (const p of participants.values()) {
+            byId.set(String(p.id), p);
+        }
+        return Array.from(byId.values());
     }, [participants, localParticipant]);
+
+    // Only a real screen share from the tutor (or, defensively, any presenter
+    // while no whiteboard is being shared) should take over the main stage.
+    // Students can no longer present (token is scoped), but guard anyway so a
+    // stray presenter can't blank out the tutor's shared whiteboard.
+    const presenterIsTutor = presenterId ? String(presenterId) === String(tutorId) : false;
+    const showScreenShare = !!presenterId && (presenterIsTutor || !showWhiteboard);
 
 
     // Sync active student/parent count to the parent ClassroomClient
@@ -810,17 +831,17 @@ function ClassroomMeetingView({
                 if (typeof data.showWhiteboard === 'boolean') {
                     setShowWhiteboard(data.showWhiteboard);
                     if (data.whiteboardId) {
-                        const found = whiteboards.find(w => w.id === data.whiteboardId);
-                        if (found) {
-                            setSelectedWhiteboard(found);
-                        }
+                        resolveAndSelectWhiteboard(data.whiteboardId);
                     }
                 }
             } catch (e) {
                 console.error("Error parsing whiteboard toggle message:", e);
             }
         }
-    }, [whiteboardMessages, whiteboards, setShowWhiteboard, setSelectedWhiteboard]);
+        // Only react to new pubsub messages; resolveAndSelectWhiteboard always
+        // reads the latest list via refetch, so it doesn't need to be a dep.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [whiteboardMessages]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -960,7 +981,7 @@ function ClassroomMeetingView({
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Area: Video Call Viewport & Shared Whiteboard */}
                 <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden relative bg-muted/20">
-                    {presenterId ? (
+                    {showScreenShare ? (
                         /* Screen Share Presenter Mode */
                         <div className="flex-1 flex flex-col min-h-0 relative">
                             {/* Small Video Avatars at top */}
@@ -1033,8 +1054,17 @@ function ClassroomMeetingView({
                             return board;
                         })()
                     ) : (
-                        /* Standard Grid Video Mode */
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 items-center justify-center p-4">
+                        /* Standard Grid Video Mode — column count adapts to the
+                           number of participants so large classes don't get
+                           squashed into a fixed 2-wide grid. */
+                        <div className={`flex-1 grid gap-4 items-center justify-center p-4 ${uniqueParticipants.length <= 1
+                            ? 'grid-cols-1'
+                            : uniqueParticipants.length <= 4
+                                ? 'grid-cols-1 sm:grid-cols-2'
+                                : uniqueParticipants.length <= 9
+                                    ? 'grid-cols-2 lg:grid-cols-3'
+                                    : 'grid-cols-2 lg:grid-cols-4'
+                            }`}>
                             {uniqueParticipants.map((p: any) => {
                                 const isParticipantTutor = String(p.id) === String(tutorId);
                                 const initials = p.displayName?.[0] || (isParticipantTutor ? 'T' : 'S');

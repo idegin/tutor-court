@@ -28,7 +28,32 @@ export function isVideoSdkAvailable(): boolean {
   return !isPlaceholder(fallbackToken, 'videosdk_token_placeholder')
 }
 
-export function generateVideoSdkToken(expirationSeconds: number = 3600 * 2): string {
+/**
+ * Token role:
+ * - `server`  → full permissions, used for server-to-server REST calls
+ *               (creating rooms, fetching sessions). Never sent to a browser.
+ * - `tutor`   → host: may moderate (kick) and screen-share.
+ * - `student` → join only. Cannot moderate or present, so a student can't kick
+ *               others or hijack the shared whiteboard with a screen share.
+ */
+export type VideoSdkRole = 'server' | 'tutor' | 'student'
+
+function permissionsForRole(role: VideoSdkRole): string[] {
+  switch (role) {
+    case 'tutor':
+      return ['allow_join', 'allow_mod', 'allow_screenshare']
+    case 'student':
+      return ['allow_join']
+    case 'server':
+    default:
+      return ['allow_join', 'allow_mod', 'ask_join', 'allow_screenshare']
+  }
+}
+
+export function generateVideoSdkToken(
+  expirationSeconds: number = 3600 * 2,
+  role: VideoSdkRole = 'server',
+): string {
   const apiKey = process.env.VIDEOSDK_API_KEY
   const secretKey = process.env.VIDEOSDK_SECRET
 
@@ -49,7 +74,7 @@ export function generateVideoSdkToken(expirationSeconds: number = 3600 * 2): str
   }
   const payload = {
     apikey: apiKey,
-    permissions: ['allow_join', 'allow_mod', 'ask_join', 'allow_screenshare'],
+    permissions: permissionsForRole(role),
     version: 2,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expirationSeconds,

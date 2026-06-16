@@ -56,26 +56,59 @@ export async function POST(request: Request) {
       )
     }
 
-    // Try to call VideoSDK to create a room if configured
-    let roomId = `room-${classId}-${Date.now()}`
-    const token = generateVideoSdkToken()
+    // Prevent duplicate concurrent sessions for the same class (double-clicks,
+    // two open tabs). Reuse the existing live session instead of creating a
+    // second room that would split participants.
+    const existingLive = await payload.find({
+      collection: 'live-sessions',
+      where: {
+        and: [{ class: { equals: classId } }, { status: { equals: 'live' } }],
+      },
+      limit: 1,
+      depth: 0,
+    })
+    if (existingLive.docs.length > 0) {
+      return NextResponse.json({ session: existingLive.docs[0] })
+    }
 
-    if (token) {
-      try {
-        const videoSdkRes = await fetch('https://api.videosdk.live/v2/rooms', {
-          method: 'POST',
-          headers: {
-            Authorization: token,
-            'Content-Type': 'application/json',
+    // Create a real VideoSDK room. We use a fresh server-scoped token for the
+    // REST call. If the room can't be created (e.g. VideoSDK is out of credit or
+    // unreachable), we must NOT mark a session live — otherwise the tutor would
+    // be billed for a class whose media never connects. Surface the failure.
+    let roomId: string
+    const token = generateVideoSdkToken(3600 * 2, 'server')
+
+    try {
+      const videoSdkRes = await fetch('https://api.videosdk.live/v2/rooms', {
+        method: 'POST',
+        headers: {
+          Authorization: token,
+          'Content-Type': 'application/json',
+        },
+      })
+      const videoSdkData = await videoSdkRes.json()
+      if (!videoSdkRes.ok || !videoSdkData.roomId) {
+        console.error('VideoSDK room creation failed:', videoSdkRes.status, videoSdkData)
+        return NextResponse.json(
+          {
+            error: 'live_classes_unavailable',
+            message:
+              "We couldn't connect to the live video service. Please try again shortly — you have not been charged.",
           },
-        })
-        const videoSdkData = await videoSdkRes.json()
-        if (videoSdkData.roomId) {
-          roomId = videoSdkData.roomId
-        }
-      } catch (err) {
-        console.error('Error calling VideoSDK rooms API:', err)
+          { status: 502 },
+        )
       }
+      roomId = videoSdkData.roomId
+    } catch (err) {
+      console.error('Error calling VideoSDK rooms API:', err)
+      return NextResponse.json(
+        {
+          error: 'live_classes_unavailable',
+          message:
+            "We couldn't connect to the live video service. Please try again shortly — you have not been charged.",
+        },
+        { status: 502 },
+      )
     }
 
     const session = await payload.create({

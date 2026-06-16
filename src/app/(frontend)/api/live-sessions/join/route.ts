@@ -51,6 +51,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Live session not found.' }, { status: 404 })
     }
 
+    if (session.status !== 'live') {
+      return NextResponse.json(
+        { error: 'This live session has already ended.' },
+        { status: 409 },
+      )
+    }
+
     const classIdVal = typeof session.class === 'object' ? session.class.id : session.class
     const tutorIdVal = typeof session.tutor === 'object' ? session.tutor.id : session.tutor
 
