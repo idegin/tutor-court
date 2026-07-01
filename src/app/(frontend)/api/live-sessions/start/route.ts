@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { CREDIT_RATE } from '@/lib/constants'
+import { toIntId } from '@/lib/id'
 
 export async function POST(request: Request) {
   if (!isVideoSdkAvailable()) {
@@ -32,12 +33,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { classId } = body
+  const classId = toIntId(body?.classId)
   if (!classId) {
-    return NextResponse.json({ error: 'Class ID is required.' }, { status: 400 })
+    return NextResponse.json({ error: 'A valid class ID is required.' }, { status: 400 })
   }
 
   try {
+    // Authorization: the caller must be THIS class's tutor. Without this, any
+    // tutor could start (and bill against themselves) a session for a class they
+    // have no relationship to, and pull another tutor's students into their room.
+    const cls = await payload
+      .findByID({ collection: 'classes', id: classId, depth: 0 })
+      .catch(() => null)
+    if (!cls) {
+      return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
+    }
+    const classTutorId = typeof cls.tutor === 'object' ? (cls.tutor as any).id : cls.tutor
+    if (classTutorId !== user.id) {
+      return NextResponse.json({ error: 'You are not the tutor of this class.' }, { status: 403 })
+    }
+
     // Check tutor credit balance
     const wallets = await payload.find({
       collection: 'wallets',
@@ -111,22 +126,40 @@ export async function POST(request: Request) {
       )
     }
 
-    const session = await payload.create({
-      collection: 'live-sessions',
-      data: {
-        class: classId,
-        tutor: user.id,
-        roomId,
-        startedAt: new Date().toISOString(),
-        status: 'live',
-        attendees: [],
-        coinsConsumed: 0,
-        durationMinutes: 0,
-      } as any,
-    })
+    // Create the session. A partial unique index (one live session per class)
+    // makes this atomic: if a concurrent request won the race, the insert throws
+    // and we reuse the winner instead of creating a second room/billing.
+    let session
+    try {
+      session = await payload.create({
+        collection: 'live-sessions',
+        data: {
+          class: classId,
+          tutor: user.id,
+          roomId,
+          startedAt: new Date().toISOString(),
+          status: 'live',
+          attendees: [],
+          coinsConsumed: 0,
+          durationMinutes: 0,
+        } as any,
+      })
+    } catch (createErr) {
+      const raced = await payload.find({
+        collection: 'live-sessions',
+        where: { and: [{ class: { equals: classId } }, { status: { equals: 'live' } }] },
+        limit: 1,
+        depth: 0,
+      })
+      if (raced.docs.length > 0) {
+        return NextResponse.json({ session: raced.docs[0] })
+      }
+      throw createErr
+    }
 
     return NextResponse.json({ session })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[live-sessions/start] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

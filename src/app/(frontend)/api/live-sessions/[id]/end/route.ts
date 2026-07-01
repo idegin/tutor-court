@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
+import { toIntId } from '@/lib/id'
 
 function deriveEngagementFlag(
   attendanceMinutes: number,
@@ -27,26 +28,47 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Only tutors can end live classes.' }, { status: 403 })
   }
 
-  const { id } = params
+  const id = toIntId(params.id)
+  if (!id) {
+    return NextResponse.json({ error: 'Invalid session id.' }, { status: 400 })
+  }
 
   try {
-    const session = await payload.findByID({
-      collection: 'live-sessions',
-      id,
-      depth: 0,
-    })
+    const session = await payload
+      .findByID({ collection: 'live-sessions', id, depth: 0 })
+      .catch(() => null)
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
 
-    if (session.status === 'ended') {
-      return NextResponse.json({ error: 'Session already ended.' }, { status: 400 })
+    // Only the session's own tutor (or an admin) may end it — otherwise any tutor
+    // could end another tutor's class and bill the victim's wallet.
+    const sessionTutorId =
+      typeof session.tutor === 'object' ? (session.tutor as any).id : session.tutor
+    if (sessionTutorId !== user.id) {
+      return NextResponse.json({ error: 'You are not the tutor of this session.' }, { status: 403 })
+    }
+
+    if (session.status !== 'live') {
+      return NextResponse.json({ error: 'Session already ended.' }, { status: 409 })
     }
 
     const startedTime = new Date(session.startedAt || session.createdAt).getTime()
     const endedTime = Date.now()
     const endedIso = new Date(endedTime).toISOString()
+
+    // Atomically claim the live -> ended transition. If another request (or the
+    // status-poll auto-close) already ended it, this affects 0 rows and we bail
+    // out before running billing a second time.
+    const claim = await payload.update({
+      collection: 'live-sessions',
+      where: { and: [{ id: { equals: id } }, { status: { equals: 'live' } }] },
+      data: { status: 'ended', endedAt: endedIso } as any,
+    })
+    if (!claim.docs || claim.docs.length === 0) {
+      return NextResponse.json({ error: 'Session already ended.' }, { status: 409 })
+    }
     const durationMs = endedTime - startedTime
     const sessionDurationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)))
 
@@ -260,6 +282,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     return NextResponse.json({ success: true, session: updatedSession })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[live-sessions/end] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

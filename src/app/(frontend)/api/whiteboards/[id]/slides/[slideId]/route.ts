@@ -2,6 +2,29 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { toIntId } from '@/lib/id'
+import { getWhiteboardAccess } from '@/lib/whiteboard-access'
+
+// Loads the slide and confirms it actually belongs to the whiteboard in the URL
+// AND the caller may write to that whiteboard. Prevents editing/deleting another
+// board's slide by pairing a board you own with a victim's slideId.
+async function authorizeSlide(payload: any, whiteboardId: number, slideId: number, user: any) {
+  const { whiteboard, canWrite } = await getWhiteboardAccess(payload, whiteboardId, user)
+  if (!whiteboard) return { error: 'Whiteboard not found', status: 404 as const }
+  if (!canWrite) {
+    return { error: 'Forbidden: Only the owner of this whiteboard can modify slides', status: 403 as const }
+  }
+  const slide = await payload
+    .findByID({ collection: 'whiteboard-slides', id: slideId, depth: 0 })
+    .catch(() => null)
+  if (!slide) return { error: 'Slide not found', status: 404 as const }
+  const slideWhiteboardId =
+    typeof slide.whiteboard === 'object' ? slide.whiteboard?.id : slide.whiteboard
+  if (slideWhiteboardId !== whiteboardId) {
+    return { error: 'Slide does not belong to this whiteboard.', status: 404 as const }
+  }
+  return { slide }
+}
 
 export async function PATCH(
   request: Request,
@@ -16,25 +39,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id, slideId } = params
-
-  try {
-    const whiteboard = await payload.findByID({
-      collection: 'whiteboards',
-      id,
-      depth: 0,
-    })
-
-    if (!whiteboard) {
-      return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 })
-    }
-
-    const ownerId = typeof whiteboard.owner === 'object' ? whiteboard.owner?.id : whiteboard.owner
-    if (ownerId !== user.id && user.accountType !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Only the owner of this whiteboard can edit slides' }, { status: 403 })
-    }
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const id = toIntId(params.id)
+  const slideId = toIntId(params.slideId)
+  if (!id || !slideId) {
+    return NextResponse.json({ error: 'Invalid whiteboard or slide id.' }, { status: 400 })
   }
 
   let body: any
@@ -45,6 +53,11 @@ export async function PATCH(
   }
 
   try {
+    const auth = await authorizeSlide(payload, id, slideId, user)
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     const updatedSlide = await payload.update({
       collection: 'whiteboard-slides',
       id: slideId,
@@ -57,7 +70,8 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, slide: updatedSlide })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[whiteboards/slide PATCH] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
 
@@ -74,28 +88,18 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { id, slideId } = params
-
-  try {
-    const whiteboard = await payload.findByID({
-      collection: 'whiteboards',
-      id,
-      depth: 0,
-    })
-
-    if (!whiteboard) {
-      return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 })
-    }
-
-    const ownerId = typeof whiteboard.owner === 'object' ? whiteboard.owner?.id : whiteboard.owner
-    if (ownerId !== user.id && user.accountType !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Only the owner of this whiteboard can delete slides' }, { status: 403 })
-    }
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const id = toIntId(params.id)
+  const slideId = toIntId(params.slideId)
+  if (!id || !slideId) {
+    return NextResponse.json({ error: 'Invalid whiteboard or slide id.' }, { status: 400 })
   }
 
   try {
+    const auth = await authorizeSlide(payload, id, slideId, user)
+    if ('error' in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+
     await payload.delete({
       collection: 'whiteboard-slides',
       id: slideId,
@@ -103,6 +107,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[whiteboards/slide DELETE] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

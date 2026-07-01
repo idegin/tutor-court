@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
+import { toIntId } from '@/lib/id'
 
 // List whiteboards (with their slides) for a class. Used by the classroom client
 // to refresh its list when the tutor shares a board that was created after the
@@ -17,9 +18,9 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const classId = searchParams.get('classId')
+  const classId = toIntId(searchParams.get('classId'))
   if (!classId) {
-    return NextResponse.json({ error: 'Missing classId.' }, { status: 400 })
+    return NextResponse.json({ error: 'A valid classId is required.' }, { status: 400 })
   }
 
   try {
@@ -62,7 +63,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ whiteboards })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[whiteboards GET] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
 
@@ -86,6 +88,12 @@ export async function POST(request: Request) {
   if (!title) {
     return NextResponse.json({ error: 'Whiteboard title is required.' }, { status: 400 })
   }
+  // classId is optional, but if supplied it must be a valid integer id — a raw
+  // string would fail Payload's relationship validation.
+  const numericClassId = classId != null ? toIntId(classId) : null
+  if (classId != null && !numericClassId) {
+    return NextResponse.json({ error: 'Invalid classId.' }, { status: 400 })
+  }
 
   try {
     const newWhiteboard = await payload.create({
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
       data: {
         title,
         owner: user.id,
-        class: classId || undefined,
+        class: numericClassId ?? undefined,
         isPublic: false,
         shareToken: crypto.randomBytes(16).toString('hex'),
       } as any,
@@ -112,6 +120,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, whiteboard: newWhiteboard })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[whiteboards POST] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
