@@ -115,7 +115,11 @@ export default async function ClassroomPage(props: PageProps) {
         currentUser={user}
         initialSession={activeSession}
         initialWhiteboards={whiteboardsWithSlides}
-        videoSdkToken={generateVideoSdkToken(3600 * 2, isTutor ? 'tutor' : 'student')}
+        videoSdkToken={generateVideoSdkToken(
+          3600 * 2,
+          isTutor ? 'tutor' : 'student',
+          activeSession?.roomId || undefined,
+        )}
       />
     )
   } catch (err) {

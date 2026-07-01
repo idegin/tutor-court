@@ -32,6 +32,12 @@ interface Line {
 // a 0..1 fraction. Normalized values never exceed 1.
 const NORMALIZED_MAX = 1.0001;
 
+// Stroke decimation to bound payload size (normalized 0..1 units). Points closer
+// than this to the previous one are dropped; a single line segment is capped so
+// long strokes are split rather than growing without limit.
+const MIN_POINT_DISTANCE = 0.003;
+const MAX_POINTS_PER_LINE = 500;
+
 interface WhiteboardCanvasProps {
     whiteboardId: string;
     isTutor: boolean;
@@ -63,13 +69,24 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         isDrawingRef.current = isDrawing;
     }, [isDrawing]);
 
+    // Timestamp of the last local save. Polls that land shortly after a local
+    // write are ignored so a stale server response can't revert strokes the
+    // tutor just drew (last-write-wins clobber).
+    const lastLocalWriteRef = useRef(0);
+    const LOCAL_WRITE_GUARD_MS = 2500;
+
     // Tools
     const [color, setColor] = useState('#000000');
     const [width, setWidth] = useState(3);
     const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
 
-    // Fetch slides on mount/whiteboardId change
+    // Load slides only when the whiteboard actually changes. Depending on
+    // `initialSlides` identity (which the parent recreates on every render) used
+    // to snap the tutor back to slide 0 and reload stale lines mid-session.
+    const loadedWhiteboardRef = useRef<string | null>(null);
     useEffect(() => {
+        if (loadedWhiteboardRef.current === whiteboardId) return;
+        loadedWhiteboardRef.current = whiteboardId;
         if (initialSlides && initialSlides.length > 0) {
             setSlides(initialSlides);
             setCurrentSlideIndex(0);
@@ -77,6 +94,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         } else {
             fetchSlides();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [whiteboardId, initialSlides]);
 
     // Draw lines whenever lines state or canvas size changes
@@ -98,7 +116,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     const fetchSlides = async () => {
         try {
             const res = await fetch(`/api/whiteboards/${whiteboardId}/slides`);
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (data.slides) {
                 setSlides(data.slides);
                 if (data.slides.length > 0) {
@@ -118,14 +136,25 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
 
         try {
             const res = await fetch(`/api/whiteboards/${whiteboardId}/slides`);
-            const data = await res.json();
-            if (data.slides && data.slides[currentSlideIndex]) {
-                const polledLines = data.slides[currentSlideIndex].data?.lines || [];
-                // Compare full content (not just point counts) so erases and
-                // redraws that keep the same number of points still sync. Skip
-                // while actively drawing to avoid clobbering the local stroke.
-                if (!isDrawingRef.current && JSON.stringify(polledLines) !== JSON.stringify(linesRef.current)) {
-                    setLines(polledLines);
+            const data = await res.json().catch(() => ({}));
+            if (data.slides) {
+                // Match the slide by id, NOT array position — a concurrent
+                // add/delete/reorder shifts positions and would otherwise copy a
+                // different slide's lines onto the current view.
+                const polledSlide = data.slides.find((s: any) => s.id === currentSlide.id);
+                if (polledSlide) {
+                    const polledLines = polledSlide.data?.lines || [];
+                    // Skip while actively drawing, and briefly after a local save,
+                    // so an in-flight stale response can't revert fresh strokes.
+                    const recentlyWroteLocally =
+                        Date.now() - lastLocalWriteRef.current < LOCAL_WRITE_GUARD_MS;
+                    if (
+                        !isDrawingRef.current &&
+                        !recentlyWroteLocally &&
+                        JSON.stringify(polledLines) !== JSON.stringify(linesRef.current)
+                    ) {
+                        setLines(polledLines);
+                    }
                 }
 
                 // Keep slide meta in sync
@@ -140,6 +169,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         const currentSlide = slides[currentSlideIndex];
         if (!currentSlide) return;
 
+        lastLocalWriteRef.current = Date.now();
         try {
             await fetch(`/api/whiteboards/${whiteboardId}/slides/${currentSlide.id}`, {
                 method: 'PATCH',
@@ -184,8 +214,9 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         // scale to the canvas; legacy absolute values (>1) are drawn as-is.
         const toPx = (v: number, dim: number) => (v <= NORMALIZED_MAX ? v * dim : v);
 
-        // Draw user lines
-        lines.forEach(line => {
+        // Draw user lines (read from the ref so any caller — the lines effect or
+        // the resize handler — always renders the current strokes).
+        linesRef.current.forEach(line => {
             if (line.points.length < 2) return;
             ctx.beginPath();
             ctx.strokeStyle = line.color;
@@ -217,7 +248,11 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [lines]);
+        // Register the listener once; redraws on stroke changes are handled by the
+        // `[lines]` effect above. Depending on `lines` here re-subscribed the
+        // window listener and reset the canvas buffer on every single point.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>): Point | null => {
         const canvas = canvasRef.current;
@@ -295,6 +330,20 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         setLines(prev => {
             if (prev.length === 0) return prev;
             const last = prev[prev.length - 1];
+            // Decimate: drop points closer than MIN_POINT_DISTANCE to the previous
+            // one, and cap points per line. Keeps the stored/polled payload from
+            // growing without bound (every participant re-downloads it every 3s).
+            const lastPoint = last.points[last.points.length - 1];
+            if (lastPoint) {
+                const dx = coords.x - lastPoint.x;
+                const dy = coords.y - lastPoint.y;
+                if (Math.sqrt(dx * dx + dy * dy) < MIN_POINT_DISTANCE) return prev;
+            }
+            if (last.points.length >= MAX_POINTS_PER_LINE) {
+                // Start a new line segment so a single stroke can't grow unbounded.
+                const newSegment: Line = { color: last.color, width: last.width, points: [lastPoint, coords] };
+                return [...prev, newSegment];
+            }
             // Immutable update: replace the last line with a new object rather
             // than mutating it in place, so React always sees a fresh reference.
             const updatedLast: Line = { ...last, points: [...last.points, coords] };
@@ -323,7 +372,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             const res = await fetch(`/api/whiteboards/${whiteboardId}/slides`, {
                 method: 'POST',
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (data.success) {
                 toast.success('New slide created');
                 const updatedSlides = [...slides, data.slide];

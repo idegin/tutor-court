@@ -208,6 +208,36 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
     const [activeStudentsCount, setActiveStudentsCount] = useState(0);
 
+    // The token handed to VideoSDK. Starts from the (room-scoped when known)
+    // server-minted prop, and is refreshed to a room-scoped token once we know
+    // the live session's room — so a token can't be reused for another room.
+    const [meetingToken, setMeetingToken] = useState(videoSdkToken);
+
+    // Keep the latest active count in a ref so the status-poll interval can read
+    // it without re-subscribing (which would tear down/rebuild the interval on
+    // every participant change).
+    const activeStudentsCountRef = useRef(activeStudentsCount);
+    useEffect(() => {
+        activeStudentsCountRef.current = activeStudentsCount;
+    }, [activeStudentsCount]);
+
+    const fetchScopedToken = async () => {
+        try {
+            const res = await fetch('/api/live-sessions/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ classId: cls.id }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.token) {
+                setMeetingToken(data.token);
+            }
+        } catch (err) {
+            // Non-fatal: fall back to the server-minted prop token.
+            console.error('Failed to fetch scoped meeting token:', err);
+        }
+    };
+
     const toggleTab = (tab: 'chat' | 'participants' | 'tools') => {
         if (isPanelOpen && activeTab === tab) {
             setIsPanelOpen(false);
@@ -235,7 +265,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     useEffect(() => {
         const wbId = searchParams.get('whiteboardId');
         if (wbId) {
-            const found = whiteboards.find(w => w.id === wbId);
+            const found = whiteboards.find(w => String(w.id) === String(wbId));
             if (found) {
                 setSelectedWhiteboard(found);
                 setShowWhiteboard(true);
@@ -268,10 +298,10 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Resolve a shared whiteboard by id, refetching the list once if it's not
     // already known locally.
     const resolveAndSelectWhiteboard = async (wbId: string) => {
-        let found = whiteboards.find(w => w.id === wbId);
+        let found = whiteboards.find(w => String(w.id) === String(wbId));
         if (!found) {
             const refreshed = await refreshWhiteboards();
-            found = refreshed.find(w => w.id === wbId);
+            found = refreshed.find(w => String(w.id) === String(wbId));
         }
         if (found) {
             setSelectedWhiteboard(found);
@@ -304,9 +334,12 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
             try {
                 const res = await fetch(`/api/live-sessions/status?classId=${cls.id}`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await res.json().catch(() => ({}));
                     if (data?.status === 'live' && data?.sessionId) {
-                        setSession({ id: data.sessionId, roomId: data.roomId, status: 'live' });
+                        // Merge so we don't drop other session fields.
+                        setSession((prev: any) => ({ ...prev, id: data.sessionId, roomId: data.roomId, status: 'live' }));
+                        // Get a room-scoped token before entering the meeting.
+                        await fetchScopedToken();
                         setIsLive(true);
                         // Sync whiteboard state immediately
                         setShowWhiteboard(data.showWhiteboard || false);
@@ -322,7 +355,8 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }, 3000);
 
         return () => clearInterval(interval);
-    }, [isLive, cls.id, whiteboards]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLive, cls.id]);
 
     // Register attendance and join live session
     useEffect(() => {
@@ -339,7 +373,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                     });
 
                     if (!res.ok) {
-                        const data = await res.json();
+                        const data = await res.json().catch(() => ({}));
                         if (res.status === 403) {
                             setAuthError(data.error || 'Access Denied: You are not enrolled in this class.');
                             return;
@@ -391,9 +425,9 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/live-sessions/${session.id}/status?activeStudentsCount=${activeStudentsCount}`);
+                const res = await fetch(`/api/live-sessions/${session.id}/status?activeStudentsCount=${activeStudentsCountRef.current}`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await res.json().catch(() => ({}));
 
                     // Only the tutor should ever see/track their own credit balance.
                     if (isTutor && typeof data.remainingCredits === 'number') {
@@ -443,7 +477,10 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [isTutor, isLive, session?.id, router, cls.id, whiteboards, activeStudentsCount]);
+        // activeStudentsCount is read via ref; whiteboards via refetch — keeping
+        // them out of deps prevents the interval from constantly re-arming.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTutor, isLive, session?.id, router, cls.id]);
 
     const handleStartSession = async () => {
         setIsLoading(true);
@@ -453,11 +490,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ classId: cls.id }),
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to start class.');
             }
             setSession(data.session);
+            // Get a room-scoped token for the freshly created room before joining.
+            await fetchScopedToken();
             setIsLive(true);
             toast.success('Live classroom session started.');
         } catch (error: any) {
@@ -467,34 +506,38 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }
     };
 
-    const handleEndSession = async () => {
-        if (!session) return;
-        if (!window.confirm('Are you sure you want to end this live session? This will bill credits and disconnect participants.')) return;
+    // Returns true when the caller should disconnect from the media room, false
+    // when the tutor cancelled the confirm (so we don't kill their camera).
+    const handleEndSession = async (): Promise<boolean> => {
+        if (!session) return false;
+        if (!window.confirm('Are you sure you want to end this live session? This will bill credits and disconnect participants.')) return false;
 
         setIsLoading(true);
         try {
             const res = await fetch(`/api/live-sessions/${session.id}/end`, {
                 method: 'POST',
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 throw new Error(data.error || 'Failed to end class.');
             }
             toast.success('Live session ended successfully.');
             router.push(`/dashboard/tutor/classes/${cls.id}`);
+            return true;
         } catch (error: any) {
             toast.error(error.message || 'An error occurred.');
+            return false;
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleLeaveSession = () => {
+    const handleLeaveSession = async (): Promise<boolean> => {
         if (isTutor) {
-            handleEndSession();
-        } else {
-            router.push('/dashboard/student');
+            return await handleEndSession();
         }
+        router.push('/dashboard/student');
+        return true;
     };
 
     const handleCreateWhiteboard = async (title: string): Promise<any | null> => {
@@ -508,7 +551,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                     liveSessionId: session?.id,
                 }),
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (data.success) {
                 setWhiteboards(prev => [...prev, data.whiteboard]);
                 setSelectedWhiteboard(data.whiteboard);
@@ -640,7 +683,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Wrap in MeetingProvider once live session starts
     return (
         <MeetingProvider
-            token={videoSdkToken}
+            token={meetingToken}
             config={{
                 meetingId: session.roomId || `room-${cls.id}`,
                 micEnabled: micEnabled,
@@ -688,7 +731,7 @@ interface ClassroomMeetingViewProps {
     showWhiteboard: boolean;
     setShowWhiteboard: (show: boolean) => void;
     resolveAndSelectWhiteboard: (wbId: string) => Promise<void>;
-    handleLeaveSession: () => void;
+    handleLeaveSession: () => Promise<boolean>;
     handleCreateWhiteboard: (title: string) => Promise<any | null>;
     newWbTitle: string;
     setNewWbTitle: (title: string) => void;
@@ -750,11 +793,34 @@ function ClassroomMeetingView({
         onMeetingLeft: () => {
             router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`);
         },
+        onMeetingStateChanged: (data: any) => {
+            // Surface connection lifecycle so a dropped/expired connection isn't a
+            // silent frozen screen. VideoSDK handles reconnection internally; we
+            // just reflect it to the user.
+            const state = data?.state;
+            if (state === 'RECONNECTING') {
+                toast.warning('Connection lost — reconnecting…');
+            } else if (state === 'CONNECTED') {
+                // no-op; back online
+            } else if (state === 'CLOSED' || state === 'FAILED') {
+                toast.error('The classroom connection was lost.');
+            }
+        },
         onError: (error) => {
             console.error("VideoSDK error event:", error);
             toast.error(`Media connection error: ${error.message}`);
         }
     });
+
+    // Explicitly disconnect from the media room (stops the local camera/mic) and
+    // then run the role-appropriate end/leave flow. Prevents the camera light
+    // staying on after leaving and ghost participants lingering in the room.
+    const handleExit = async () => {
+        const proceed = await handleLeaveSession();
+        if (proceed) {
+            try { leave(); } catch { /* already disconnected */ }
+        }
+    };
 
     // Auto-join the meeting on mount, and leave on unmount. The deps MUST stay
     // empty: VideoSDK returns fresh join/leave references on every render, so
@@ -763,7 +829,14 @@ function ClassroomMeetingView({
     // chat, mic/camera toggling, and made each user only ever see themselves.
     useEffect(() => {
         join();
+        // Stop local media on tab close too — the SDK's own beforeunload doesn't
+        // reliably stop getUserMedia tracks, leaving the camera light on.
+        const onUnload = () => {
+            try { leave(); } catch { /* noop */ }
+        };
+        window.addEventListener('beforeunload', onUnload);
         return () => {
+            window.removeEventListener('beforeunload', onUnload);
             leave();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -878,12 +951,15 @@ function ClassroomMeetingView({
 
 
 
-    // Helper to check if a specific database user ID is in the current VideoSDK participants Map
-    const isParticipantJoined = (userId: string) => participants.has(userId);
+    // Helper to check if a specific database user ID is in the current VideoSDK
+    // participants Map. The map is keyed by String(user.id), so normalize.
+    const isParticipantJoined = (userId: string | number) => participants.has(String(userId));
 
-    // Collect any guest or dynamic participant IDs that are NOT the tutor or enrolled students
-    const expectedUserIds = [tutorId, ...expectedStudents.map((s: any) => s.id)];
-    const guestParticipantIds = participantIds.filter(id => !expectedUserIds.includes(id));
+    // Collect any guest participant IDs that are NOT the tutor or an enrolled
+    // student. Both sides must be strings — participantIds are strings while DB
+    // ids are numbers, so a raw compare would flag every real participant.
+    const expectedUserIds = [String(tutorId), ...expectedStudents.map((s: any) => String(s.id))];
+    const guestParticipantIds = participantIds.filter(id => !expectedUserIds.includes(String(id)));
 
     return (
         <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
@@ -968,7 +1044,7 @@ function ClassroomMeetingView({
                     </Button>
                     <Button
                         variant="destructive"
-                        onClick={handleLeaveSession}
+                        onClick={handleExit}
                         className="rounded-full flex items-center gap-1 px-4 py-1.5 text-xs font-semibold cursor-pointer bg-red-600 hover:bg-red-700 text-white border-0"
                     >
                         <HiOutlineArrowLeftOnRectangle className="h-4 w-4" />
@@ -1356,17 +1432,33 @@ function ParticipantVideoView({ participantId, displayName, isTutorUser, avatarI
     const videoRef = useRef<HTMLVideoElement>(null);
     const micRef = useRef<HTMLAudioElement>(null);
 
-    // Handle video track streaming
+    // Handle video track streaming. Retry play() on failure so an autoplay-policy
+    // rejection (common right after toggling a camera on) doesn't leave a
+    // permanently black tile.
     useEffect(() => {
-        if (videoRef.current) {
-            if (webcamOn && webcamStream) {
-                const mediaStream = new MediaStream([webcamStream.track]);
-                videoRef.current.srcObject = mediaStream;
-                videoRef.current.play().catch((err) => console.error("Webcam video play failed:", err));
-            } else {
-                videoRef.current.srcObject = null;
-            }
+        const el = videoRef.current;
+        if (!el) return;
+        if (webcamOn && webcamStream) {
+            el.srcObject = new MediaStream([webcamStream.track]);
+            let cancelled = false;
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const tryPlay = (attempt = 0) => {
+                el.play().catch((err) => {
+                    if (cancelled) return;
+                    if (attempt < 3) {
+                        timer = setTimeout(() => tryPlay(attempt + 1), 300);
+                    } else {
+                        console.error('Webcam video play failed after retries:', err);
+                    }
+                });
+            };
+            tryPlay();
+            return () => {
+                cancelled = true;
+                if (timer) clearTimeout(timer);
+            };
         }
+        el.srcObject = null;
     }, [webcamStream, webcamOn]);
 
     // Handle audio track streaming (only play for remote participants to prevent local echo)
