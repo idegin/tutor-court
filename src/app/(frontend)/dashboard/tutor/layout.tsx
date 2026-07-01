@@ -60,7 +60,6 @@ const allTutorNavItems: (NavItem & { devOnly?: boolean })[] = [
         href: '/dashboard/tutor/calendar',
         icon: HiOutlineCalendar,
         activeIcon: HiCalendar,
-        devOnly: true,
     },
     {
         name: 'Bookings',
