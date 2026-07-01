@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { createNotification } from '@/lib/notification-service'
 import { createActivityLogs } from '@/lib/activity-log-service'
 import { isVideoSdkAvailable } from '@/lib/videosdk'
+import { toIntId } from '@/lib/id'
 
 const LATE_THRESHOLD_MINUTES = 5
 
@@ -35,17 +36,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { classId, sessionId } = body
-  if (!classId || !sessionId) {
-    return NextResponse.json({ error: 'Missing classId or sessionId.' }, { status: 400 })
+  const sessionId = toIntId(body?.sessionId)
+  if (!body?.classId || !sessionId) {
+    return NextResponse.json({ error: 'A valid classId and sessionId are required.' }, { status: 400 })
   }
 
   try {
-    const session = await payload.findByID({
-      collection: 'live-sessions',
-      id: sessionId,
-      depth: 1,
-    })
+    const session = await payload
+      .findByID({ collection: 'live-sessions', id: sessionId, depth: 1 })
+      .catch(() => null)
 
     if (!session) {
       return NextResponse.json({ error: 'Live session not found.' }, { status: 404 })
@@ -61,12 +60,12 @@ export async function POST(request: Request) {
     const classIdVal = typeof session.class === 'object' ? session.class.id : session.class
     const tutorIdVal = typeof session.tutor === 'object' ? session.tutor.id : session.tutor
 
-    // Authorization Check: only class tutor or enrolled students can join
-    const cls = await payload.findByID({
-      collection: 'classes',
-      id: classIdVal,
-      depth: 0,
-    })
+    // Authorization Check: only the class tutor, an enrolled student, or a
+    // linked parent can join. (Parents are tracked/billed elsewhere in the
+    // lifecycle, so they must be allowed through here too.)
+    const cls = await payload
+      .findByID({ collection: 'classes', id: classIdVal, depth: 0 })
+      .catch(() => null)
 
     if (!cls) {
       return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
@@ -74,8 +73,13 @@ export async function POST(request: Request) {
 
     const classTutorId = typeof cls.tutor === 'object' ? (cls.tutor as any).id : cls.tutor
     const studentIds = cls.students ? cls.students.map((s: any) => typeof s === 'object' ? s.id : s) : []
+    const parentIds = ((cls as any).parents || []).map((p: any) => (typeof p === 'object' ? p.id : p))
 
-    if (user.id !== classTutorId && !studentIds.includes(user.id)) {
+    if (
+      user.id !== classTutorId &&
+      !studentIds.includes(user.id) &&
+      !parentIds.includes(user.id)
+    ) {
       return NextResponse.json({ error: 'You are not enrolled in this class.' }, { status: 403 })
     }
 
@@ -217,6 +221,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[live-sessions/join] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

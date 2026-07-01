@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createActivityLogs } from '@/lib/activity-log-service'
+import { toIntId } from '@/lib/id'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -20,9 +21,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { sessionId } = body
+  const sessionId = toIntId(body?.sessionId)
   if (!sessionId) {
-    return NextResponse.json({ error: 'Missing sessionId.' }, { status: 400 })
+    return NextResponse.json({ error: 'A valid sessionId is required.' }, { status: 400 })
   }
 
   try {
@@ -81,14 +82,14 @@ export async function POST(request: Request) {
         })
       }
 
-      // Activity log: only meaningful for students, since the tutor leaving
-      // is implicit in "class_ended".
-      try {
-        const session = await payload.findByID({
-          collection: 'live-sessions',
-          id: sessionId,
-          depth: 0,
-        })
+      // Activity log: only meaningful when the student actually had an active
+      // participation record. Skip it for a "leave" with no matching join so we
+      // don't write a bogus "0 minutes" entry.
+      if (latestLog) try {
+        const session = await payload
+          .findByID({ collection: 'live-sessions', id: sessionId, depth: 0 })
+          .catch(() => null)
+        if (!session) throw new Error('Session not found for activity log.')
         const classIdVal =
           typeof session.class === 'object' ? (session.class as any).id : session.class
         const tutorIdVal =
@@ -136,6 +137,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[live-sessions/leave] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }

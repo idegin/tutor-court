@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
+import { toIntId } from '@/lib/id'
 
 function deriveEngagementFlag(
   attendanceMinutes: number,
@@ -21,7 +22,7 @@ function deriveEngagementFlag(
 async function getActiveVideoSdkParticipants(roomId: string): Promise<string[] | null> {
   if (!isVideoSdkAvailable()) return null
 
-  const token = generateVideoSdkToken()
+  const token = generateVideoSdkToken(3600 * 2, 'server')
   if (!token) return null
 
   try {
@@ -73,18 +74,19 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   const payload = await getPayload({ config })
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
-  const { id } = params
+  const id = toIntId(params.id)
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
   }
+  if (!id) {
+    return NextResponse.json({ error: 'Invalid session id.' }, { status: 400 })
+  }
 
   try {
-    const session = await payload.findByID({
-      collection: 'live-sessions',
-      id,
-      depth: 0,
-    })
+    const session = await payload
+      .findByID({ collection: 'live-sessions', id, depth: 0 })
+      .catch(() => null)
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
@@ -277,6 +279,25 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     if (remainingCredits <= 0 && session.status === 'live') {
       const endedIso = new Date(endedTime).toISOString()
 
+      // Atomically claim the live -> ended transition so two overlapping polls
+      // (or a poll racing the manual /end route) can't both run billing.
+      const claim = await payload.update({
+        collection: 'live-sessions',
+        where: { and: [{ id: { equals: id } }, { status: { equals: 'live' } }] },
+        data: { status: 'ended', endedAt: endedIso } as any,
+      })
+      if (!claim.docs || claim.docs.length === 0) {
+        // Another request already ended it; just report the ended state.
+        return NextResponse.json({
+          status: 'ended',
+          remainingCredits: 0,
+          showWhiteboard: false,
+          activeWhiteboard: null,
+          startedAt: session.startedAt,
+          endedAt: endedIso,
+        })
+      }
+
       // 1. Close/End all active participant logs for this session
       const activeParticipants = await payload.find({
         collection: 'live-session-participants',
@@ -462,6 +483,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       remainingCredits,
     })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[live-sessions/status] error:', error)
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 })
   }
 }
