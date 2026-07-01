@@ -94,7 +94,7 @@ export function TakeAssessment(props: TakeAssessmentProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tutorAssessmentId }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Could not start the assessment.')
       setHasStarted(true)
       setStartedAt(data.startedAt || new Date().toISOString())
@@ -122,7 +122,7 @@ export function TakeAssessment(props: TakeAssessmentProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || 'Could not submit.')
         toast.success(
           auto

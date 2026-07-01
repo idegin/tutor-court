@@ -23,10 +23,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const tutorAssessmentId = body?.tutorAssessmentId
-  if (!tutorAssessmentId) {
+  const rawId = body?.tutorAssessmentId
+  if (!rawId) {
     return NextResponse.json({ error: 'tutorAssessmentId is required.' }, { status: 400 })
   }
+  // Collections use integer primary keys; the client sends the id as a string,
+  // so coerce numeric strings or Payload's relationship validation rejects them.
+  const tutorAssessmentId =
+    typeof rawId === 'string' && /^\d+$/.test(rawId) ? Number(rawId) : rawId
 
   let ta: any
   try {
@@ -52,43 +56,51 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Assessment has expired.' }, { status: 409 })
   }
 
-  const existing = await payload.find({
-    collection: 'assessment-results',
-    where: { tutorAssessment: { equals: tutorAssessmentId } },
-    limit: 1,
-    depth: 0,
-  })
-
-  let result = existing.docs[0]
-
-  if (!result) {
-    const tutorId = typeof ta.tutor === 'object' ? ta.tutor?.id : ta.tutor
-    result = await payload.create({
+  try {
+    const existing = await payload.find({
       collection: 'assessment-results',
-      data: {
-        tutorAssessment: tutorAssessmentId,
-        student: user.id,
-        tutor: tutorId,
-        answers: [],
-        totalPoints: 0,
-        earnedPoints: 0,
-        score: 0,
-        passed: false,
-      } as any,
+      where: { tutorAssessment: { equals: tutorAssessmentId } },
+      limit: 1,
+      depth: 0,
     })
-  }
 
-  if (ta.status !== 'in_progress') {
-    await payload.update({
-      collection: 'tutor-assessments',
-      id: tutorAssessmentId,
-      data: { status: 'in_progress' } as any,
+    let result = existing.docs[0]
+
+    if (!result) {
+      const tutorId = typeof ta.tutor === 'object' ? ta.tutor?.id : ta.tutor
+      result = await payload.create({
+        collection: 'assessment-results',
+        data: {
+          tutorAssessment: tutorAssessmentId,
+          student: user.id,
+          tutor: tutorId,
+          answers: [],
+          totalPoints: 0,
+          earnedPoints: 0,
+          score: 0,
+          passed: false,
+        } as any,
+      })
+    }
+
+    if (ta.status !== 'in_progress') {
+      await payload.update({
+        collection: 'tutor-assessments',
+        id: tutorAssessmentId,
+        data: { status: 'in_progress' } as any,
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      startedAt: result.createdAt,
+      resultId: result.id,
     })
+  } catch (err: any) {
+    console.error('[assessments/results/start] failed:', err)
+    return NextResponse.json(
+      { error: err?.message || 'Could not start the assessment.' },
+      { status: 500 },
+    )
   }
-
-  return NextResponse.json({
-    success: true,
-    startedAt: result.createdAt,
-    resultId: result.id,
-  })
 }

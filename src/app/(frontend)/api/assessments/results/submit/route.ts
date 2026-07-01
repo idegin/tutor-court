@@ -60,12 +60,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const tutorAssessmentId = body?.tutorAssessmentId
+  const rawId = body?.tutorAssessmentId
   const answers: SubmittedAnswer[] = Array.isArray(body?.answers) ? body.answers : []
 
-  if (!tutorAssessmentId) {
+  if (!rawId) {
     return NextResponse.json({ error: 'tutorAssessmentId is required.' }, { status: 400 })
   }
+  // Collections use integer primary keys; the client sends the id as a string,
+  // so coerce numeric strings or Payload's relationship validation rejects them.
+  const tutorAssessmentId =
+    typeof rawId === 'string' && /^\d+$/.test(rawId) ? Number(rawId) : rawId
 
   let ta: any
   try {
