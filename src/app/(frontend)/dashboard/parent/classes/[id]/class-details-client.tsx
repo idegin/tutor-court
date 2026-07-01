@@ -264,21 +264,21 @@ export function ParentClassDetailsClient({
               ) : (
                 <div className="divide-y divide-border rounded-xl border bg-background overflow-hidden">
                   {enrolledChildren.map((child) => (
-                    <div key={child.id} className="flex items-center justify-between p-4 hover:bg-muted/10 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-tutor-purple-50 text-tutor-purple-700 font-semibold text-sm">
+                    <div key={child.id} className="flex items-center justify-between gap-3 p-4 hover:bg-muted/10 transition-colors">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-tutor-purple-50 text-tutor-purple-700 font-semibold text-sm">
                           {child.firstName.charAt(0)}{child.lastName.charAt(0)}
                         </div>
-                        <div>
-                          <p className="font-semibold text-sm text-foreground">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-foreground truncate">
                             {child.firstName} {child.lastName}
                           </p>
-                          <p className="text-xs text-muted-foreground capitalize">
+                          <p className="text-xs text-muted-foreground capitalize truncate">
                             Grade: {child.gradeLevel?.replace(/_/g, ' ').replace(/-/g, ' ')} · Login: {child.email}
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 capitalize font-medium text-[10px]">
+                      <Badge variant="outline" className="shrink-0 bg-emerald-50 text-emerald-700 border-emerald-200 capitalize font-medium text-[10px]">
                         Enrolled
                       </Badge>
                     </div>
