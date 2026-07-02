@@ -152,7 +152,8 @@ function ClassCard({ cls, muted }: { cls: any; muted?: boolean }) {
       {canEnter && (
         <Link
           href={`/classroom/${cls.id}`}
-          className="absolute inset-0 z-0 rounded-2xl"
+          aria-label={`Enter classroom for ${cls.title}`}
+          className="absolute inset-0 z-20 rounded-2xl"
         />
       )}
       <div className="flex items-start justify-between gap-3 relative z-10">

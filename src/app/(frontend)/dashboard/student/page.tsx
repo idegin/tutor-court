@@ -15,6 +15,7 @@ import {
   HiOutlineClock,
 } from 'react-icons/hi2'
 import { Button } from '@/components/ui/button'
+import { getUpcomingClasses } from '@/lib/class-schedule'
 
 export const metadata = {
   title: 'Overview | Student Dashboard',
@@ -47,7 +48,7 @@ export default async function StudentOverviewPage() {
       collection: 'classes',
       where: { students: { equals: user!.id } },
       sort: 'startDate',
-      limit: 10,
+      limit: 50,
       depth: 2,
     }),
     payload.find({
@@ -66,9 +67,8 @@ export default async function StudentOverviewPage() {
     }),
   ])
 
-  const upcoming = classesRes.docs.filter(
-    (c: any) => c.status !== 'completed' && c.status !== 'cancelled',
-  )
+  // Only classes with a future occurrence (drops ended series), soonest first.
+  const upcoming = getUpcomingClasses(classesRes.docs as any[])
   const pendingAssessments = (tutorAssessmentsRes.docs as any[]).filter(
     (a) => a.status === 'pending' || a.status === 'in_progress',
   )

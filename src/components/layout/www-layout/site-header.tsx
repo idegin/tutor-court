@@ -83,7 +83,7 @@ export function SiteHeader() {
                         </Link>
                     </nav>
                 </div>
-                <div className="flex items-center gap-8">
+                <div className="flex items-center gap-4 md:gap-8">
                     {user ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -131,13 +131,13 @@ export function SiteHeader() {
                         <>
                             <Link
                                 href="/auth/login"
-                                className="hidden md:block text-sm font-bold text-foreground hover:text-tutor-red-400 transition-colors"
+                                className="text-sm font-bold text-foreground hover:text-tutor-red-400 transition-colors whitespace-nowrap"
                             >
                                 Log In
                             </Link>
                             <Link
                                 href="/auth/register"
-                                className="text-sm font-bold bg-tutor-purple-400 text-foreground border-2 border-foreground px-6 py-2.5 rounded hover:bg-tutor-purple-500 transition-colors"
+                                className="text-sm font-bold bg-tutor-purple-400 text-foreground border-2 border-foreground px-4 py-2 md:px-6 md:py-2.5 rounded hover:bg-tutor-purple-500 transition-colors whitespace-nowrap"
                             >
                                 Sign Up
                             </Link>

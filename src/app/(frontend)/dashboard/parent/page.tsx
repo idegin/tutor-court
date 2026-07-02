@@ -11,6 +11,7 @@ import {
 
 import { formatCredits, formatNaira } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
+import { getUpcomingClasses } from '@/lib/class-schedule'
 
 export const metadata = {
   title: 'Overview | Parent Dashboard',
@@ -38,7 +39,7 @@ export default async function ParentOverviewPage() {
       collection: 'classes',
       where: { parents: { equals: user!.id } },
       sort: 'startDate',
-      limit: 5,
+      limit: 50,
       depth: 1,
     }),
   ])
@@ -46,6 +47,9 @@ export default async function ParentOverviewPage() {
   const wallet = walletRes.docs[0]
   const balance = (wallet?.balance as number) || 0
   const credits = (wallet?.creditBalance as number) || 0
+
+  // Only classes with a future occurrence (drops ended series), soonest first.
+  const upcomingClasses = getUpcomingClasses(classesRes.docs as any[])
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 lg:px-8">
@@ -76,7 +80,7 @@ export default async function ParentOverviewPage() {
         />
         <StatCard
           label="Upcoming classes"
-          value={classesRes.totalDocs.toString()}
+          value={upcomingClasses.length.toString()}
           hint="scheduled this period"
           icon={<HiOutlineCalendarDays className="h-5 w-5" />}
         />
@@ -92,12 +96,12 @@ export default async function ParentOverviewPage() {
           </div>
         </div>
         <div className="mt-6 space-y-3">
-          {classesRes.docs.length === 0 ? (
+          {upcomingClasses.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               No upcoming classes yet. A tutor will send you an invite to join one.
             </div>
           ) : (
-            classesRes.docs.map((cls: any) => (
+            upcomingClasses.map((cls: any) => (
               <div
                 key={cls.id}
                 className="flex flex-col gap-2 rounded-lg border bg-background p-4 sm:flex-row sm:items-center sm:justify-between"
