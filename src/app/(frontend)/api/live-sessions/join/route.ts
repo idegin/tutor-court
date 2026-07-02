@@ -107,17 +107,32 @@ export async function POST(request: Request) {
       depth: 0,
     })
 
+    // Idempotent participation: the collection enforces one record per user per
+    // session (a beforeChange hook throws on a duplicate create). So create only
+    // when none exists, reopen the existing one on rejoin, and no-op if already
+    // active — otherwise a refresh/reconnect would 500.
     const latestLog = existingLog.docs[0] as any
-    if (!latestLog || latestLog.leftAt) {
-      await payload.create({
+    if (!latestLog) {
+      try {
+        await payload.create({
+          collection: 'live-session-participants',
+          data: {
+            liveSession: sessionId,
+            class: classIdVal,
+            user: user.id,
+            accountType: user.accountType,
+            joinedAt: new Date().toISOString(),
+          } as any,
+        })
+      } catch (err: any) {
+        // Lost a create race with a concurrent join — treat as already joined.
+        if (!String(err?.message || '').includes('already exists')) throw err
+      }
+    } else if (latestLog.leftAt) {
+      await payload.update({
         collection: 'live-session-participants',
-        data: {
-          liveSession: sessionId,
-          class: classIdVal,
-          user: user.id,
-          accountType: user.accountType,
-          joinedAt: new Date().toISOString(),
-        } as any,
+        id: latestLog.id,
+        data: { leftAt: null, joinedAt: new Date().toISOString() } as any,
       })
     }
 

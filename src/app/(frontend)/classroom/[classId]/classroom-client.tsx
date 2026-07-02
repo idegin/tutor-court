@@ -208,11 +208,6 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
     const [activeStudentsCount, setActiveStudentsCount] = useState(0);
 
-    // The token handed to VideoSDK. Starts from the (room-scoped when known)
-    // server-minted prop, and is refreshed to a room-scoped token once we know
-    // the live session's room — so a token can't be reused for another room.
-    const [meetingToken, setMeetingToken] = useState(videoSdkToken);
-
     // Keep the latest active count in a ref so the status-poll interval can read
     // it without re-subscribing (which would tear down/rebuild the interval on
     // every participant change).
@@ -220,23 +215,6 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     useEffect(() => {
         activeStudentsCountRef.current = activeStudentsCount;
     }, [activeStudentsCount]);
-
-    const fetchScopedToken = async () => {
-        try {
-            const res = await fetch('/api/live-sessions/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ classId: cls.id }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.token) {
-                setMeetingToken(data.token);
-            }
-        } catch (err) {
-            // Non-fatal: fall back to the server-minted prop token.
-            console.error('Failed to fetch scoped meeting token:', err);
-        }
-    };
 
     const toggleTab = (tab: 'chat' | 'participants' | 'tools') => {
         if (isPanelOpen && activeTab === tab) {
@@ -338,8 +316,6 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                     if (data?.status === 'live' && data?.sessionId) {
                         // Merge so we don't drop other session fields.
                         setSession((prev: any) => ({ ...prev, id: data.sessionId, roomId: data.roomId, status: 'live' }));
-                        // Get a room-scoped token before entering the meeting.
-                        await fetchScopedToken();
                         setIsLive(true);
                         // Sync whiteboard state immediately
                         setShowWhiteboard(data.showWhiteboard || false);
@@ -495,8 +471,6 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 throw new Error(data.error || 'Failed to start class.');
             }
             setSession(data.session);
-            // Get a room-scoped token for the freshly created room before joining.
-            await fetchScopedToken();
             setIsLive(true);
             toast.success('Live classroom session started.');
         } catch (error: any) {
@@ -683,7 +657,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Wrap in MeetingProvider once live session starts
     return (
         <MeetingProvider
-            token={meetingToken}
+            token={videoSdkToken}
             config={{
                 meetingId: session.roomId || `room-${cls.id}`,
                 micEnabled: micEnabled,
@@ -964,8 +938,8 @@ function ClassroomMeetingView({
     return (
         <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
             {/* Top Navigation / Status Header */}
-            <header className="h-14 bg-background border-b border-border px-4 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
+            <header className="h-14 bg-background border-b border-border px-2 sm:px-4 flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -1001,8 +975,10 @@ function ClassroomMeetingView({
                                 className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${showWhiteboard ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground" : "border-border text-foreground"
                                     }`}
                             >
-                                <HiOutlineDocumentText className="h-4 w-4 mr-1.5" />
-                                {showWhiteboard ? "Close Whiteboard for All" : "Share Whiteboard with Class"}
+                                <HiOutlineDocumentText className="h-4 w-4 sm:mr-1.5" />
+                                <span className="hidden sm:inline">
+                                    {showWhiteboard ? "Close Whiteboard for All" : "Share Whiteboard with Class"}
+                                </span>
                             </Button>
                         ) : (
                             <Badge variant={showWhiteboard ? "default" : "secondary"} className="h-6 text-[10px] gap-1 px-2.5">
@@ -1014,7 +990,7 @@ function ClassroomMeetingView({
                 </div>
 
                 {/* Call Control Center */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                     <Button
                         size="icon"
                         variant={isMicEnabled ? 'outline' : 'destructive'}
@@ -1054,9 +1030,9 @@ function ClassroomMeetingView({
             </header>
 
             {/* Main Classroom Split Panel */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden relative">
                 {/* Left Area: Video Call Viewport & Shared Whiteboard */}
-                <div className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden relative bg-muted/20">
+                <div className="flex-1 flex flex-col p-2 sm:p-4 space-y-4 overflow-hidden relative bg-muted/20">
                     {showScreenShare ? (
                         /* Screen Share Presenter Mode */
                         <div className="flex-1 flex flex-col min-h-0 relative">
@@ -1158,9 +1134,11 @@ function ClassroomMeetingView({
                     )}
                 </div>
 
-                {/* Collapsible Panel */}
+                {/* Collapsible Panel. On mobile it overlays the video area full-width
+                    (so chat/participants are usable instead of a squished sliver);
+                    on large screens it's a normal 320px side column. */}
                 {isPanelOpen && (
-                    <div className="w-80 border-l border-border bg-background flex flex-col shrink-0 animate-none">
+                    <div className="absolute inset-y-0 left-0 right-14 z-30 border-l border-border bg-background flex flex-col shrink-0 animate-none lg:static lg:inset-auto lg:z-auto lg:w-80">
                         {activeTab === 'chat' && (
                             <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
                                 <div className="border-b border-border pb-3 flex items-center justify-between">

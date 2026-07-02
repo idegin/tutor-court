@@ -4,9 +4,9 @@ import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
-import { ClassroomClient } from './classroom-client'
+import { ClassroomLoader } from './classroom-loader'
 import { LiveClassUnavailable } from './live-class-unavailable'
-import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
+import { generateVideoSdkToken, validateVideoSdkConfig } from '@/lib/videosdk'
 
 interface PageProps {
   params: Promise<{ classId: string }>
@@ -28,8 +28,12 @@ export default async function ClassroomPage(props: PageProps) {
   const numericClassId = /^\d+$/.test(classId) ? Number(classId) : classId
   const sessionId = searchParams.sessionId
 
-  if (!isVideoSdkAvailable()) {
-    return <LiveClassUnavailable accountType={user.accountType} />
+  // Block entering the class unless the video server is fully configured AND its
+  // credentials are actually valid — so nobody (tutor or student) lands in a
+  // silently-broken room. Shows a "poorly configured" message otherwise.
+  const videoConfig = await validateVideoSdkConfig()
+  if (!videoConfig.ok) {
+    return <LiveClassUnavailable accountType={user.accountType} reason="misconfigured" />
   }
 
   try {
@@ -110,16 +114,12 @@ export default async function ClassroomPage(props: PageProps) {
 
 
     return (
-      <ClassroomClient
+      <ClassroomLoader
         cls={cls}
         currentUser={user}
         initialSession={activeSession}
         initialWhiteboards={whiteboardsWithSlides}
-        videoSdkToken={generateVideoSdkToken(
-          3600 * 2,
-          isTutor ? 'tutor' : 'student',
-          activeSession?.roomId || undefined,
-        )}
+        videoSdkToken={generateVideoSdkToken(3600 * 2, isTutor ? 'tutor' : 'student')}
       />
     )
   } catch (err) {

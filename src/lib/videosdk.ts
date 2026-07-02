@@ -48,14 +48,9 @@ function permissionsForRole(role: VideoSdkRole): string[] {
 /**
  * Mint a VideoSDK JWT server-side. `role` is required so a full-permission
  * `server` token can never be minted by accident on a client-reachable path.
- * Pass `roomId` for client tokens so the token only works for that specific
- * meeting (prevents reusing a token to join another class's room).
+ * Role permissions still prevent students from moderating or screen-sharing.
  */
-export function generateVideoSdkToken(
-  expirationSeconds: number,
-  role: VideoSdkRole,
-  roomId?: string,
-): string {
+export function generateVideoSdkToken(expirationSeconds: number, role: VideoSdkRole): string {
   const apiKey = process.env.VIDEOSDK_API_KEY
   const secretKey = process.env.VIDEOSDK_SECRET
 
@@ -77,11 +72,6 @@ export function generateVideoSdkToken(
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expirationSeconds,
   }
-  // Scope client tokens to a single room. Omitted for `server` tokens, which
-  // are used for REST calls (room creation) that operate account-wide.
-  if (roomId && role !== 'server') {
-    payload.roomId = roomId
-  }
 
   const headerB64 = base64url(JSON.stringify(header))
   const payloadB64 = base64url(JSON.stringify(payload))
@@ -91,4 +81,55 @@ export function generateVideoSdkToken(
 
   const signatureB64 = base64url(signature)
   return `${signatureInput}.${signatureB64}`
+}
+
+export type VideoSdkConfigStatus =
+  | { ok: true }
+  | { ok: false; reason: 'missing_credentials' | 'invalid_credentials' }
+
+// Cache a successful validation briefly so we don't call VideoSDK on every
+// classroom load. Failures are never cached (they should re-check).
+let cachedValidation: { at: number } | null = null
+const VALIDATION_TTL_MS = 5 * 60 * 1000
+
+/**
+ * Verify the live-video service is fully configured AND the credentials are
+ * actually accepted by VideoSDK (not just present). Used to block entering a
+ * class when the video server is misconfigured, rather than dropping users into
+ * a silently-broken room.
+ */
+export async function validateVideoSdkConfig(): Promise<VideoSdkConfigStatus> {
+  if (!isVideoSdkAvailable()) {
+    return { ok: false, reason: 'missing_credentials' }
+  }
+
+  if (cachedValidation && Date.now() - cachedValidation.at < VALIDATION_TTL_MS) {
+    return { ok: true }
+  }
+
+  const token = generateVideoSdkToken(300, 'server')
+  if (!token) return { ok: false, reason: 'missing_credentials' }
+
+  try {
+    // A lightweight authenticated call: valid credentials return 2xx, bad ones 401/403.
+    const res = await fetch('https://api.videosdk.live/v2/rooms', {
+      method: 'GET',
+      headers: { Authorization: token, 'Content-Type': 'application/json' },
+    })
+    // Only a hard auth rejection means the credentials are wrong. Transient
+    // errors (rate limits, 5xx) shouldn't block a class — the start route still
+    // validates real room creation before billing.
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: 'invalid_credentials' }
+    }
+    if (res.ok) {
+      cachedValidation = { at: Date.now() }
+    } else {
+      console.warn('[videosdk] validation returned', res.status)
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error('[videosdk] credential validation request failed:', err)
+    return { ok: false, reason: 'invalid_credentials' }
+  }
 }
