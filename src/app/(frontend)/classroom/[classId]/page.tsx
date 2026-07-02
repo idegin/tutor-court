@@ -60,32 +60,33 @@ export default async function ClassroomPage(props: PageProps) {
       return redirect('/dashboard')
     }
 
-    // Resolve active live session
-    let activeSession = null
-    if (sessionId) {
+    // Always resolve to the class's CURRENT live session so the tutor and every
+    // student join the SAME VideoSDK room. A stale ?sessionId (e.g. an ended
+    // session) must never drop someone into a dead/different room — that's what
+    // makes each participant end up alone.
+    const liveSessionsRes = await payload.find({
+      collection: 'live-sessions',
+      where: {
+        and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }],
+      },
+      limit: 1,
+      depth: 0,
+    })
+    let activeSession = liveSessionsRes.docs[0] || null
+
+    // Only honor an explicit ?sessionId when nothing is live AND it's still live.
+    if (!activeSession && sessionId) {
       const numericSessionId = /^\d+$/.test(sessionId) ? Number(sessionId) : sessionId
       try {
-        activeSession = await payload.findByID({
+        const requested = await payload.findByID({
           collection: 'live-sessions',
           id: numericSessionId,
           depth: 0,
         })
+        if (requested && requested.status === 'live') activeSession = requested
       } catch (err) {
         console.warn(`Could not find live-session with ID ${sessionId}:`, err)
       }
-    }
-
-    if (!activeSession) {
-      // Find active live session as fallback
-      const activeSessionsRes = await payload.find({
-        collection: 'live-sessions',
-        where: {
-          and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }],
-        },
-        limit: 1,
-        depth: 0,
-      })
-      activeSession = activeSessionsRes.docs[0] || null
     }
 
     // Fetch existing whiteboards

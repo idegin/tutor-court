@@ -28,6 +28,7 @@ import {
     HiPlus,
     HiOutlineArrowsPointingOut,
     HiOutlineArrowsPointingIn,
+    HiXMark,
 } from 'react-icons/hi2';
 import { MeetingProvider, useMeeting, useParticipant, usePubSub } from '@videosdk.live/react-sdk';
 
@@ -1139,6 +1140,14 @@ function ClassroomMeetingView({
                     on large screens it's a normal 320px side column. */}
                 {isPanelOpen && (
                     <div className="absolute inset-y-0 left-0 right-14 z-30 border-l border-border bg-background flex flex-col shrink-0 animate-none lg:static lg:inset-auto lg:z-auto lg:w-80">
+                        {/* Mobile-only close button (desktop uses the side tab rail). */}
+                        <button
+                            onClick={() => toggleTab(activeTab)}
+                            aria-label="Close panel"
+                            className="lg:hidden absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted cursor-pointer"
+                        >
+                            <HiXMark className="h-5 w-5" />
+                        </button>
                         {activeTab === 'chat' && (
                             <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
                                 <div className="border-b border-border pb-3 flex items-center justify-between">

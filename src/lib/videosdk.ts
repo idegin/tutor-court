@@ -33,15 +33,19 @@ export function isVideoSdkAvailable(): boolean {
  */
 export type VideoSdkRole = 'server' | 'tutor' | 'student'
 
+// VideoSDK only recognizes these permission values: allow_join, ask_join,
+// allow_mod. (Screen share is an SDK capability, not a token permission.)
+// Including an unknown value like `allow_screenshare` risks the token being
+// rejected, which silently keeps a participant out of the room.
 function permissionsForRole(role: VideoSdkRole): string[] {
   switch (role) {
     case 'tutor':
-      return ['allow_join', 'allow_mod', 'allow_screenshare']
+      return ['allow_join', 'allow_mod']
     case 'student':
       return ['allow_join']
     case 'server':
     default:
-      return ['allow_join', 'allow_mod', 'ask_join', 'allow_screenshare']
+      return ['allow_join', 'allow_mod', 'ask_join']
   }
 }
 
