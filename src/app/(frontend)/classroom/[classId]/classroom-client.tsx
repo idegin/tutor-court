@@ -764,6 +764,19 @@ function ClassroomMeetingView({
     const [isWhiteboardFullScreen, setIsWhiteboardFullScreen] = useState(false);
     const [createWbOpen, setCreateWbOpen] = useState(false);
     const [creatingWb, setCreatingWb] = useState(false);
+    // Whether this device can screen-share at all. VideoSDK (and the underlying
+    // getDisplayMedia API) only support screen sharing on desktop browsers — it's
+    // absent on iOS/Android and most tablet browsers, where tapping "Share Screen"
+    // otherwise did nothing with no explanation. Start optimistic (desktop is the
+    // common case; avoids an SSR/first-paint flicker) and correct on mount.
+    const [canScreenShare, setCanScreenShare] = useState(true);
+    useEffect(() => {
+        setCanScreenShare(
+            typeof navigator !== 'undefined' &&
+            !!navigator.mediaDevices &&
+            typeof navigator.mediaDevices.getDisplayMedia === 'function'
+        );
+    }, []);
     // Get expected tutor/students info from DB to build the grid
     const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor;
     const tutorInfo = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor : null;
@@ -796,6 +809,13 @@ function ClassroomMeetingView({
         onParticipantLeft: (participant: any) => {
             console.log("[videosdk] participant left:", participant?.id, participant?.displayName);
         },
+        onPresenterChanged: (peerId: string | null) => {
+            // Whoever is screen-sharing (null = nobody). If a tutor starts a share
+            // but this never fires on a student's client, the presenter stream
+            // isn't propagating — the first thing to check for "screen share isn't
+            // working" reports.
+            console.log("[videosdk] presenter changed:", peerId);
+        },
         onMeetingLeft: () => {
             router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`);
         },
@@ -814,6 +834,14 @@ function ClassroomMeetingView({
         },
         onError: (error) => {
             console.error("VideoSDK error event:", error);
+            // Screen-share start failures (unsupported browser, denied OS/browser
+            // permission, or the user dismissing the picker) are handled — and
+            // messaged — by handleToggleScreenShare below. Don't also fire a scary
+            // generic "Media connection error" toast for those.
+            const msg = String(error?.message || '').toLowerCase();
+            if (msg.includes('screenshare') || msg.includes('screen share') || msg.includes('display') || msg.includes('getdisplaymedia')) {
+                return;
+            }
             toast.error(`Media connection error: ${error.message}`);
         }
     });
@@ -825,6 +853,37 @@ function ClassroomMeetingView({
         const proceed = await handleLeaveSession();
         if (proceed) {
             try { leave(); } catch { /* already disconnected */ }
+        }
+    };
+
+    // Start/stop screen sharing with real feedback. Previously this was a bare
+    // `toggleScreenShare()` with no support check and no error handling, so on an
+    // unsupported device, a denied OS permission, or a dismissed picker it just
+    // silently did nothing — the core of the "screen sharing isn't working"
+    // reports. Stopping never needs a gate; starting is guarded and messaged.
+    const handleToggleScreenShare = async () => {
+        if (localScreenShareOn) {
+            try { await toggleScreenShare(); } catch { /* stopping should never fail loudly */ }
+            return;
+        }
+        if (!canScreenShare) {
+            toast.error('Screen sharing is only available on desktop browsers (Chrome, Edge, or Firefox).');
+            return;
+        }
+        console.log('[videosdk] starting screen share');
+        try {
+            await toggleScreenShare();
+        } catch (err: any) {
+            // Dismissing the browser's screen picker throws NotAllowedError — a
+            // normal cancel, so stay quiet. Anything else is a real failure worth
+            // surfacing (most commonly a missing macOS screen-recording grant).
+            const name = err?.name;
+            const message = String(err?.message || '');
+            const cancelled = name === 'NotAllowedError' || /permission denied|cancel|dismiss|aborted/i.test(message);
+            if (!cancelled) {
+                console.error('[videosdk] screen share failed:', err);
+                toast.error("Couldn't start screen sharing. On macOS, allow screen recording for your browser in System Settings, then try again.");
+            }
         }
     };
 
@@ -1164,9 +1223,14 @@ function ClassroomMeetingView({
                     <Button
                         size="icon"
                         variant={localScreenShareOn ? 'secondary' : 'outline'}
-                        onClick={() => toggleScreenShare()}
-                        className={`h-9 w-9 rounded-full cursor-pointer ${localScreenShareOn ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'border-border text-foreground hover:bg-muted'}`}
-                        title={localScreenShareOn ? 'Stop Presenting' : 'Share Screen'}
+                        onClick={handleToggleScreenShare}
+                        disabled={!canScreenShare && !localScreenShareOn}
+                        className={`h-9 w-9 rounded-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${localScreenShareOn ? 'bg-secondary text-secondary-foreground hover:bg-secondary/90' : 'border-border text-foreground hover:bg-muted'}`}
+                        title={
+                            !canScreenShare
+                                ? 'Screen sharing is available on desktop browsers only'
+                                : localScreenShareOn ? 'Stop Presenting' : 'Share Screen'
+                        }
                     >
                         <HiOutlineTv className="h-4.5 w-4.5" />
                     </Button>
@@ -1744,9 +1808,12 @@ function OfflineParticipantView({ displayName, isTutorUser, avatarInitials }: Of
 function PresenterScreenShare({ presenterId }: { presenterId: string }) {
     const participantObj = useParticipant(presenterId);
     const screenShareStream = participantObj?.screenShareStream;
+    const screenShareAudioStream = (participantObj as any)?.screenShareAudioStream;
     const screenShareOn = participantObj?.screenShareOn;
+    const isLocal = participantObj?.isLocal;
     const displayName = participantObj?.displayName;
     const videoRef = useRef<HTMLVideoElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     useEffect(() => {
         if (videoRef.current) {
@@ -1760,8 +1827,24 @@ function PresenterScreenShare({ presenterId }: { presenterId: string }) {
         }
     }, [screenShareStream, screenShareOn]);
 
+    // Forward the shared tab/system audio (e.g. a tutor playing a video in a
+    // shared Chrome tab) so remote viewers hear it too — previously only the
+    // video track was rendered, so screen shares were silent. Skip the local
+    // presenter: they already hear their own tab, and playing it back would echo.
+    useEffect(() => {
+        if (!audioRef.current) return;
+        if (!isLocal && screenShareOn && screenShareAudioStream?.track) {
+            audioRef.current.srcObject = new MediaStream([screenShareAudioStream.track]);
+            // Autoplay with sound may be deferred until a user gesture — that's fine.
+            audioRef.current.play().catch(() => { /* will resume on interaction */ });
+        } else {
+            audioRef.current.srcObject = null;
+        }
+    }, [screenShareAudioStream, screenShareOn, isLocal]);
+
     return (
         <div className="flex-1 h-full min-h-[300px] rounded-xl bg-black border border-border flex flex-col items-center justify-center relative overflow-hidden shadow-md">
+            <audio ref={audioRef} autoPlay className="hidden" />
             <video
                 ref={videoRef}
                 autoPlay
