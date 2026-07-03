@@ -84,6 +84,7 @@ export interface Config {
     'live-sessions': LiveSession;
     attendance: Attendance;
     'live-session-participants': LiveSessionParticipant;
+    'live-session-messages': LiveSessionMessage;
     assessments: Assessment;
     'assessment-questions': AssessmentQuestion;
     'tutor-assessments': TutorAssessment;
@@ -114,6 +115,7 @@ export interface Config {
     'live-sessions': LiveSessionsSelect<false> | LiveSessionsSelect<true>;
     attendance: AttendanceSelect<false> | AttendanceSelect<true>;
     'live-session-participants': LiveSessionParticipantsSelect<false> | LiveSessionParticipantsSelect<true>;
+    'live-session-messages': LiveSessionMessagesSelect<false> | LiveSessionMessagesSelect<true>;
     assessments: AssessmentsSelect<false> | AssessmentsSelect<true>;
     'assessment-questions': AssessmentQuestionsSelect<false> | AssessmentQuestionsSelect<true>;
     'tutor-assessments': TutorAssessmentsSelect<false> | TutorAssessmentsSelect<true>;
@@ -821,6 +823,22 @@ export interface LiveSessionParticipant {
   createdAt: string;
 }
 /**
+ * Chat messages posted during a live class session.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-session-messages".
+ */
+export interface LiveSessionMessage {
+  id: number;
+  liveSession: number | LiveSession;
+  sender: number | User;
+  senderName: string;
+  senderAccountType?: ('tutor' | 'student' | 'parent' | 'admin') | null;
+  message: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "assessments".
  */
@@ -1150,6 +1168,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'live-session-participants';
         value: number | LiveSessionParticipant;
+      } | null)
+    | ({
+        relationTo: 'live-session-messages';
+        value: number | LiveSessionMessage;
       } | null)
     | ({
         relationTo: 'assessments';
@@ -1576,6 +1598,19 @@ export interface LiveSessionParticipantsSelect<T extends boolean = true> {
   joinedAt?: T;
   leftAt?: T;
   durationSeconds?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "live-session-messages_select".
+ */
+export interface LiveSessionMessagesSelect<T extends boolean = true> {
+  liveSession?: T;
+  sender?: T;
+  senderName?: T;
+  senderAccountType?: T;
+  message?: T;
   updatedAt?: T;
   createdAt?: T;
 }

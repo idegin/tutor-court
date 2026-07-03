@@ -4,6 +4,7 @@ import * as migration_20260612_133823_update_nigeria_grades from './20260612_133
 import * as migration_20260612_135240_update_grade_levels_k12 from './20260612_135240_update_grade_levels_k12';
 import * as migration_20260612_150356_seed_subject_categories from './20260612_150356_seed_subject_categories';
 import * as migration_20260701_000000_live_session_unique_live_index from './20260701_000000_live_session_unique_live_index';
+import * as migration_20260703_131950_live_session_messages from './20260703_131950_live_session_messages';
 
 export const migrations = [
   {
@@ -29,11 +30,16 @@ export const migrations = [
   {
     up: migration_20260612_150356_seed_subject_categories.up,
     down: migration_20260612_150356_seed_subject_categories.down,
-    name: '20260612_150356_seed_subject_categories'
+    name: '20260612_150356_seed_subject_categories',
   },
   {
     up: migration_20260701_000000_live_session_unique_live_index.up,
     down: migration_20260701_000000_live_session_unique_live_index.down,
     name: '20260701_000000_live_session_unique_live_index',
+  },
+  {
+    up: migration_20260703_131950_live_session_messages.up,
+    down: migration_20260703_131950_live_session_messages.down,
+    name: '20260703_131950_live_session_messages'
   },
 ];

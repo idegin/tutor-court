@@ -655,12 +655,32 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         );
     }
 
-    // Wrap in MeetingProvider once live session starts
+    // The session is live but we don't yet have the real VideoSDK room id (e.g. a
+    // brief race between `isLive` flipping and the roomId arriving from the start
+    // response / status poll). We must NOT mount MeetingProvider with a made-up
+    // meetingId — a fabricated room that was never created via VideoSDK's /v2/rooms
+    // API would isolate this user in their own room (the "everyone only sees
+    // themselves" bug). MeetingProvider also does not re-initialise when the
+    // meetingId later changes, so joining the wrong room once is permanent for the
+    // session. Show a short connecting state and let the polls populate roomId.
+    if (!session?.roomId) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-muted/10 text-foreground p-4">
+                <Card className="w-full max-w-md bg-card border border-border shadow-2xl p-8 rounded-2xl text-center space-y-4">
+                    <div className="mx-auto h-12 w-12 rounded-full border-2 border-secondary border-t-transparent animate-spin" />
+                    <h2 className="text-lg font-bold tracking-tight text-foreground">Connecting to the classroom…</h2>
+                    <p className="text-sm text-muted-foreground">Setting up the live video room. This only takes a moment.</p>
+                </Card>
+            </div>
+        );
+    }
+
+    // Wrap in MeetingProvider once the live session AND its real room id exist.
     return (
         <MeetingProvider
             token={videoSdkToken}
             config={{
-                meetingId: session.roomId || `room-${cls.id}`,
+                meetingId: session.roomId,
                 micEnabled: micEnabled,
                 webcamEnabled: camEnabled,
                 name: `${currentUser.firstName} ${currentUser.lastName}`,
@@ -763,7 +783,18 @@ function ClassroomMeetingView({
         participants
     } = useMeeting({
         onMeetingJoined: () => {
-            console.log("Connected to VideoSDK WebRTC room");
+            // Log the room we actually joined. If tutor and students print DIFFERENT
+            // meetingIds here, they're in separate rooms — the root cause of "each
+            // user only sees themselves". They MUST match across all participants.
+            console.log("[videosdk] joined WebRTC room:", session?.roomId, "as participant", String(currentUser.id));
+        },
+        onParticipantJoined: (participant: any) => {
+            // A remote peer entered THIS room. If this never fires while others are
+            // in the class, the peers are in different rooms or media isn't relaying.
+            console.log("[videosdk] participant joined:", participant?.id, participant?.displayName);
+        },
+        onParticipantLeft: (participant: any) => {
+            console.log("[videosdk] participant left:", participant?.id, participant?.displayName);
         },
         onMeetingLeft: () => {
             router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`);
@@ -857,10 +888,19 @@ function ClassroomMeetingView({
         setActiveStudentsCount(studentCount);
     }, [uniqueParticipants, setActiveStudentsCount, tutorId]);
 
-    // Real-time Chat using VideoSDK PubSub
-    const { publish, messages } = usePubSub("CHAT");
+    // Live-class chat. This used to run over VideoSDK pubSub, but persisted
+    // publishes were rejected by the SDK and the message never left the browser
+    // ("Failed to send chat message" with no network request at all). Chat now
+    // uses our own backend — POST to send, a short poll to receive — so it no
+    // longer depends on the VideoSDK meeting connection.
+    const [chatMessages, setChatMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const chatEndRef = useRef<HTMLDivElement>(null);
+    // The poll's `after` cursor (highest message id already fetched) and the set
+    // of ids already rendered, so a self-sent message and its polled copy never
+    // show up twice.
+    const chatCursorRef = useRef<number>(0);
+    const chatSeenRef = useRef<Set<number>>(new Set());
 
     // Real-time Whiteboard Toggle using VideoSDK PubSub
     const { publish: publishWhiteboard, messages: whiteboardMessages } = usePubSub("WHITEBOARD_TOGGLE");
@@ -868,7 +908,52 @@ function ClassroomMeetingView({
     // Scroll chat to bottom when new messages arrive
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [chatMessages]);
+
+    // Poll the backend for chat messages. This view only mounts once the class
+    // is live, so a valid session id is all we need to gate on. Uses the `after`
+    // cursor so each tick only pulls messages newer than what we already have.
+    useEffect(() => {
+        if (!session?.id) return;
+
+        let cancelled = false;
+
+        const applyMessages = (incoming: any[]) => {
+            if (!Array.isArray(incoming) || incoming.length === 0) return;
+            // Advance the cursor for the next poll even if everything was already
+            // seen (e.g. our own just-sent message), so the poll doesn't refetch
+            // the same tail forever.
+            chatCursorRef.current = incoming.reduce(
+                (max, m) => (m.id > max ? m.id : max),
+                chatCursorRef.current,
+            );
+            const fresh = incoming.filter((m) => !chatSeenRef.current.has(m.id));
+            if (fresh.length === 0) return;
+            fresh.forEach((m) => chatSeenRef.current.add(m.id));
+            setChatMessages((prev) => [...prev, ...fresh].sort((a, b) => a.id - b.id));
+        };
+
+        const poll = async () => {
+            try {
+                const after = chatCursorRef.current;
+                const url = `/api/live-sessions/${session.id}/chat${after ? `?after=${after}` : ''}`;
+                const res = await fetch(url);
+                if (cancelled || !res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                if (!cancelled) applyMessages(data.messages);
+            } catch (err) {
+                console.error('Error polling chat messages:', err);
+            }
+        };
+
+        poll();
+        const interval = setInterval(poll, 3000);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [session?.id]);
 
     // Sync Whiteboard State across all participants in the meeting room
     useEffect(() => {
@@ -893,13 +978,30 @@ function ClassroomMeetingView({
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim()) return;
+        const text = newMessage.trim();
+        if (!text || !session?.id) return;
 
         try {
-            await publish(newMessage.trim(), { persist: true });
+            const res = await fetch(`/api/live-sessions/${session.id}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to send message');
+            }
+            const { message: sent } = await res.json();
             setNewMessage('');
-        } catch (err) {
-            toast.error("Failed to send chat message.");
+            // Show our own message immediately; the poll dedupes it by id via
+            // chatSeenRef, so it won't appear twice when the next tick returns it.
+            if (sent && !chatSeenRef.current.has(sent.id)) {
+                chatSeenRef.current.add(sent.id);
+                setChatMessages((prev) => [...prev, sent].sort((a, b) => a.id - b.id));
+            }
+        } catch (err: any) {
+            console.error('[chat] send failed:', err);
+            toast.error('Failed to send chat message.');
         }
     };
 
@@ -1156,12 +1258,12 @@ function ClassroomMeetingView({
                                     </h3>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                                    {messages.map((msg: any) => (
+                                    {chatMessages.map((msg: any) => (
                                         <div key={msg.id} className="space-y-0.5">
                                             <div className="flex justify-between items-center">
                                                 <span className="font-bold text-secondary">{msg.senderName}</span>
                                                 <span className="text-[9px] text-muted-foreground">
-                                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
                                             <p className="bg-muted/40 p-2 rounded-lg text-foreground border border-border/40 break-words">
@@ -1169,7 +1271,7 @@ function ClassroomMeetingView({
                                             </p>
                                         </div>
                                     ))}
-                                    {messages.length === 0 && (
+                                    {chatMessages.length === 0 && (
                                         <p className="text-center text-muted-foreground text-[10px] mt-6">
                                             No messages yet. Start the conversation!
                                         </p>

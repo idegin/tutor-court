@@ -25,6 +25,7 @@ import { WhiteboardSlides } from './collections/WhiteboardSlides'
 import { LiveSessions } from './collections/LiveSessions'
 import { Attendance } from './collections/Attendance'
 import { LiveSessionParticipants } from './collections/LiveSessionParticipants'
+import { LiveSessionMessages } from './collections/LiveSessionMessages'
 import { Assessments } from './collections/Assessments'
 import { AssessmentQuestions } from './collections/AssessmentQuestions'
 import { TutorAssessments } from './collections/TutorAssessments'
@@ -123,6 +124,7 @@ export default buildConfig({
     LiveSessions,
     Attendance,
     LiveSessionParticipants,
+    LiveSessionMessages,
     Assessments,
     AssessmentQuestions,
     TutorAssessments,
