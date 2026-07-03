@@ -828,14 +828,28 @@ function ClassroomMeetingView({
         }
     };
 
-    // Auto-join the meeting on mount, and leave on unmount. The deps MUST stay
-    // empty: VideoSDK returns fresh join/leave references on every render, so
-    // depending on them (the previous behaviour) re-ran this effect constantly,
-    // tearing down and rebuilding the room on each render. That silently broke
-    // chat, mic/camera toggling, and made each user only ever see themselves.
+    // Auto-join the meeting exactly once.
+    //
+    // React 18 StrictMode (on by default in Next.js dev) mounts every effect
+    // twice — mount → cleanup → mount. The previous version called join() on
+    // mount and leave() in the cleanup, so the cleanup fired leave() in the
+    // MIDDLE of the still-in-flight async join(). VideoSDK doesn't recover from
+    // that: you'd get a local participant (so you saw yourself) but the SFU
+    // connection was corrupted — no remote peers ever arrived and mic/camera
+    // toggles did nothing. That's the "everyone is alone and can't toggle
+    // mic/cam" bug.
+    //
+    // Fix: a ref guards join() to run once, and we do NOT leave() on the
+    // synthetic unmount. Real exits are handled explicitly by handleExit() and
+    // onMeetingLeft; tab close is covered by the beforeunload listener. The
+    // status route also reconciles active participants against VideoSDK's live
+    // list, so a lingering ghost from a raw back-navigation is cleaned up.
+    const hasJoinedRef = useRef(false);
     useEffect(() => {
+        if (hasJoinedRef.current) return;
+        hasJoinedRef.current = true;
         join();
-        // Stop local media on tab close too — the SDK's own beforeunload doesn't
+        // Stop local media on tab close — the SDK's own beforeunload doesn't
         // reliably stop getUserMedia tracks, leaving the camera light on.
         const onUnload = () => {
             try { leave(); } catch { /* noop */ }
@@ -843,7 +857,6 @@ function ClassroomMeetingView({
         window.addEventListener('beforeunload', onUnload);
         return () => {
             window.removeEventListener('beforeunload', onUnload);
-            leave();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -901,6 +914,11 @@ function ClassroomMeetingView({
     // show up twice.
     const chatCursorRef = useRef<number>(0);
     const chatSeenRef = useRef<Set<number>>(new Set());
+    // Number of unread messages from other people, shown as a badge on the chat
+    // tab. `chatInitializedRef` guards the very first poll so the history that
+    // loads on join doesn't fire a burst of "new message" toasts.
+    const [unreadChat, setUnreadChat] = useState(0);
+    const chatInitializedRef = useRef(false);
 
     // Real-time Whiteboard Toggle using VideoSDK PubSub
     const { publish: publishWhiteboard, messages: whiteboardMessages } = usePubSub("WHITEBOARD_TOGGLE");
@@ -909,6 +927,15 @@ function ClassroomMeetingView({
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatMessages]);
+
+    // Track whether the chat panel is currently open in a ref (so the poll's
+    // long-lived closure sees the live value) and clear the unread badge whenever
+    // the user is actually looking at the chat.
+    const chatOpenRef = useRef(false);
+    useEffect(() => {
+        chatOpenRef.current = activeTab === 'chat' && isPanelOpen;
+        if (chatOpenRef.current) setUnreadChat(0);
+    }, [activeTab, isPanelOpen, chatMessages]);
 
     // Poll the backend for chat messages. This view only mounts once the class
     // is live, so a valid session id is all we need to gate on. Uses the `after`
@@ -931,6 +958,28 @@ function ClassroomMeetingView({
             if (fresh.length === 0) return;
             fresh.forEach((m) => chatSeenRef.current.add(m.id));
             setChatMessages((prev) => [...prev, ...fresh].sort((a, b) => a.id - b.id));
+
+            // Notify about messages from other people. Skip the first poll (that's
+            // just backlog on join) and skip when the chat panel is already open.
+            // chatOpenRef is read (not activeTab/isPanelOpen directly) because this
+            // closure is created once per session and would otherwise see a stale
+            // tab state.
+            if (chatInitializedRef.current && !chatOpenRef.current) {
+                const fromOthers = fresh.filter(
+                    (m) => String(m.senderId) !== String(currentUser.id),
+                );
+                if (fromOthers.length > 0) {
+                    const latest = fromOthers[fromOthers.length - 1];
+                    toast.info(
+                        fromOthers.length === 1
+                            ? `${latest.senderName}: ${latest.message}`
+                            : `${fromOthers.length} new messages`,
+                        { description: fromOthers.length === 1 ? undefined : `Latest from ${latest.senderName}` },
+                    );
+                    setUnreadChat((n) => n + fromOthers.length);
+                }
+            }
+            chatInitializedRef.current = true;
         };
 
         const poll = async () => {
@@ -1438,6 +1487,11 @@ function ClassroomMeetingView({
                         title="Chat"
                     >
                         <HiOutlineChatBubbleLeftRight className="h-5 w-5" />
+                        {unreadChat > 0 && (
+                            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none">
+                                {unreadChat > 9 ? '9+' : unreadChat}
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={() => toggleTab('participants')}
