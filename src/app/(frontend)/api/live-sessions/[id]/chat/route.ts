@@ -117,6 +117,29 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email || 'Participant'
 
   try {
+    // Idempotency guard: if this exact message from this sender was just written
+    // (double-click, a retried request, or a component remount re-firing the
+    // send), return the existing row instead of creating a duplicate. This is
+    // what caused "every message is delivered twice".
+    const DEDUPE_WINDOW_MS = 10_000
+    const recent = await payload.find({
+      collection: 'live-session-messages',
+      where: {
+        and: [
+          { liveSession: { equals: id } },
+          { sender: { equals: user.id } },
+          { message: { equals: message } },
+          { createdAt: { greater_than: new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString() } },
+        ],
+      },
+      sort: '-id',
+      limit: 1,
+      depth: 0,
+    })
+    if (recent.docs.length > 0) {
+      return NextResponse.json({ message: serialize(recent.docs[0]), deduped: true }, { status: 200 })
+    }
+
     const created = await payload.create({
       collection: 'live-session-messages',
       data: {

@@ -69,6 +69,10 @@ export default async function ClassroomPage(props: PageProps) {
       where: {
         and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }],
       },
+      // Deterministic: if more than one live session somehow exists, everyone
+      // (this page, the status route, the start route) picks the SAME most-recent
+      // one, so tutor and students never split across different roomIds.
+      sort: '-startedAt',
       limit: 1,
       depth: 0,
     })

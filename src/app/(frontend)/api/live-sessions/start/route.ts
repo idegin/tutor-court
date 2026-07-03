@@ -72,18 +72,37 @@ export async function POST(request: Request) {
     }
 
     // Prevent duplicate concurrent sessions for the same class (double-clicks,
-    // two open tabs). Reuse the existing live session instead of creating a
-    // second room that would split participants.
+    // two open tabs) AND heal any that already exist. There is no DB-level
+    // "one live session per class" constraint, so more than one `live` row can
+    // exist (a lingering session that was never ended + a fresh start). If the
+    // tutor reuses one and a student's page load resolves another, they get
+    // different roomIds and end up isolated ("everyone only sees themselves").
+    //
+    // Canonicalise to the MOST RECENT live session and end the rest, so every
+    // reader (page.tsx / status route, which sort the same way) converges on the
+    // same room.
     const existingLive = await payload.find({
       collection: 'live-sessions',
       where: {
         and: [{ class: { equals: classId } }, { status: { equals: 'live' } }],
       },
-      limit: 1,
+      sort: '-startedAt',
+      limit: 100,
       depth: 0,
     })
     if (existingLive.docs.length > 0) {
-      return NextResponse.json({ session: existingLive.docs[0] })
+      const [canonical, ...stale] = existingLive.docs
+      // End any duplicate live sessions so only the canonical one remains.
+      for (const dup of stale) {
+        await payload
+          .update({
+            collection: 'live-sessions',
+            id: dup.id,
+            data: { status: 'ended', endedAt: new Date().toISOString() } as any,
+          })
+          .catch((err) => console.error('[live-sessions/start] failed to end stale session', dup.id, err))
+      }
+      return NextResponse.json({ session: canonical })
     }
 
     // Create a real VideoSDK room. We use a fresh server-scoped token for the
@@ -126,9 +145,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create the session. A partial unique index (one live session per class)
-    // makes this atomic: if a concurrent request won the race, the insert throws
-    // and we reuse the winner instead of creating a second room/billing.
+    // Create the session. If a concurrent request won the race and created a
+    // live session in the meantime, reuse the most recent one instead of leaving
+    // two rooms behind (same deterministic sort as everywhere else).
     let session
     try {
       session = await payload.create({
@@ -148,6 +167,7 @@ export async function POST(request: Request) {
       const raced = await payload.find({
         collection: 'live-sessions',
         where: { and: [{ class: { equals: classId } }, { status: { equals: 'live' } }] },
+        sort: '-startedAt',
         limit: 1,
         depth: 0,
       })

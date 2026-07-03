@@ -967,6 +967,9 @@ function ClassroomMeetingView({
     // longer depends on the VideoSDK meeting connection.
     const [chatMessages, setChatMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
+    // In-flight guard for sending so one submit can't POST the same message twice.
+    const [sendingMessage, setSendingMessage] = useState(false);
+    const sendingRef = useRef(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
     // The poll's `after` cursor (highest message id already fetched) and the set
     // of ids already rendered, so a self-sent message and its polled copy never
@@ -1088,6 +1091,12 @@ function ClassroomMeetingView({
         e.preventDefault();
         const text = newMessage.trim();
         if (!text || !session?.id) return;
+        // Guard against a double-submit (rapid Enter+click, or a re-render firing
+        // the handler twice) sending the same message twice. The server also
+        // dedupes, but stopping it here avoids the wasted round-trip entirely.
+        if (sendingRef.current) return;
+        sendingRef.current = true;
+        setSendingMessage(true);
 
         try {
             const res = await fetch(`/api/live-sessions/${session.id}/chat`, {
@@ -1110,6 +1119,9 @@ function ClassroomMeetingView({
         } catch (err: any) {
             console.error('[chat] send failed:', err);
             toast.error('Failed to send chat message.');
+        } finally {
+            sendingRef.current = false;
+            setSendingMessage(false);
         }
     };
 
@@ -1399,8 +1411,8 @@ function ClassroomMeetingView({
                                         placeholder="Type message..."
                                         className="h-9 bg-background border-border text-xs focus:ring-secondary focus:border-secondary text-foreground animate-none"
                                     />
-                                    <Button type="submit" size="sm" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground cursor-pointer h-9 text-xs">
-                                        Send
+                                    <Button type="submit" size="sm" disabled={sendingMessage} className="bg-secondary hover:bg-secondary/90 text-secondary-foreground cursor-pointer h-9 text-xs disabled:opacity-60 disabled:cursor-not-allowed">
+                                        {sendingMessage ? 'Sending…' : 'Send'}
                                     </Button>
                                 </form>
                             </div>

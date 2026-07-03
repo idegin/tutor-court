@@ -40,7 +40,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
-    // Find active/live session for this class
+    // Find active/live session for this class. Sort by newest-first so a waiting
+    // student resolves the SAME session (and roomId) the tutor's start route and
+    // the classroom page settle on, even if a stale live session lingers.
     const sessions = await payload.find({
       collection: 'live-sessions',
       where: {
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
           { status: { equals: 'live' } },
         ],
       },
+      sort: '-startedAt',
       limit: 1,
       depth: 0,
     })
