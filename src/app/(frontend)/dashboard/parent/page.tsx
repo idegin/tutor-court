@@ -48,7 +48,7 @@ export default async function ParentOverviewPage() {
   const balance = (wallet?.balance as number) || 0
   const credits = (wallet?.creditBalance as number) || 0
 
-  // Only classes with a future occurrence (drops ended series), soonest first.
+  // Active classes (not completed/cancelled), ordered by next occurrence.
   const upcomingClasses = getUpcomingClasses(classesRes.docs as any[])
 
   return (

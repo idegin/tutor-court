@@ -18,19 +18,27 @@ const DAY_INDEX: Record<string, number> = {
 type ScheduleSlot = { day?: string; startTime?: string }
 
 /**
- * Returns the next occurrence Date at/after `now`, or null when the class has no
- * future occurrence (series ended, or no schedule). Times are treated in the
+ * Returns the next weekly occurrence Date at/after `now` from the class schedule,
+ * or null only when the class has no usable schedule. Times are treated in the
  * server's local zone — matching how the dashboards render day/time labels.
+ *
+ * `endDate` is treated as an upper bound ONLY while the series window is still
+ * open (endDate >= now). A class that is still active/scheduled past its endDate
+ * keeps producing a next occurrence so the dashboard mirrors the Classes page
+ * (which lists a class as "active & upcoming" purely by status). Otherwise a
+ * still-running recurring class silently vanished from the student's overview
+ * the moment its original endDate passed, even though its status was unchanged.
  */
 export function getNextOccurrence(cls: any, now: Date): Date | null {
   const schedule: ScheduleSlot[] = Array.isArray(cls?.schedule) ? cls.schedule : []
   if (schedule.length === 0) return null
 
   const endOfSeries = cls?.endDate ? new Date(cls.endDate) : null
-  if (endOfSeries) {
-    endOfSeries.setHours(23, 59, 59, 999)
-    if (endOfSeries.getTime() < now.getTime()) return null
-  }
+  if (endOfSeries) endOfSeries.setHours(23, 59, 59, 999)
+  // Only clamp future occurrences to the endDate while the series is still within
+  // its window; a past endDate no longer bounds an otherwise-active class.
+  const bound =
+    endOfSeries && endOfSeries.getTime() >= now.getTime() ? endOfSeries : null
 
   // If the series hasn't started yet, count occurrences from the start date.
   const startDate = cls?.startDate ? new Date(cls.startDate) : null
@@ -49,27 +57,30 @@ export function getNextOccurrence(cls: any, now: Date): Date | null {
     if (diff === 0 && candidate.getTime() < base.getTime()) diff = 7
     candidate.setDate(candidate.getDate() + diff)
 
-    if (endOfSeries && candidate.getTime() > endOfSeries.getTime()) continue
+    if (bound && candidate.getTime() > bound.getTime()) continue
     if (!best || candidate.getTime() < best.getTime()) best = candidate
   }
   return best
 }
 
 /**
- * Filters out ended/completed/cancelled classes and returns those with a future
- * occurrence, sorted soonest-first. Each item is the original class with a
- * `nextOccurrence` Date attached.
+ * Returns a student's/parent's active classes — everything that isn't completed
+ * or cancelled, i.e. the same set the Classes page shows as "active & upcoming" —
+ * sorted soonest-first by their next occurrence. A class is never dropped for
+ * lacking a computable occurrence (e.g. its series endDate has passed but it's
+ * still active); such classes just sort after those with a concrete next time.
+ * Each item carries a `nextOccurrence` (null when none could be computed).
  */
 export function getUpcomingClasses<T extends Record<string, any>>(
   classes: T[],
   now: Date = new Date(),
-): (T & { nextOccurrence: Date })[] {
+): (T & { nextOccurrence: Date | null })[] {
   return classes
     .filter((c) => c.status !== 'completed' && c.status !== 'cancelled')
-    .map((c) => {
-      const nextOccurrence = getNextOccurrence(c, now)
-      return nextOccurrence ? { ...c, nextOccurrence } : null
+    .map((c) => ({ ...c, nextOccurrence: getNextOccurrence(c, now) }))
+    .sort((a, b) => {
+      const at = a.nextOccurrence ? a.nextOccurrence.getTime() : Infinity
+      const bt = b.nextOccurrence ? b.nextOccurrence.getTime() : Infinity
+      return at - bt
     })
-    .filter((c): c is T & { nextOccurrence: Date } => c !== null)
-    .sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime())
 }

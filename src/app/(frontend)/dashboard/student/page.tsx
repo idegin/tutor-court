@@ -67,7 +67,7 @@ export default async function StudentOverviewPage() {
     }),
   ])
 
-  // Only classes with a future occurrence (drops ended series), soonest first.
+  // Active classes (not completed/cancelled), ordered by next occurrence.
   const upcoming = getUpcomingClasses(classesRes.docs as any[])
   const pendingAssessments = (tutorAssessmentsRes.docs as any[]).filter(
     (a) => a.status === 'pending' || a.status === 'in_progress',
