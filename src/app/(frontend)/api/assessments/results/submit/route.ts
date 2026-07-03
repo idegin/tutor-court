@@ -1,5 +1,6 @@
 import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
@@ -258,6 +259,19 @@ export async function POST(request: Request) {
     } catch (mailErr) {
       console.error('[assessments/submit] Failed to email tutor:', mailErr)
     }
+  }
+
+  // PROG-106: the new score is persisted above, but the progress dashboards are
+  // held in Next.js' client Router Cache and would keep showing the old score
+  // until it expired. Mark the score-bearing routes stale so the student's,
+  // parent's, and tutor's next visit re-renders with fresh data.
+  try {
+    revalidatePath('/dashboard/student')
+    revalidatePath('/dashboard/student/assessments')
+    revalidatePath('/dashboard/parent/students/[id]', 'page')
+    revalidatePath('/dashboard/tutor')
+  } catch (err) {
+    console.error('[assessments/submit] revalidate failed:', err)
   }
 
   return NextResponse.json({ success: true, result })
