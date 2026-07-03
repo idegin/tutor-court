@@ -47,6 +47,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from '@/components/ui/textarea';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const DAYS_OF_WEEK = [
     { id: 'sun', label: 'Sun', name: 'sunday' },
@@ -63,6 +73,8 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
     const [classes, setClasses] = useState(initialClasses);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Form states
     const [editingClassId, setEditingClassId] = useState<string | null>(null);
@@ -220,6 +232,30 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             toast.error(error.message || 'An error occurred.');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDeleteClass = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/tutor/classes/${deleteTarget.id}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to delete class.');
+            }
+            // Drop it from the local list immediately so the row disappears even
+            // before the server components refetch.
+            setClasses((current) => current.filter((c) => String(c.id) !== String(deleteTarget.id)));
+            toast.success('Class deleted successfully.');
+            setDeleteTarget(null);
+            router.refresh();
+        } catch (error: any) {
+            toast.error(error.message || 'An error occurred while deleting the class.');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -516,7 +552,12 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                         Edit details
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        variant="destructive"
+                                                        onClick={() => setDeleteTarget(cls)}
+                                                    >
+                                                        Delete
+                                                    </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
@@ -533,6 +574,32 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     </TableBody>
                 </Table>
             </div>
+
+            {/* Delete Class Confirmation */}
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Class</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete{' '}
+                            <strong>{deleteTarget?.title || 'this class'}</strong>? This permanently
+                            removes the class and its pending invitations. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteClass();
+                            }}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

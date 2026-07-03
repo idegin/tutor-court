@@ -76,3 +76,56 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const payload = await getPayload({ config })
+  const headers = await getHeaders()
+  const { user } = await payload.auth({ headers })
+  const { id } = await params
+
+  if (!user || user.accountType !== 'tutor') {
+    return NextResponse.json({ error: 'Only tutors can delete classes.' }, { status: 403 })
+  }
+
+  try {
+    const existingClass = await payload.findByID({ collection: 'classes', id, depth: 0 })
+    if (!existingClass) {
+      return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
+    }
+
+    const tutorId =
+      typeof existingClass.tutor === 'object' ? (existingClass.tutor as any).id : existingClass.tutor
+    if (tutorId !== user.id) {
+      return NextResponse.json({ error: 'Not authorized to delete this class.' }, { status: 403 })
+    }
+
+    // Never delete a class that is mid-session — the tutor must end it first,
+    // otherwise participants would be left in an orphaned live room.
+    const activeSessions = await payload.find({
+      collection: 'live-sessions',
+      where: {
+        and: [{ class: { equals: id } }, { status: { in: ['live', 'waiting'] } }],
+      },
+      limit: 1,
+      depth: 0,
+    })
+    if (activeSessions.totalDocs > 0) {
+      return NextResponse.json({ error: 'End the live class before deleting it.' }, { status: 409 })
+    }
+
+    // Remove pending invitations for this class: they carry unique tokens and
+    // are meaningless once the class is gone. Other related rows (past sessions,
+    // attendance, reviews) have ON DELETE SET NULL foreign keys, so they remain
+    // as history without blocking the delete.
+    await payload
+      .delete({ collection: 'class-invitations', where: { class: { equals: id } } })
+      .catch((err) => console.error('[classes/delete] invitation cleanup failed:', err))
+
+    await payload.delete({ collection: 'classes', id, overrideAccess: true })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('[classes/delete] error:', error)
+    return NextResponse.json({ error: error.message || 'Failed to delete class.' }, { status: 500 })
+  }
+}
