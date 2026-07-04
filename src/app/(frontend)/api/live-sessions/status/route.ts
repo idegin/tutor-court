@@ -51,7 +51,7 @@ export async function GET(request: Request) {
           { status: { equals: 'live' } },
         ],
       },
-      sort: '-startedAt',
+      sort: ['-startedAt', '-id'],
       limit: 1,
       depth: 0,
     })

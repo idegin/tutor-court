@@ -43,14 +43,16 @@ export async function POST(request: Request) {
     if (latestLog && !latestLog.leftAt) {
       const joinedTime = new Date(latestLog.joinedAt).getTime()
       const leftTime = now.getTime()
-      const durationSeconds = Math.max(0, Math.floor((leftTime - joinedTime) / 1000))
+      const intervalSeconds = Math.max(0, Math.floor((leftTime - joinedTime) / 1000))
 
       await payload.update({
         collection: 'live-session-participants',
         id: latestLog.id,
         data: {
           leftAt: now.toISOString(),
-          durationSeconds,
+          // joinedAt resets on every rejoin; earlier intervals are already
+          // accumulated in durationSeconds, so add rather than overwrite.
+          durationSeconds: (Number(latestLog.durationSeconds) || 0) + intervalSeconds,
         } as any,
       })
     }
@@ -70,14 +72,17 @@ export async function POST(request: Request) {
       if (latestAttendance && !latestAttendance.leftAt) {
         const joinedTime = new Date(latestAttendance.joinedAt).getTime()
         const leftTime = now.getTime()
-        const durationMinutes = Math.max(1, Math.ceil((leftTime - joinedTime) / (1000 * 60)))
+        // No 1-minute floor here: intervals ACCUMULATE across rejoins, and a
+        // floored interval per reconnect would inflate a flaky connection into
+        // phantom minutes.
+        const intervalMinutes = Math.max(0, Math.ceil((leftTime - joinedTime) / (1000 * 60)))
 
         await payload.update({
           collection: 'attendance',
           id: latestAttendance.id,
           data: {
             leftAt: now.toISOString(),
-            durationMinutes,
+            durationMinutes: (Number(latestAttendance.durationMinutes) || 0) + intervalMinutes,
           } as any,
         })
       }

@@ -6,6 +6,36 @@ import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { CREDIT_RATE } from '@/lib/constants'
 import { toIntId } from '@/lib/id'
 
+// A "live" session can be an orphan: there is no background worker, so if the
+// tutor's tab dies without ending the class, the row stays live forever. Any
+// live session older than this is treated as abandoned rather than reusable.
+const MAX_LIVE_SESSION_AGE_MS = 6 * 60 * 60 * 1000
+
+/**
+ * Check that a previously created VideoSDK room is still accepted by the
+ * service under the CURRENT credentials. Only a definitive 4xx marks the room
+ * invalid; transient failures must not block reusing an otherwise-fine room.
+ */
+async function isRoomStillValid(roomId: string | null | undefined): Promise<boolean> {
+  if (!roomId) return false
+  const token = generateVideoSdkToken(300, 'server')
+  if (!token) return false
+  try {
+    const res = await fetch(`https://api.videosdk.live/v2/rooms/validate/${roomId}`, {
+      headers: { Authorization: token, 'Content-Type': 'application/json' },
+    })
+    if (res.ok) {
+      // A room can validate but be administratively disabled — that's dead too.
+      const data = await res.json().catch(() => ({}))
+      return data?.disabled !== true
+    }
+    if (res.status >= 400 && res.status < 500) return false
+    return true
+  } catch {
+    return true
+  }
+}
+
 export async function POST(request: Request) {
   if (!isVideoSdkAvailable()) {
     return NextResponse.json(
@@ -86,23 +116,102 @@ export async function POST(request: Request) {
       where: {
         and: [{ class: { equals: classId } }, { status: { equals: 'live' } }],
       },
-      sort: '-startedAt',
+      sort: ['-startedAt', '-id'],
       limit: 100,
       depth: 0,
     })
+    // End an abandoned/duplicate live session AND close its dangling
+    // participant/attendance rows, so they can never feed the billing poll
+    // (whose duration math would otherwise be computed from an ancient
+    // startedAt and drain the wallet the moment the class is reused).
+    const endStaleSession = async (doc: any) => {
+      const endedIso = new Date().toISOString()
+      await payload
+        .update({
+          collection: 'live-sessions',
+          id: doc.id,
+          data: { status: 'ended', endedAt: endedIso } as any,
+        })
+        .catch((err) =>
+          console.error('[live-sessions/start] failed to end stale session', doc.id, err),
+        )
+      try {
+        const openLogs = await payload.find({
+          collection: 'live-session-participants',
+          where: {
+            and: [{ liveSession: { equals: doc.id } }, { leftAt: { exists: false } }],
+          },
+          limit: 1000,
+          depth: 0,
+        })
+        for (const log of openLogs.docs as any[]) {
+          const intervalSec = Math.max(
+            0,
+            Math.floor((Date.now() - new Date(log.joinedAt).getTime()) / 1000),
+          )
+          await payload.update({
+            collection: 'live-session-participants',
+            id: log.id,
+            data: {
+              leftAt: endedIso,
+              // Cap the closing interval so an orphan from days ago doesn't
+              // record an absurd duration.
+              durationSeconds:
+                (Number(log.durationSeconds) || 0) +
+                Math.min(intervalSec, Math.floor(MAX_LIVE_SESSION_AGE_MS / 1000)),
+            } as any,
+          })
+        }
+        const openAttendance = await payload.find({
+          collection: 'attendance',
+          where: {
+            and: [{ liveSession: { equals: doc.id } }, { leftAt: { exists: false } }],
+          },
+          limit: 1000,
+          depth: 0,
+        })
+        for (const att of openAttendance.docs as any[]) {
+          const intervalMin = Math.max(
+            0,
+            Math.ceil((Date.now() - new Date(att.joinedAt).getTime()) / (1000 * 60)),
+          )
+          await payload.update({
+            collection: 'attendance',
+            id: att.id,
+            data: {
+              leftAt: endedIso,
+              durationMinutes:
+                (Number(att.durationMinutes) || 0) +
+                Math.min(intervalMin, Math.floor(MAX_LIVE_SESSION_AGE_MS / (1000 * 60))),
+            } as any,
+          })
+        }
+      } catch (err) {
+        console.error('[live-sessions/start] failed to close logs of stale session', doc.id, err)
+      }
+    }
+
     if (existingLive.docs.length > 0) {
       const [canonical, ...stale] = existingLive.docs
       // End any duplicate live sessions so only the canonical one remains.
       for (const dup of stale) {
-        await payload
-          .update({
-            collection: 'live-sessions',
-            id: dup.id,
-            data: { status: 'ended', endedAt: new Date().toISOString() } as any,
-          })
-          .catch((err) => console.error('[live-sessions/start] failed to end stale session', dup.id, err))
+        await endStaleSession(dup)
       }
-      return NextResponse.json({ session: canonical })
+
+      // Only reuse the canonical session when it is recent AND its VideoSDK
+      // room is still valid. Reusing an orphan hands every participant a dead
+      // room — media never connects while chat/whiteboard (our own backend)
+      // keep working, which is exactly the "nobody can see or hear anyone"
+      // report. Otherwise end it and start fresh below.
+      const startedAtMs = new Date(
+        (canonical as any).startedAt || (canonical as any).createdAt,
+      ).getTime()
+      const isFresh =
+        Number.isFinite(startedAtMs) && Date.now() - startedAtMs < MAX_LIVE_SESSION_AGE_MS
+      if (isFresh && (await isRoomStillValid((canonical as any).roomId))) {
+        return NextResponse.json({ session: canonical })
+      }
+      await endStaleSession(canonical)
     }
 
     // Create a real VideoSDK room. We use a fresh server-scoped token for the
@@ -167,7 +276,7 @@ export async function POST(request: Request) {
       const raced = await payload.find({
         collection: 'live-sessions',
         where: { and: [{ class: { equals: classId } }, { status: { equals: 'live' } }] },
-        sort: '-startedAt',
+        sort: ['-startedAt', '-id'],
         limit: 1,
         depth: 0,
       })
@@ -175,6 +284,33 @@ export async function POST(request: Request) {
         return NextResponse.json({ session: raced.docs[0] })
       }
       throw createErr
+    }
+
+    // Converge after create: the duplicate check above is check-then-create
+    // with no DB constraint, so two near-simultaneous starts can BOTH create a
+    // session. If that happened, deterministically keep the newest and end the
+    // rest — and return the survivor even if it isn't the one this request
+    // created, so both racing tabs (and every student poll) land in the SAME
+    // room instead of the class splitting across two.
+    const postCreate = await payload.find({
+      collection: 'live-sessions',
+      where: { and: [{ class: { equals: classId } }, { status: { equals: 'live' } }] },
+      sort: ['-startedAt', '-id'],
+      limit: 10,
+      depth: 0,
+    })
+    if (postCreate.docs.length > 1) {
+      const ranked = [...postCreate.docs].sort((a: any, b: any) => {
+        const at = new Date(a.startedAt || a.createdAt).getTime()
+        const bt = new Date(b.startedAt || b.createdAt).getTime()
+        if (bt !== at) return bt - at
+        return Number(b.id) - Number(a.id)
+      })
+      const winner = ranked[0]
+      for (const dup of ranked.slice(1)) {
+        await endStaleSession(dup)
+      }
+      return NextResponse.json({ session: winner })
     }
 
     return NextResponse.json({ session })

@@ -31,6 +31,7 @@ import {
     HiXMark,
 } from 'react-icons/hi2';
 import { MeetingProvider, useMeeting, useParticipant, usePubSub } from '@videosdk.live/react-sdk';
+import { makeLiveParticipantId, participantUserId } from '@/lib/live-participant-id';
 
 interface ClassroomClientProps {
     cls: any;
@@ -192,6 +193,31 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Call controls initial state
     const [micEnabled, setMicEnabled] = useState(true);
     const [camEnabled, setCamEnabled] = useState(true);
+
+    // VideoSDK participant id for THIS tab. Never the bare user id: VideoSDK
+    // rejects a join whose participantId already exists in the room
+    // (DUPLICATE_PARTICIPANT), which used to break refresh/rejoin and second
+    // tabs — the user would sit alone with dead mic/cam toggles. Stable for the
+    // lifetime of the page via ref.
+    const participantIdRef = useRef<string | null>(null);
+    if (!participantIdRef.current) {
+        participantIdRef.current = makeLiveParticipantId(currentUser.id);
+    }
+
+    // Fresh room token, minted when the class actually goes live. The token
+    // embedded at page render ages while a student waits for the tutor (or
+    // while a class runs long); joining with an expired token fails silently —
+    // no remote participants, dead toggles. `null` = not fetched yet.
+    const [liveToken, setLiveToken] = useState<string | null>(null);
+
+    // Registered by the meeting view so THIS component can disconnect media on
+    // paths that unmount MeetingProvider from the outside (session ended by
+    // the tutor/auto-close, or an authorization kick). Without it, the camera
+    // could stay live after the SPA navigation away from the classroom.
+    const meetingLeaveRef = useRef<(() => void) | null>(null);
+    const disconnectMeeting = () => {
+        try { meetingLeaveRef.current?.(); } catch { /* already disconnected */ }
+    };
     // True when the browser denied/blocked camera & mic access during preview — used
     // to warn the tutor that the video SDK won't work before they start the class.
     const [mediaDenied, setMediaDenied] = useState(false);
@@ -207,15 +233,6 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [isPanelOpen, setIsPanelOpen] = useState(true);
 
     const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
-    const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-
-    // Keep the latest active count in a ref so the status-poll interval can read
-    // it without re-subscribing (which would tear down/rebuild the interval on
-    // every participant change).
-    const activeStudentsCountRef = useRef(activeStudentsCount);
-    useEffect(() => {
-        activeStudentsCountRef.current = activeStudentsCount;
-    }, [activeStudentsCount]);
 
     const toggleTab = (tab: 'chat' | 'participants' | 'tools') => {
         if (isPanelOpen && activeTab === tab) {
@@ -352,6 +369,11 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                     if (!res.ok) {
                         const data = await res.json().catch(() => ({}));
                         if (res.status === 403) {
+                            // Kicked at the authorization layer — also drop any
+                            // media connection that already came up, since the
+                            // error screen unmounts MeetingProvider without
+                            // going through the normal leave path.
+                            disconnectMeeting();
                             setAuthError(data.error || 'Access Denied: You are not enrolled in this class.');
                             return;
                         }
@@ -370,6 +392,33 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     useEffect(() => {
         sessionRef.current = session;
     }, [session]);
+
+    // Mint a fresh VideoSDK token the moment the session is (or becomes) live,
+    // so its TTL starts at the real join. Falls back to the page-load token if
+    // the endpoint fails, which is still better than never joining.
+    useEffect(() => {
+        if (!isLive) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/live-sessions/token?classId=${cls.id}`);
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    if (!cancelled && typeof data?.token === 'string' && data.token) {
+                        setLiveToken(data.token);
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('[videosdk] fresh token fetch failed:', err);
+            }
+            if (!cancelled) setLiveToken(videoSdkToken);
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLive, cls.id]);
 
     // End session when tutor leaves page or closes tab
     // (Removed automatic end session on tab close to prevent accidental termination)
@@ -402,7 +451,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`/api/live-sessions/${session.id}/status?activeStudentsCount=${activeStudentsCountRef.current}`);
+                const res = await fetch(`/api/live-sessions/${session.id}/status`);
                 if (res.ok) {
                     const data = await res.json().catch(() => ({}));
 
@@ -414,6 +463,9 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                     // Handle session ended
                     if (data?.status === 'ended') {
                         clearInterval(interval);
+                        // Disconnect from the media room BEFORE navigating —
+                        // the SPA navigation alone doesn't stop the camera.
+                        disconnectMeeting();
                         if (isTutor) {
                             if (!tutorAlertedRef.current) {
                                 tutorAlertedRef.current = true;
@@ -433,7 +485,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                             } else {
                                 toast.info('The tutor has ended the class.');
                             }
-                            router.push('/dashboard/student');
+                            router.push(`/dashboard/${currentUser.accountType}`);
                         }
                         return;
                     }
@@ -459,7 +511,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isTutor, isLive, session?.id, router, cls.id]);
 
+    // Ref (not state) guard: `isLoading` state flushes asynchronously, so a
+    // fast double-click could fire /start twice and create two rooms — the
+    // tutor keeps one while students resolve the other, splitting the class.
+    const startingRef = useRef(false);
     const handleStartSession = async () => {
+        if (startingRef.current) return;
+        startingRef.current = true;
         setIsLoading(true);
         try {
             const res = await fetch('/api/live-sessions/start', {
@@ -477,6 +535,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         } catch (error: any) {
             toast.error(error.message || 'An error occurred.');
         } finally {
+            startingRef.current = false;
             setIsLoading(false);
         }
     };
@@ -511,7 +570,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         if (isTutor) {
             return await handleEndSession();
         }
-        router.push('/dashboard/student');
+        router.push(`/dashboard/${currentUser.accountType}`);
         return true;
     };
 
@@ -554,7 +613,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                         <p className="text-sm text-muted-foreground">{authError}</p>
                     </div>
                     <Button
-                        onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : '/dashboard/student')}
+                        onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`)}
                         className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold cursor-pointer py-2.5 rounded-lg border-0"
                     >
                         Go Back to Dashboard
@@ -642,7 +701,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
 
                                 <Button
                                     variant="ghost"
-                                    onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : '/dashboard/student')}
+                                    onClick={() => router.push(isTutor ? `/dashboard/tutor/classes/${cls.id}` : `/dashboard/${currentUser.accountType}`)}
                                     className="w-full text-muted-foreground hover:text-foreground cursor-pointer text-xs py-2 hover:bg-muted/50 rounded-lg"
                                 >
                                     Return to Dashboard
@@ -663,7 +722,9 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // themselves" bug). MeetingProvider also does not re-initialise when the
     // meetingId later changes, so joining the wrong room once is permanent for the
     // session. Show a short connecting state and let the polls populate roomId.
-    if (!session?.roomId) {
+    // Also wait for the fresh token (fetched above once isLive flips) — the
+    // provider must never mount with a token that could already be expired.
+    if (!session?.roomId || !liveToken) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-muted/10 text-foreground p-4">
                 <Card className="w-full max-w-md bg-card border border-border shadow-2xl p-8 rounded-2xl text-center space-y-4">
@@ -678,13 +739,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     // Wrap in MeetingProvider once the live session AND its real room id exist.
     return (
         <MeetingProvider
-            token={videoSdkToken}
+            token={liveToken}
             config={{
                 meetingId: session.roomId,
                 micEnabled: micEnabled,
                 webcamEnabled: camEnabled,
                 name: `${currentUser.firstName} ${currentUser.lastName}`,
-                participantId: String(currentUser.id),
+                participantId: participantIdRef.current,
                 debugMode: false,
             }}
         >
@@ -708,7 +769,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 isPanelOpen={isPanelOpen}
                 syncWhiteboardStateToDB={syncWhiteboardStateToDB}
                 remainingCredits={remainingCredits}
-                setActiveStudentsCount={setActiveStudentsCount}
+                meetingLeaveRef={meetingLeaveRef}
             />
         </MeetingProvider>
     );
@@ -735,7 +796,7 @@ interface ClassroomMeetingViewProps {
     isPanelOpen: boolean;
     syncWhiteboardStateToDB: (show: boolean, wbId: string | null) => Promise<void>;
     remainingCredits: number | null;
-    setActiveStudentsCount: (count: number) => void;
+    meetingLeaveRef: React.MutableRefObject<(() => void) | null>;
 }
 
 function ClassroomMeetingView({
@@ -758,7 +819,7 @@ function ClassroomMeetingView({
     isPanelOpen,
     syncWhiteboardStateToDB,
     remainingCredits,
-    setActiveStudentsCount,
+    meetingLeaveRef,
 }: ClassroomMeetingViewProps) {
     const router = useRouter();
     const [isWhiteboardFullScreen, setIsWhiteboardFullScreen] = useState(false);
@@ -777,10 +838,8 @@ function ClassroomMeetingView({
             typeof navigator.mediaDevices.getDisplayMedia === 'function'
         );
     }, []);
-    // Get expected tutor/students info from DB to build the grid
+    // The class's tutor id — used to tell the tutor's tile/labels apart.
     const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor;
-    const tutorInfo = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor : null;
-    const expectedStudents = cls.students || [];
 
     const {
         join,
@@ -799,7 +858,7 @@ function ClassroomMeetingView({
             // Log the room we actually joined. If tutor and students print DIFFERENT
             // meetingIds here, they're in separate rooms — the root cause of "each
             // user only sees themselves". They MUST match across all participants.
-            console.log("[videosdk] joined WebRTC room:", session?.roomId, "as participant", String(currentUser.id));
+            console.log("[videosdk] joined WebRTC room:", session?.roomId, "as user", String(currentUser.id));
         },
         onParticipantJoined: (participant: any) => {
             // A remote peer entered THIS room. If this never fires while others are
@@ -842,9 +901,37 @@ function ClassroomMeetingView({
             if (msg.includes('screenshare') || msg.includes('screen share') || msg.includes('display') || msg.includes('getdisplaymedia')) {
                 return;
             }
+            // Translate the failures a user can actually act on. Codes from the
+            // installed SDK's error table: 4001 INVALID_API_KEY, 4002
+            // INVALID_TOKEN, 4003 INVALID_MEETING_ID, 4005
+            // DUPLICATE_PARTICIPANT, 4022 UNAUTHORIZED_MEETING_ID (token is
+            // scoped to a different room).
+            const code = Number((error as any)?.code);
+            if (code === 4001 || code === 4002) {
+                toast.error('Your classroom session expired. Please refresh the page to reconnect.');
+                return;
+            }
+            if (code === 4003 || code === 4022) {
+                toast.error('This classroom is no longer available. Please go back to your dashboard and re-enter the class.');
+                return;
+            }
+            if (code === 4005) {
+                toast.error('You appear to be connected from another tab or device. Close it (or refresh this page) to reconnect here.');
+                return;
+            }
             toast.error(`Media connection error: ${error.message}`);
         }
     });
+
+    // Let the parent (which owns the ended/kicked navigation paths) disconnect
+    // the media room even though `leave` only exists inside the provider.
+    useEffect(() => {
+        meetingLeaveRef.current = leave;
+        return () => {
+            meetingLeaveRef.current = null;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [leave]);
 
     // Explicitly disconnect from the media room (stops the local camera/mic) and
     // then run the role-appropriate end/leave flow. Prevents the camera light
@@ -887,27 +974,39 @@ function ClassroomMeetingView({
         }
     };
 
-    // Auto-join the meeting exactly once.
+    // Auto-join the meeting exactly once — DEFERRED by one macrotask.
     //
-    // React 18 StrictMode (on by default in Next.js dev) mounts every effect
-    // twice — mount → cleanup → mount. The previous version called join() on
-    // mount and leave() in the cleanup, so the cleanup fired leave() in the
-    // MIDDLE of the still-in-flight async join(). VideoSDK doesn't recover from
-    // that: you'd get a local participant (so you saw yourself) but the SFU
-    // connection was corrupted — no remote peers ever arrived and mic/camera
-    // toggles did nothing. That's the "everyone is alone and can't toggle
-    // mic/cam" bug.
+    // The deferral is the load-bearing part. React flushes mount effects
+    // child-first, and this component is a child of MeetingProvider. The
+    // provider only registers the auth token with the SDK (VideoSDK.config)
+    // inside its OWN mount effect, which runs AFTER ours. Calling join()
+    // synchronously here therefore built the room connection with an undefined
+    // token: the local participant appears (you see your own tile, so the join
+    // "looks" fine) but signaling auth fails — no remote participant ever
+    // arrives and mic/cam toggles are dead. That is exactly the reported
+    // "can't see the tutor/students, can't toggle mic or camera" bug, while
+    // chat and whiteboard (our own backend) kept working. setTimeout(0) runs
+    // strictly after the whole mount-effect flush, i.e. after the provider has
+    // configured the token.
     //
-    // Fix: a ref guards join() to run once, and we do NOT leave() on the
-    // synthetic unmount. Real exits are handled explicitly by handleExit() and
-    // onMeetingLeft; tab close is covered by the beforeunload listener. The
-    // status route also reconciles active participants against VideoSDK's live
-    // list, so a lingering ghost from a raw back-navigation is cleaned up.
+    // The ref guard keeps this StrictMode-safe (dev double-mount must not join
+    // twice), and we intentionally do NOT clear the timeout or call leave() in
+    // the cleanup — StrictMode's synthetic unmount would cancel the only join.
+    // Real exits are handled by handleExit()/onMeetingLeft, and tab close by
+    // the beforeunload listener below.
     const hasJoinedRef = useRef(false);
     useEffect(() => {
-        if (hasJoinedRef.current) return;
-        hasJoinedRef.current = true;
-        join();
+        if (!hasJoinedRef.current) {
+            hasJoinedRef.current = true;
+            setTimeout(() => {
+                try {
+                    join();
+                } catch (err) {
+                    console.error('[videosdk] join() threw:', err);
+                    toast.error('Could not connect to the classroom. Please refresh the page.');
+                }
+            }, 0);
+        }
         // Stop local media on tab close — the SDK's own beforeunload doesn't
         // reliably stop getUserMedia tracks, leaving the camera light on.
         const onUnload = () => {
@@ -919,9 +1018,6 @@ function ClassroomMeetingView({
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    // Track active participants list
-    const participantIds = Array.from(participants.keys());
 
     // Local mic/camera state comes straight from the meeting (the local user is
     // not always present in the `participants` map), so the header toggles
@@ -950,15 +1046,9 @@ function ClassroomMeetingView({
     // while no whiteboard is being shared) should take over the main stage.
     // Students can no longer present (token is scoped), but guard anyway so a
     // stray presenter can't blank out the tutor's shared whiteboard.
-    const presenterIsTutor = presenterId ? String(presenterId) === String(tutorId) : false;
+    const presenterIsTutor = presenterId ? participantUserId(presenterId) === String(tutorId) : false;
     const showScreenShare = !!presenterId && (presenterIsTutor || !showWhiteboard);
 
-
-    // Sync active student/parent count to the parent ClassroomClient
-    useEffect(() => {
-        const studentCount = uniqueParticipants.filter(p => String(p.id) !== String(tutorId)).length;
-        setActiveStudentsCount(studentCount);
-    }, [uniqueParticipants, setActiveStudentsCount, tutorId]);
 
     // Live-class chat. This used to run over VideoSDK pubSub, but persisted
     // publishes were rejected by the SDK and the message never left the browser
@@ -1148,16 +1238,6 @@ function ClassroomMeetingView({
 
 
 
-    // Helper to check if a specific database user ID is in the current VideoSDK
-    // participants Map. The map is keyed by String(user.id), so normalize.
-    const isParticipantJoined = (userId: string | number) => participants.has(String(userId));
-
-    // Collect any guest participant IDs that are NOT the tutor or an enrolled
-    // student. Both sides must be strings — participantIds are strings while DB
-    // ids are numbers, so a raw compare would flag every real participant.
-    const expectedUserIds = [String(tutorId), ...expectedStudents.map((s: any) => String(s.id))];
-    const guestParticipantIds = participantIds.filter(id => !expectedUserIds.includes(String(id)));
-
     return (
         <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
             {/* Top Navigation / Status Header */}
@@ -1346,7 +1426,7 @@ function ClassroomMeetingView({
                                     : 'grid-cols-2 lg:grid-cols-4'
                             }`}>
                             {uniqueParticipants.map((p: any) => {
-                                const isParticipantTutor = String(p.id) === String(tutorId);
+                                const isParticipantTutor = participantUserId(p.id) === String(tutorId);
                                 const initials = p.displayName?.[0] || (isParticipantTutor ? 'T' : 'S');
                                 return (
                                     <ParticipantVideoView
@@ -1427,7 +1507,7 @@ function ClassroomMeetingView({
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
                                     {uniqueParticipants.map((p: any) => {
-                                        const isParticipantTutor = String(p.id) === String(tutorId);
+                                        const isParticipantTutor = participantUserId(p.id) === String(tutorId);
                                         return (
                                             <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border/40">
                                                 <div className="flex items-center gap-2">
@@ -1789,29 +1869,6 @@ function SmallParticipantVideoView({ participantId }: { participantId: string })
                     <HiOutlineMicrophone className="h-3 w-3" />
                 </span>
             </div>
-        </div>
-    );
-}
-
-// Offline/Placeholder Card for expected participant not currently connected
-interface OfflineParticipantViewProps {
-    displayName: string;
-    isTutorUser: boolean;
-    avatarInitials: string;
-}
-
-function OfflineParticipantView({ displayName, isTutorUser, avatarInitials }: OfflineParticipantViewProps) {
-    return (
-        <div className="h-full min-h-[220px] rounded-xl bg-card border border-border flex flex-col items-center justify-center relative overflow-hidden shadow-sm opacity-60">
-            <Avatar className={`h-16 w-16 border-2 border-dashed ${isTutorUser ? 'border-secondary/40' : 'border-border'}`}>
-                <AvatarFallback className="text-xl font-bold bg-muted text-muted-foreground">
-                    {avatarInitials}
-                </AvatarFallback>
-            </Avatar>
-            <span className="absolute bottom-3 left-3 bg-background/90 border border-border px-2 py-0.5 rounded text-xs text-foreground font-semibold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-muted-foreground animate-pulse" />
-                {isTutorUser ? 'Tutor: ' : ''}{displayName} (Offline)
-            </span>
         </div>
     );
 }

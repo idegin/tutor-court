@@ -53,8 +53,17 @@ function permissionsForRole(role: VideoSdkRole): string[] {
  * Mint a VideoSDK JWT server-side. `role` is required so a full-permission
  * `server` token can never be minted by accident on a client-reachable path.
  * Role permissions still prevent students from moderating or screen-sharing.
+ *
+ * When `roomId` is provided the token is scoped to that single room — VideoSDK
+ * rejects it for any other room. Browser tokens should be scoped whenever the
+ * room is already known, so a leaked/forwarded token (or a crafted ?sessionId)
+ * can't be used to enter someone else's class.
  */
-export function generateVideoSdkToken(expirationSeconds: number, role: VideoSdkRole): string {
+export function generateVideoSdkToken(
+  expirationSeconds: number,
+  role: VideoSdkRole,
+  roomId?: string,
+): string {
   const apiKey = process.env.VIDEOSDK_API_KEY
   const secretKey = process.env.VIDEOSDK_SECRET
 
@@ -75,6 +84,9 @@ export function generateVideoSdkToken(expirationSeconds: number, role: VideoSdkR
     version: 2,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expirationSeconds,
+  }
+  if (roomId) {
+    payload.roomId = roomId
   }
 
   const headerB64 = base64url(JSON.stringify(header))

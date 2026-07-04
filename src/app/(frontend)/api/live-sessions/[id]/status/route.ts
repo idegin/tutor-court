@@ -6,6 +6,13 @@ import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { toIntId } from '@/lib/id'
+import { participantUserId } from '@/lib/live-participant-id'
+
+// Don't reconcile a participant log that was created moments ago: the /join
+// API call lands seconds BEFORE the browser's WebRTC join completes, so a
+// brand-new log briefly has no matching VideoSDK participant and would be
+// wrongly closed ("left at minute 0") by the very first poll.
+const RECONCILE_GRACE_MS = 90 * 1000
 
 function deriveEngagementFlag(
   attendanceMinutes: number,
@@ -40,13 +47,18 @@ async function getActiveVideoSdkParticipants(roomId: string): Promise<string[] |
 
     const sessionsData = await sessionsRes.json()
     const sessions = sessionsData.data || []
-    
-    // Find active session
-    const activeSession = sessions.find((s: any) => !s.end) || sessions[0]
-    if (!activeSession) return []
+
+    // Only an UN-ENDED VideoSDK session counts. Returning `[]` here would tell
+    // the caller "the room is verifiably empty" and every DB-active participant
+    // would be marked as left — but "no active session yet" is the NORMAL state
+    // in the first seconds after the room is created (before anyone completes
+    // the WebRTC join), and falling back to an ended session has the same
+    // mass-close effect. In both cases the truth is unknown → skip (null).
+    const activeSession = sessions.find((s: any) => !s.end)
+    if (!activeSession) return null
 
     const sessionId = activeSession.id || activeSession.sessionId
-    if (!sessionId) return []
+    if (!sessionId) return null
 
     const participantsRes = await fetch(`https://api.videosdk.live/v2/sessions/${sessionId}/participants/active`, {
       headers: {
@@ -62,7 +74,9 @@ async function getActiveVideoSdkParticipants(roomId: string): Promise<string[] |
 
     const participantsData = await participantsRes.json()
     const activeParticipants = participantsData.data || []
-    return activeParticipants.map((p: any) => String(p.participantId))
+    // Participant ids are `${userId}--${nonce}` (see lib/live-participant-id);
+    // reduce them to app user ids for the DB comparison.
+    return activeParticipants.map((p: any) => participantUserId(p.participantId))
   } catch (err) {
     console.error('[VideoSDK] Error fetching active participants:', err)
     return null
@@ -123,8 +137,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     }
 
     // Only the tutor (the wallet owner) ever needs the credit balance computed
-    // and the auto-close side effects driven from their own polling loop.
-    const isSessionTutor = user.id === sessionTutorId || user.accountType === 'admin'
+    // and the auto-close side effects driven from their own polling loop. An
+    // admin merely viewing status must stay side-effect-free — reconciliation
+    // and billing math should never run off an admin's read.
+    const isSessionTutor = user.id === sessionTutorId
 
     if (session.status === 'ended') {
       // Report the tutor's ACTUAL remaining balance (not a hardcoded 0) so the
@@ -171,33 +187,73 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       if (activeVideoSdkUserIds !== null) {
         const nowIso = new Date().toISOString()
         
-        // Find all active database participant logs for this session
-        const dbActiveLogs = await payload.find({
+        // All participant logs for this session — open ones may need closing,
+        // closed ones may need REOPENING (e.g. a user closed one of two tabs:
+        // /leave closed their only log while they're still live in the other).
+        const dbLogs = await payload.find({
           collection: 'live-session-participants',
-          where: {
-            and: [
-              { liveSession: { equals: session.id } },
-              { leftAt: { exists: false } },
-            ],
-          },
+          where: { liveSession: { equals: session.id } },
           limit: 1000,
           depth: 0,
         })
 
-        for (const log of dbActiveLogs.docs as any[]) {
+        for (const log of dbLogs.docs as any[]) {
           const userIdStr = typeof log.user === 'object' ? String(log.user.id) : String(log.user)
-          
+          const logJoinedTime = new Date(log.joinedAt).getTime()
+
+          if (log.leftAt) {
+            // Closed log but the user is verifiably active in the room →
+            // reopen for a new interval. Require the close to be at least a
+            // few seconds old so a just-left user with a briefly stale
+            // VideoSDK active list doesn't flap back open.
+            const closedForMs = Date.now() - new Date(log.leftAt).getTime()
+            if (activeVideoSdkUserIds.includes(userIdStr) && closedForMs > 15_000) {
+              await payload.update({
+                collection: 'live-session-participants',
+                id: log.id,
+                data: { leftAt: null, joinedAt: nowIso } as any,
+              })
+              if (log.accountType === 'student') {
+                const closedAttendance = await payload.find({
+                  collection: 'attendance',
+                  where: {
+                    and: [
+                      { liveSession: { equals: session.id } },
+                      { student: { equals: toIntId(userIdStr) ?? userIdStr } },
+                    ],
+                  },
+                  limit: 1,
+                  depth: 0,
+                })
+                const att = closedAttendance.docs[0] as any
+                if (att && att.leftAt) {
+                  await payload.update({
+                    collection: 'attendance',
+                    id: att.id,
+                    data: { leftAt: null, joinedAt: nowIso } as any,
+                  })
+                }
+              }
+            }
+            continue
+          }
+
+          // Give a fresh join time to complete its WebRTC handshake before we
+          // trust VideoSDK's active list for it.
+          if (Date.now() - logJoinedTime < RECONCILE_GRACE_MS) continue
+
           // If user is NOT active in VideoSDK, mark them as left in the DB
           if (!activeVideoSdkUserIds.includes(userIdStr)) {
-            const logJoinedTime = new Date(log.joinedAt).getTime()
-            const logDurationSeconds = Math.max(0, Math.floor((Date.now() - logJoinedTime) / 1000))
+            const intervalSeconds = Math.max(0, Math.floor((Date.now() - logJoinedTime) / 1000))
 
             await payload.update({
               collection: 'live-session-participants',
               id: log.id,
               data: {
                 leftAt: nowIso,
-                durationSeconds: logDurationSeconds,
+                // Accumulate on top of earlier intervals (joinedAt is reset on
+                // every rejoin, so this interval alone undercounts).
+                durationSeconds: (Number(log.durationSeconds) || 0) + intervalSeconds,
               } as any,
             })
 
@@ -208,7 +264,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
                 where: {
                   and: [
                     { liveSession: { equals: session.id } },
-                    { student: { equals: userIdStr } },
+                    { student: { equals: toIntId(userIdStr) ?? userIdStr } },
                     { leftAt: { exists: false } },
                   ],
                 },
@@ -218,13 +274,14 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
               const att = activeAttendance.docs[0] as any
               if (att) {
                 const attJoinedTime = new Date(att.joinedAt).getTime()
-                const attDurationMinutes = Math.max(1, Math.ceil((Date.now() - attJoinedTime) / (1000 * 60)))
+                // No 1-minute floor: intervals accumulate across rejoins.
+                const attIntervalMinutes = Math.max(0, Math.ceil((Date.now() - attJoinedTime) / (1000 * 60)))
                 await payload.update({
                   collection: 'attendance',
                   id: att.id,
                   data: {
                     leftAt: nowIso,
-                    durationMinutes: attDurationMinutes,
+                    durationMinutes: (Number(att.durationMinutes) || 0) + attIntervalMinutes,
                   } as any,
                 })
               }
@@ -242,7 +299,23 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       depth: 0,
     })
     const wallet = wallets.docs[0]
-    const currentCreditBalance = wallet ? ((wallet.creditBalance as number) || 0) : 0
+    // A missing wallet row is a data problem, NOT a zero balance. Treating it
+    // as 0 would auto-end the class within one poll tick ("tutor ran out of
+    // credits") even though the tutor may have plenty. Skip billing/auto-close
+    // entirely and keep the class running.
+    if (!wallet) {
+      console.error(
+        `[live-sessions/status] no wallet found for tutor ${String(session.tutor)} — skipping billing/auto-close`,
+      )
+      return NextResponse.json({
+        status: session.status,
+        showWhiteboard: session.showWhiteboard || false,
+        activeWhiteboard: session.activeWhiteboard || null,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+      })
+    }
+    const currentCreditBalance = (wallet.creditBalance as number) || 0
 
     // 2. Compute cost based on participant logs
     const participantLogs = await payload.find({
@@ -263,11 +336,20 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
     let totalParticipantMinutes = 0
     for (const log of participantLogs.docs as any[]) {
-      const logJoined = new Date(log.joinedAt).getTime()
-      const logLeft = log.leftAt ? new Date(log.leftAt).getTime() : endedTime
-      const logDurationMs = logLeft - logJoined
-      const logDurationMinutes = Math.max(1, Math.ceil(logDurationMs / (1000 * 60)))
-      totalParticipantMinutes += logDurationMinutes
+      // Closed logs carry their full accumulated duration (across rejoins) in
+      // durationSeconds; open logs accumulate prior intervals there plus the
+      // currently running one since joinedAt.
+      let logSeconds: number
+      if (log.leftAt) {
+        logSeconds =
+          Number(log.durationSeconds) ||
+          Math.max(0, (new Date(log.leftAt).getTime() - new Date(log.joinedAt).getTime()) / 1000)
+      } else {
+        logSeconds =
+          (Number(log.durationSeconds) || 0) +
+          Math.max(0, (endedTime - new Date(log.joinedAt).getTime()) / 1000)
+      }
+      totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
     }
 
     const billableMinutes =
@@ -310,14 +392,14 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
       for (const log of activeParticipants.docs as any[]) {
         const logJoinedTime = new Date(log.joinedAt).getTime()
-        const logDurationSeconds = Math.max(0, Math.floor((endedTime - logJoinedTime) / 1000))
+        const intervalSeconds = Math.max(0, Math.floor((endedTime - logJoinedTime) / 1000))
 
         await payload.update({
           collection: 'live-session-participants',
           id: log.id,
           data: {
             leftAt: endedIso,
-            durationSeconds: logDurationSeconds,
+            durationSeconds: (Number(log.durationSeconds) || 0) + intervalSeconds,
           } as any,
         })
       }
@@ -334,7 +416,9 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
       for (const att of activeAttendance.docs as any[]) {
         const attJoinedTime = new Date(att.joinedAt).getTime()
-        const attDurationMinutes = Math.max(1, Math.ceil((endedTime - attJoinedTime) / (1000 * 60)))
+        const attDurationMinutes =
+          (Number(att.durationMinutes) || 0) +
+          Math.max(0, Math.ceil((endedTime - attJoinedTime) / (1000 * 60)))
 
         await payload.update({
           collection: 'attendance',

@@ -121,7 +121,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     // (double-click, a retried request, or a component remount re-firing the
     // send), return the existing row instead of creating a duplicate. This is
     // what caused "every message is delivered twice".
-    const DEDUPE_WINDOW_MS = 10_000
+    //
+    // The window is deliberately short: the client's in-flight ref already
+    // stops true double-submits, so this only needs to catch a raced retry. A
+    // long window (it used to be 10s) made a deliberately repeated message
+    // ("ok" … "ok") silently vanish — the second POST returned the first row's
+    // id, which the client had already rendered. A repeat typed within 2s can
+    // still be swallowed; fully fixing that needs a client-generated message
+    // nonce persisted on the row (schema change), which text-equality dedupe
+    // can't replicate.
+    const DEDUPE_WINDOW_MS = 2_000
     const recent = await payload.find({
       collection: 'live-session-messages',
       where: {

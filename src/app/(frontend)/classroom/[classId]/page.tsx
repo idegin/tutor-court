@@ -47,16 +47,22 @@ export default async function ClassroomPage(props: PageProps) {
       return notFound()
     }
 
-    // Verify user is either the tutor or an enrolled student
+    // Verify user is the tutor, an enrolled student, or a linked parent — the
+    // same audience the live-session join/status/chat routes authorize, so a
+    // parent allowed by those APIs isn't bounced at the page.
     const tutorId = typeof cls.tutor === 'object' && cls.tutor ? cls.tutor.id : cls.tutor
     const studentIds = cls.students
       ? cls.students.map((s: any) => (typeof s === 'object' && s ? s.id : s))
       : []
+    const parentIds = ((cls as any).parents || []).map((p: any) =>
+      typeof p === 'object' && p ? p.id : p,
+    )
 
     const isTutor = user.id === tutorId
     const isStudent = studentIds.includes(user.id)
+    const isParent = parentIds.includes(user.id)
 
-    if (!isTutor && !isStudent) {
+    if (!isTutor && !isStudent && !isParent) {
       return redirect('/dashboard')
     }
 
@@ -72,13 +78,16 @@ export default async function ClassroomPage(props: PageProps) {
       // Deterministic: if more than one live session somehow exists, everyone
       // (this page, the status route, the start route) picks the SAME most-recent
       // one, so tutor and students never split across different roomIds.
-      sort: '-startedAt',
+      sort: ['-startedAt', '-id'],
       limit: 1,
       depth: 0,
     })
     let activeSession = liveSessionsRes.docs[0] || null
 
-    // Only honor an explicit ?sessionId when nothing is live AND it's still live.
+    // Only honor an explicit ?sessionId when nothing is live, it's still live,
+    // AND it belongs to THIS class. Without the class check, a user enrolled in
+    // class A could pass another class's sessionId and (with the room-agnostic
+    // client token) join a classroom they were never authorized for.
     if (!activeSession && sessionId) {
       const numericSessionId = /^\d+$/.test(sessionId) ? Number(sessionId) : sessionId
       try {
@@ -87,7 +96,17 @@ export default async function ClassroomPage(props: PageProps) {
           id: numericSessionId,
           depth: 0,
         })
-        if (requested && requested.status === 'live') activeSession = requested
+        const requestedClassId =
+          requested && (typeof requested.class === 'object' && requested.class
+            ? (requested.class as any).id
+            : requested.class)
+        if (
+          requested &&
+          requested.status === 'live' &&
+          String(requestedClassId) === String(numericClassId)
+        ) {
+          activeSession = requested
+        }
       } catch (err) {
         console.warn(`Could not find live-session with ID ${sessionId}:`, err)
       }
@@ -124,10 +143,20 @@ export default async function ClassroomPage(props: PageProps) {
         currentUser={user}
         initialSession={activeSession}
         initialWhiteboards={whiteboardsWithSlides}
-        videoSdkToken={generateVideoSdkToken(3600 * 2, isTutor ? 'tutor' : 'student')}
+        // Fallback token only: the client mints a fresh one via
+        // /api/live-sessions/token when the class actually goes live. Long TTL
+        // so the fallback still works after a long waiting-room wait.
+        videoSdkToken={generateVideoSdkToken(3600 * 6, isTutor ? 'tutor' : 'student')}
       />
     )
   } catch (err) {
+    // redirect()/notFound() work by THROWING control-flow errors — swallowing
+    // them here turned the "not enrolled → back to dashboard" redirect into a
+    // confusing 404. Let Next.js handle its own signals.
+    const digest = (err as any)?.digest
+    if (typeof digest === 'string' && (digest.startsWith('NEXT_REDIRECT') || digest === 'NEXT_NOT_FOUND')) {
+      throw err
+    }
     console.error('Error opening classroom:', err)
     return notFound()
   }

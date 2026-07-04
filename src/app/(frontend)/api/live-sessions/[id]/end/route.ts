@@ -84,14 +84,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     for (const log of activeParticipants.docs as any[]) {
       const logJoinedTime = new Date(log.joinedAt).getTime()
-      const logDurationSeconds = Math.max(0, Math.floor((endedTime - logJoinedTime) / 1000))
+      const intervalSeconds = Math.max(0, Math.floor((endedTime - logJoinedTime) / 1000))
 
       await payload.update({
         collection: 'live-session-participants',
         id: log.id,
         data: {
           leftAt: endedIso,
-          durationSeconds: logDurationSeconds,
+          // Accumulate: joinedAt resets on every rejoin, so earlier intervals
+          // live in durationSeconds already.
+          durationSeconds: (Number(log.durationSeconds) || 0) + intervalSeconds,
         } as any,
       })
     }
@@ -108,7 +110,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     for (const att of activeAttendance.docs as any[]) {
       const attJoinedTime = new Date(att.joinedAt).getTime()
-      const attDurationMinutes = Math.max(1, Math.ceil((endedTime - attJoinedTime) / (1000 * 60)))
+      const attDurationMinutes =
+        (Number(att.durationMinutes) || 0) +
+        // No 1-minute floor: intervals accumulate across rejoins.
+        Math.max(0, Math.ceil((endedTime - attJoinedTime) / (1000 * 60)))
 
       await payload.update({
         collection: 'attendance',
@@ -162,11 +167,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     let totalParticipantMinutes = 0
     for (const log of participantLogs.docs as any[]) {
-      const logJoined = new Date(log.joinedAt).getTime()
-      const logLeft = log.leftAt ? new Date(log.leftAt).getTime() : endedTime
-      const logDurationMs = logLeft - logJoined
-      const logDurationMinutes = Math.max(1, Math.ceil(logDurationMs / (1000 * 60)))
-      totalParticipantMinutes += logDurationMinutes
+      // durationSeconds is the accumulated total across rejoins (all logs were
+      // closed just above); fall back to the last interval if it's absent.
+      const logSeconds =
+        Number(log.durationSeconds) ||
+        Math.max(
+          0,
+          ((log.leftAt ? new Date(log.leftAt).getTime() : endedTime) -
+            new Date(log.joinedAt).getTime()) /
+            1000,
+        )
+      totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
     }
 
     // If no students/parents joined, charge a baseline of 1 credit/min of tutor's session duration.

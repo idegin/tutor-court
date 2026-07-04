@@ -175,6 +175,15 @@ export async function POST(request: Request) {
             engagementFlag: 'unknown',
           } as any,
         })
+      } else if ((existingAttendance.docs[0] as any).leftAt) {
+        // Rejoin: reopen the attendance record for a new interval. Minutes from
+        // the earlier interval are already accumulated in durationMinutes and
+        // every closer ADDS the new interval, so nothing is lost.
+        await payload.update({
+          collection: 'attendance',
+          id: (existingAttendance.docs[0] as any).id,
+          data: { leftAt: null, joinedAt: joinedAt.toISOString() } as any,
+        })
       }
     }
 
@@ -187,12 +196,12 @@ export async function POST(request: Request) {
 
       const studentName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
       const className = (cls as any)?.title || 'the class'
-      const notifType =
-        user.accountType === 'student' ? 'student_joined_class' : 'student_added_to_class'
 
       createNotification({
         recipientId: String(tutorIdVal),
-        type: notifType,
+        // Someone joined the LIVE session — 'student_added_to_class' is the
+        // enrollment event and was the wrong type for a parent joining.
+        type: 'student_joined_class',
         title: user.accountType === 'student' ? 'Student Joined Live Class' : 'Parent Joined Live Class',
         message: `${studentName} has joined "${className}" live session.`,
         link: `/dashboard/tutor/classes/${classIdVal}`,
