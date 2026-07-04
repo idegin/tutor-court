@@ -1,5 +1,5 @@
 import React from 'react'
-import { notFound, redirect } from 'next/navigation'
+import { notFound, redirect, unstable_rethrow } from 'next/navigation'
 import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -145,18 +145,22 @@ export default async function ClassroomPage(props: PageProps) {
         initialWhiteboards={whiteboardsWithSlides}
         // Fallback token only: the client mints a fresh one via
         // /api/live-sessions/token when the class actually goes live. Long TTL
-        // so the fallback still works after a long waiting-room wait.
-        videoSdkToken={generateVideoSdkToken(3600 * 6, isTutor ? 'tutor' : 'student')}
+        // so the fallback still works after a long waiting-room wait; scoped to
+        // the live room whenever one already exists so an unscoped any-room
+        // token is only ever minted for a class that isn't live yet.
+        videoSdkToken={generateVideoSdkToken(
+          3600 * 6,
+          isTutor ? 'tutor' : 'student',
+          (activeSession as any)?.roomId || undefined,
+        )}
       />
     )
   } catch (err) {
     // redirect()/notFound() work by THROWING control-flow errors — swallowing
     // them here turned the "not enrolled → back to dashboard" redirect into a
-    // confusing 404. Let Next.js handle its own signals.
-    const digest = (err as any)?.digest
-    if (typeof digest === 'string' && (digest.startsWith('NEXT_REDIRECT') || digest === 'NEXT_NOT_FOUND')) {
-      throw err
-    }
+    // confusing 404. unstable_rethrow re-throws Next.js's own signals (any
+    // version's digest format) and falls through for real errors.
+    unstable_rethrow(err)
     console.error('Error opening classroom:', err)
     return notFound()
   }

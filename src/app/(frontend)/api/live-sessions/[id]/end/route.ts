@@ -69,6 +69,16 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (!claim.docs || claim.docs.length === 0) {
       return NextResponse.json({ error: 'Session already ended.' }, { status: 409 })
     }
+    // Payload's where-based update is find-then-update, not a DB-conditional
+    // write, so two racers (manual end vs auto-close poll) can BOTH pass the
+    // claim. Re-read and only proceed if OUR endedAt is the one that stuck —
+    // the loser bails before running billing a second time.
+    const claimed = await payload
+      .findByID({ collection: 'live-sessions', id, depth: 0 })
+      .catch(() => null)
+    if (!claimed || new Date((claimed as any).endedAt).getTime() !== endedTime) {
+      return NextResponse.json({ error: 'Session already ended.' }, { status: 409 })
+    }
     const durationMs = endedTime - startedTime
     const sessionDurationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)))
 

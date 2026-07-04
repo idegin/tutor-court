@@ -326,29 +326,40 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     useEffect(() => {
         if (isLive) return;
 
+        // Guard against a response that was already in flight when the class
+        // went live: clearing the interval doesn't cancel a pending fetch, and
+        // applying its (possibly different) sessionId/roomId AFTER the meeting
+        // mounted would re-target the chat/status polls at another session
+        // while media stays in the room we already joined (MeetingProvider
+        // never re-initialises).
+        let cancelled = false;
+
         const interval = setInterval(async () => {
             try {
                 const res = await fetch(`/api/live-sessions/status?classId=${cls.id}`);
-                if (res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    if (data?.status === 'live' && data?.sessionId) {
-                        // Merge so we don't drop other session fields.
-                        setSession((prev: any) => ({ ...prev, id: data.sessionId, roomId: data.roomId, status: 'live' }));
-                        setIsLive(true);
-                        // Sync whiteboard state immediately
-                        setShowWhiteboard(data.showWhiteboard || false);
-                        if (data.activeWhiteboard) {
-                            resolveAndSelectWhiteboard(data.activeWhiteboard);
-                        }
-                        toast.success('Your tutor has started the class! Joining room...');
+                if (cancelled || !res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                if (cancelled) return;
+                if (data?.status === 'live' && data?.sessionId) {
+                    // Merge so we don't drop other session fields.
+                    setSession((prev: any) => ({ ...prev, id: data.sessionId, roomId: data.roomId, status: 'live' }));
+                    setIsLive(true);
+                    // Sync whiteboard state immediately
+                    setShowWhiteboard(data.showWhiteboard || false);
+                    if (data.activeWhiteboard) {
+                        resolveAndSelectWhiteboard(data.activeWhiteboard);
                     }
+                    toast.success('Your tutor has started the class! Joining room...');
                 }
             } catch (err) {
                 console.error('Polling active session error:', err);
             }
         }, 3000);
 
-        return () => clearInterval(interval);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLive, cls.id]);
 
@@ -466,10 +477,16 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                         // Disconnect from the media room BEFORE navigating —
                         // the SPA navigation alone doesn't stop the camera.
                         disconnectMeeting();
+                        // The server reports WHY it ended; students no longer
+                        // receive the tutor's wallet balance, so fall back to
+                        // remainingCredits only for older responses.
+                        const outOfCredits = data.endedReason
+                            ? data.endedReason === 'out_of_credits'
+                            : Number(data.remainingCredits) <= 0;
                         if (isTutor) {
                             if (!tutorAlertedRef.current) {
                                 tutorAlertedRef.current = true;
-                                if (data.remainingCredits <= 0) {
+                                if (outOfCredits) {
                                     toast.error('The class has ended automatically because you have run out of credits.');
                                 } else {
                                     toast.info('The live classroom session has ended.');
@@ -477,10 +494,7 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                                 router.push(`/dashboard/tutor/classes/${cls.id}`);
                             }
                         } else {
-                            // remainingCredits is the tutor's actual balance: 0 means the
-                            // session auto-closed because they ran out of credits; anything
-                            // above 0 means the tutor deliberately ended the class.
-                            if (data.remainingCredits <= 0) {
+                            if (outOfCredits) {
                                 toast.error('The class has ended because the tutor ran out of credits.');
                             } else {
                                 toast.info('The tutor has ended the class.');

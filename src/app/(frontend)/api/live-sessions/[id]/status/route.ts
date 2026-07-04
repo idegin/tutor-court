@@ -143,10 +143,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const isSessionTutor = user.id === sessionTutorId
 
     if (session.status === 'ended') {
-      // Report the tutor's ACTUAL remaining balance (not a hardcoded 0) so the
-      // client can tell a manual "tutor ended the class" apart from an automatic
-      // "out of credits" shutdown. The auto-close path drains the wallet to 0,
-      // while a manual end leaves whatever credits remain.
+      // Distinguish a manual "tutor ended the class" from an automatic
+      // "out of credits" shutdown (the auto-close path drains the wallet to 0,
+      // a manual end leaves whatever credits remain). Students/parents only
+      // get the REASON — the tutor's actual balance is theirs alone.
       const endedWallets = await payload.find({
         collection: 'wallets',
         where: { user: { equals: session.tutor } },
@@ -159,7 +159,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
       return NextResponse.json({
         status: 'ended',
-        remainingCredits: endedRemainingCredits,
+        endedReason: endedRemainingCredits <= 0 ? 'out_of_credits' : 'ended_by_tutor',
+        ...(user.id === sessionTutorId ? { remainingCredits: endedRemainingCredits } : {}),
         showWhiteboard: false,
         activeWhiteboard: null,
         startedAt: session.startedAt,
@@ -379,6 +380,22 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
           endedAt: endedIso,
         })
       }
+      // The where-based update is find-then-update, not a DB-conditional
+      // write, so this poll racing the manual /end route can BOTH pass the
+      // claim. Re-read and only run billing if OUR endedAt stuck.
+      const claimed = await payload
+        .findByID({ collection: 'live-sessions', id, depth: 0 })
+        .catch(() => null)
+      if (!claimed || new Date((claimed as any).endedAt).getTime() !== endedTime) {
+        return NextResponse.json({
+          status: 'ended',
+          remainingCredits: 0,
+          showWhiteboard: false,
+          activeWhiteboard: null,
+          startedAt: session.startedAt,
+          endedAt: (claimed as any)?.endedAt || endedIso,
+        })
+      }
 
       // 1. Close/End all active participant logs for this session
       const activeParticipants = await payload.find({
@@ -550,6 +567,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
       return NextResponse.json({
         status: 'ended',
+        endedReason: 'out_of_credits',
         remainingCredits: 0,
         showWhiteboard: false,
         activeWhiteboard: null,

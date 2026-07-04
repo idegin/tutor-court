@@ -73,6 +73,14 @@ export async function GET(request: Request) {
     })
     const liveRoomId = (liveSessions.docs[0] as any)?.roomId as string | undefined
 
+    // Never mint an UNSCOPED token from this endpoint: with no live session
+    // there is no legitimate room to join, and an any-room 6h token could be
+    // harvested while a class is idle and replayed elsewhere. The client falls
+    // back to the page-load token on non-OK responses.
+    if (!liveRoomId) {
+      return NextResponse.json({ error: 'no_live_session' }, { status: 409 })
+    }
+
     const token = generateVideoSdkToken(
       TOKEN_TTL_SECONDS,
       isTutor ? 'tutor' : 'student',
