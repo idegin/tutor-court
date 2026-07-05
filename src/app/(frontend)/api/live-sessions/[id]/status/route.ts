@@ -7,6 +7,7 @@ import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service
 import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { toIntId } from '@/lib/id'
 import { participantUserId } from '@/lib/live-participant-id'
+import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
 
 // Don't reconcile a participant log that was created moments ago: the /join
 // API call lands seconds BEFORE the browser's WebRTC join completes, so a
@@ -177,6 +178,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         status: session.status,
         showWhiteboard: session.showWhiteboard || false,
         activeWhiteboard: session.activeWhiteboard || null,
+        whiteboardWritable: session.whiteboardWritable || false,
         startedAt: session.startedAt,
         endedAt: session.endedAt,
       })
@@ -316,7 +318,6 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         endedAt: session.endedAt,
       })
     }
-    const currentCreditBalance = (wallet.creditBalance as number) || 0
 
     // 2. Compute cost based on participant logs
     const participantLogs = await payload.find({
@@ -335,28 +336,23 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const endedTime = Date.now()
     const sessionDurationMinutes = Math.max(1, Math.ceil((endedTime - startedTime) / (1000 * 60)))
 
-    let totalParticipantMinutes = 0
-    for (const log of participantLogs.docs as any[]) {
-      // Closed logs carry their full accumulated duration (across rejoins) in
-      // durationSeconds; open logs accumulate prior intervals there plus the
-      // currently running one since joinedAt.
-      let logSeconds: number
-      if (log.leftAt) {
-        logSeconds =
-          Number(log.durationSeconds) ||
-          Math.max(0, (new Date(log.leftAt).getTime() - new Date(log.joinedAt).getTime()) / 1000)
-      } else {
-        logSeconds =
-          (Number(log.durationSeconds) || 0) +
-          Math.max(0, (endedTime - new Date(log.joinedAt).getTime()) / 1000)
-      }
-      totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
-    }
-
-    const billableMinutes =
-      totalParticipantMinutes > 0 ? totalParticipantMinutes : sessionDurationMinutes
+    const billableMinutes = computeBillableMinutes(participantLogs.docs as any[], session, endedTime)
     const costSoFar = billableMinutes * CREDIT_RATE.coinsPerMinute
-    const remainingCredits = Math.max(0, currentCreditBalance - costSoFar)
+
+    // Charge the wallet the delta accrued since the previous poll. This is what
+    // makes the tutor's credit visibly draw down while the class runs, and means
+    // a tab closed mid-class is still billed up to this last poll (the old model
+    // only charged once, at /end, so a closed tab was never billed at all).
+    // `consumed` is the running total charged across the whole session. Only a
+    // live session accrues charges.
+    let newBalance = Math.max(0, (wallet.creditBalance as number) || 0)
+    let consumed = Number(session.coinsConsumed) || 0
+    if (session.status === 'live') {
+      const charge = await chargeSessionDelta(payload, session, costSoFar, wallet)
+      newBalance = charge.newBalance
+      consumed = charge.consumed
+    }
+    const remainingCredits = Math.max(0, newBalance)
 
     // Check if the tutor is out of credit. If so, automatically end the session!
     if (remainingCredits <= 0 && session.status === 'live') {
@@ -473,20 +469,11 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         })
       }
 
-      // 3. Deduct balance from tutor's wallet
-      if (wallet) {
-        const costToCharge = Math.min(currentCreditBalance, costSoFar)
-        const newCoinBalance = Math.max(0, currentCreditBalance - costToCharge)
-
-        await payload.update({
-          collection: 'wallets',
-          id: wallet.id,
-          data: {
-            creditBalance: newCoinBalance,
-          } as any,
-        })
-
-        // Create transaction record
+      // 3. Record the final transaction. The wallet was already drained
+      // incrementally by chargeSessionDelta above (that draw-down to 0 is what
+      // triggered this auto-close), so do NOT deduct again here — just book the
+      // running total that was charged across the whole session.
+      if (consumed > 0) {
         await payload.create({
           collection: 'transactions',
           data: {
@@ -497,10 +484,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             receiver: session.tutor,
             tutor: session.tutor,
             relatedLiveSession: session.id,
-            amount: costToCharge * CREDIT_RATE.nairaPerCoin,
+            amount: consumed * CREDIT_RATE.nairaPerCoin,
             currency: 'ngn',
             status: 'success',
-            description: `Live session automatically ended (out of credits). Charged ${costToCharge} credits.`,
+            description: `Live session automatically ended (out of credits). Charged ${consumed} credits.`,
           } as any,
         })
       }
@@ -512,7 +499,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         data: {
           endedAt: endedIso,
           status: 'ended',
-          coinsConsumed: costSoFar,
+          coinsConsumed: consumed,
           durationMinutes: sessionDurationMinutes,
         } as any,
       })
@@ -580,6 +567,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       status: session.status,
       showWhiteboard: session.showWhiteboard || false,
       activeWhiteboard: session.activeWhiteboard || null,
+      whiteboardWritable: session.whiteboardWritable || false,
       startedAt: session.startedAt,
       endedAt: session.endedAt,
       remainingCredits,

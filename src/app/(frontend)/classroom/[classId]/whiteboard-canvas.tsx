@@ -9,8 +9,10 @@ import {
     HiPlus,
     HiOutlineTrash,
     HiOutlinePencil,
-    HiOutlineSparkles,
+    HiOutlineArrowUturnLeft,
+    HiOutlineArrowUturnRight,
 } from 'react-icons/hi2';
+import { LuEraser } from 'react-icons/lu';
 
 // Points are stored NORMALIZED to the 0..1 range relative to the canvas size,
 // so a drawing made on the tutor's 1200px-wide canvas renders at the same
@@ -41,10 +43,16 @@ const MAX_POINTS_PER_LINE = 500;
 interface WhiteboardCanvasProps {
     whiteboardId: string;
     isTutor: boolean;
+    // Whether THIS user may draw. Defaults to the tutor, but the tutor can grant
+    // students drawing rights (session `whiteboardWritable`), in which case the
+    // parent passes canDraw={true} for students too.
+    canDraw?: boolean;
     initialSlides?: any[];
 }
 
-export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: WhiteboardCanvasProps) {
+export function WhiteboardCanvas({ whiteboardId, isTutor, canDraw, initialSlides }: WhiteboardCanvasProps) {
+    // Fall back to the tutor when the parent doesn't specify drawing rights.
+    const mayDraw = canDraw ?? isTutor;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +88,25 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     const [width, setWidth] = useState(3);
     const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
 
+    // Undo/redo history of line snapshots for the CURRENT slide. `history` holds
+    // past states (most recent last); `future` holds states that were undone and
+    // can be redone. A snapshot of the pre-gesture lines is pushed when a
+    // stroke/erase/clear begins, so each gesture is one undo step. Reset on slide
+    // switch so undo never crosses slide boundaries.
+    const [history, setHistory] = useState<Line[][]>([]);
+    const [future, setFuture] = useState<Line[][]>([]);
+
+    const resetHistory = () => {
+        setHistory([]);
+        setFuture([]);
+    };
+
+    // Snapshot the current lines as a new undo step and drop the redo stack.
+    const pushHistory = () => {
+        setHistory(prev => [...prev, linesRef.current]);
+        setFuture([]);
+    };
+
     // Load slides only when the whiteboard actually changes. Depending on
     // `initialSlides` identity (which the parent recreates on every render) used
     // to snap the tutor back to slide 0 and reload stale lines mid-session.
@@ -87,6 +114,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     useEffect(() => {
         if (loadedWhiteboardRef.current === whiteboardId) return;
         loadedWhiteboardRef.current = whiteboardId;
+        resetHistory();
         if (initialSlides && initialSlides.length > 0) {
             setSlides(initialSlides);
             setCurrentSlideIndex(0);
@@ -181,6 +209,24 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         } catch (err) {
             console.error('Error saving slide lines:', err);
         }
+    };
+
+    const handleUndo = () => {
+        if (!mayDraw || history.length === 0) return;
+        const previous = history[history.length - 1];
+        setHistory(h => h.slice(0, -1));
+        setFuture(f => [...f, linesRef.current]);
+        setLines(previous);
+        saveCurrentSlideData(previous);
+    };
+
+    const handleRedo = () => {
+        if (!mayDraw || future.length === 0) return;
+        const next = future[future.length - 1];
+        setFuture(f => f.slice(0, -1));
+        setHistory(h => [...h, linesRef.current]);
+        setLines(next);
+        saveCurrentSlideData(next);
     };
 
     const drawCanvas = () => {
@@ -297,11 +343,13 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleStartDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if (!isTutor) return;
+        if (!mayDraw) return;
         const coords = getCoordinates(e);
         if (!coords) return;
 
         setIsDrawing(true);
+        // Snapshot the pre-gesture state so this whole stroke/erase is one undo.
+        pushHistory();
 
         if (tool === 'eraser') {
             eraseAt(coords);
@@ -318,7 +366,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if (!isTutor || !isDrawing) return;
+        if (!mayDraw || !isDrawing) return;
         const coords = getCoordinates(e);
         if (!coords) return;
 
@@ -352,15 +400,16 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
     };
 
     const handleStopDrawing = () => {
-        if (!isTutor || !isDrawing) return;
+        if (!mayDraw || !isDrawing) return;
         setIsDrawing(false);
         // Persist the latest strokes via the ref (closure `lines` may be stale).
         saveCurrentSlideData(linesRef.current);
     };
 
     const handleClear = () => {
-        if (!isTutor) return;
+        if (!mayDraw) return;
         if (window.confirm('Clear all drawings on this slide?')) {
+            pushHistory();
             setLines([]);
             saveCurrentSlideData([]);
         }
@@ -379,6 +428,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
                 setSlides(updatedSlides);
                 setCurrentSlideIndex(updatedSlides.length - 1);
                 setLines([]);
+                resetHistory();
             }
         } catch (err) {
             toast.error('Failed to create slide');
@@ -390,6 +440,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             const newIndex = currentSlideIndex - 1;
             setCurrentSlideIndex(newIndex);
             setLines(slides[newIndex].data?.lines || []);
+            resetHistory();
         }
     };
 
@@ -398,6 +449,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
             const newIndex = currentSlideIndex + 1;
             setCurrentSlideIndex(newIndex);
             setLines(slides[newIndex].data?.lines || []);
+            resetHistory();
         }
     };
 
@@ -405,7 +457,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
         <div className="flex flex-col h-full bg-background border border-border rounded-xl overflow-hidden shadow-sm relative">
             {/* Top Toolbar */}
             <div className="bg-background border-b border-border px-4 py-2.5 flex items-center justify-between gap-4 z-10 shrink-0">
-                {isTutor ? (
+                {mayDraw ? (
                     <div className="flex items-center gap-1.5">
                         <Button
                             size="icon"
@@ -423,8 +475,33 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
                             className={`h-8 w-8 rounded-lg cursor-pointer ${tool === 'eraser' ? 'bg-secondary hover:bg-secondary/90 text-secondary-foreground' : 'border-border text-foreground'}`}
                             title="Eraser Tool"
                         >
-                            <HiOutlineSparkles className="h-4.5 w-4.5" />
+                            <LuEraser className="h-4.5 w-4.5" />
                         </Button>
+
+                        {/* Undo / Redo */}
+                        <div className="flex items-center gap-1.5 border-l border-border pl-1.5 ml-0.5">
+                            <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={handleUndo}
+                                disabled={history.length === 0}
+                                className="h-8 w-8 rounded-lg cursor-pointer border-border text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Undo"
+                            >
+                                <HiOutlineArrowUturnLeft className="h-4.5 w-4.5" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={handleRedo}
+                                disabled={future.length === 0}
+                                className="h-8 w-8 rounded-lg cursor-pointer border-border text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Redo"
+                            >
+                                <HiOutlineArrowUturnRight className="h-4.5 w-4.5" />
+                            </Button>
+                        </div>
+
                         <Button
                             size="icon"
                             variant="outline"
@@ -442,7 +519,7 @@ export function WhiteboardCanvas({ whiteboardId, isTutor, initialSlides }: White
                 )}
 
                 {/* Color Palette */}
-                {isTutor && tool === 'pen' && (
+                {mayDraw && tool === 'pen' && (
                     <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
                         {['#000000', '#ea4335', '#0f9d58', '#4285f4', '#ab47bc'].map(c => (
                             <button

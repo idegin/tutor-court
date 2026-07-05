@@ -26,7 +26,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { showWhiteboard, activeWhiteboard } = body
+  const { showWhiteboard, activeWhiteboard, whiteboardWritable } = body
   // activeWhiteboard is a relationship id; coerce or null.
   const activeWhiteboardId = activeWhiteboard != null ? toIntId(activeWhiteboard) : null
 
@@ -50,6 +50,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       data: {
         showWhiteboard: !!showWhiteboard,
         activeWhiteboard: activeWhiteboardId,
+        // Only change the draw-permission when the caller explicitly sends it,
+        // so ordinary share/hide toggles don't silently reset it.
+        ...(whiteboardWritable !== undefined
+          ? { whiteboardWritable: !!whiteboardWritable }
+          : {}),
       } as any,
     })
 

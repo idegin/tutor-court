@@ -18,7 +18,6 @@ import {
     HiOutlineMicrophone,
     HiOutlineVideoCamera,
     HiOutlineChatBubbleLeftRight,
-    HiOutlineWrenchScrewdriver,
     HiOutlineArrowLeftOnRectangle,
     HiOutlineUserGroup,
     HiOutlineUser,
@@ -226,6 +225,10 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
     const [whiteboards, setWhiteboards] = useState<any[]>(initialWhiteboards);
     const [selectedWhiteboard, setSelectedWhiteboard] = useState<any | null>(null);
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    // Whether the tutor has allowed enrolled students to draw on the shared
+    // whiteboard. Synced to the session so every client (and the slide-write
+    // authorization) agrees on who may draw.
+    const [whiteboardWritable, setWhiteboardWritable] = useState(false);
     const [newWbTitle, setNewWbTitle] = useState('');
 
     // Collapsible side tabs panel
@@ -304,8 +307,13 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
         }
     };
 
-    // Sync whiteboard helper
-    const syncWhiteboardStateToDB = async (show: boolean, wbId: string | null) => {
+    // Sync whiteboard helper. `writable` is optional: pass it only when toggling
+    // the student draw-permission, so ordinary share/hide calls leave it alone.
+    const syncWhiteboardStateToDB = async (
+        show: boolean,
+        wbId: string | null,
+        writable?: boolean,
+    ) => {
         const currentSession = sessionRef.current;
         if (!isTutor || !currentSession?.id) return;
         try {
@@ -314,7 +322,8 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     showWhiteboard: show,
-                    activeWhiteboard: wbId
+                    activeWhiteboard: wbId,
+                    ...(writable !== undefined ? { whiteboardWritable: writable } : {}),
                 })
             });
         } catch (err) {
@@ -502,6 +511,12 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                             router.push(`/dashboard/${currentUser.accountType}`);
                         }
                         return;
+                    }
+
+                    // Keep the student draw-permission in sync for everyone (the
+                    // tutor sets it, students obey it via canDraw + slide auth).
+                    if (typeof data.whiteboardWritable === 'boolean') {
+                        setWhiteboardWritable(data.whiteboardWritable);
                     }
 
                     // Sync whiteboard state if changed
@@ -773,6 +788,8 @@ export function ClassroomClient({ cls, currentUser, initialSession, initialWhite
                 setSelectedWhiteboard={setSelectedWhiteboard}
                 showWhiteboard={showWhiteboard}
                 setShowWhiteboard={setShowWhiteboard}
+                whiteboardWritable={whiteboardWritable}
+                setWhiteboardWritable={setWhiteboardWritable}
                 resolveAndSelectWhiteboard={resolveAndSelectWhiteboard}
                 handleLeaveSession={handleLeaveSession}
                 handleCreateWhiteboard={handleCreateWhiteboard}
@@ -800,6 +817,8 @@ interface ClassroomMeetingViewProps {
     setSelectedWhiteboard: (wb: any) => void;
     showWhiteboard: boolean;
     setShowWhiteboard: (show: boolean) => void;
+    whiteboardWritable: boolean;
+    setWhiteboardWritable: (writable: boolean) => void;
     resolveAndSelectWhiteboard: (wbId: string) => Promise<void>;
     handleLeaveSession: () => Promise<boolean>;
     handleCreateWhiteboard: (title: string) => Promise<any | null>;
@@ -808,7 +827,7 @@ interface ClassroomMeetingViewProps {
     activeTab: 'chat' | 'participants' | 'tools';
     toggleTab: (tab: 'chat' | 'participants' | 'tools') => void;
     isPanelOpen: boolean;
-    syncWhiteboardStateToDB: (show: boolean, wbId: string | null) => Promise<void>;
+    syncWhiteboardStateToDB: (show: boolean, wbId: string | null, writable?: boolean) => Promise<void>;
     remainingCredits: number | null;
     meetingLeaveRef: React.MutableRefObject<(() => void) | null>;
 }
@@ -823,6 +842,8 @@ function ClassroomMeetingView({
     setSelectedWhiteboard,
     showWhiteboard,
     setShowWhiteboard,
+    whiteboardWritable,
+    setWhiteboardWritable,
     resolveAndSelectWhiteboard,
     handleLeaveSession,
     handleCreateWhiteboard,
@@ -937,10 +958,40 @@ function ClassroomMeetingView({
         }
     });
 
-    // Let the parent (which owns the ended/kicked navigation paths) disconnect
-    // the media room even though `leave` only exists inside the provider.
+    // Always-current handle on the local participant so the disconnect closure
+    // below (registered once, keyed on `leave`) never reads a stale value when it
+    // stops the camera/mic tracks.
+    const localParticipantRef = useRef<any>(localParticipant);
     useEffect(() => {
-        meetingLeaveRef.current = leave;
+        localParticipantRef.current = localParticipant;
+    }, [localParticipant]);
+
+    // Hard-stop the raw getUserMedia tracks the SDK is holding. `leave()` alone
+    // does NOT reliably release the camera/mic — the OS/browser "in use"
+    // indicator (and the student's camera light) stayed on after the class
+    // ended, because navigating away races the SDK's async teardown. Stopping
+    // the tracks ourselves kills the hardware synchronously.
+    const stopLocalMedia = () => {
+        try {
+            const lp = localParticipantRef.current;
+            lp?.streams?.forEach((s: any) => {
+                try { s?.track?.stop?.(); } catch { /* individual track already gone */ }
+            });
+        } catch { /* no local streams */ }
+    };
+
+    // Fully disconnect: stop the hardware first (so it releases even if leave()'s
+    // teardown is cut short by navigation), then leave the room.
+    const disconnectFromMeeting = () => {
+        stopLocalMedia();
+        try { leave(); } catch { /* already disconnected */ }
+    };
+
+    // Let the parent (which owns the ended/kicked navigation paths) disconnect
+    // the media room even though `leave` only exists inside the provider. It must
+    // stop the local tracks too, not just signal leave — see stopLocalMedia.
+    useEffect(() => {
+        meetingLeaveRef.current = disconnectFromMeeting;
         return () => {
             meetingLeaveRef.current = null;
         };
@@ -953,7 +1004,7 @@ function ClassroomMeetingView({
     const handleExit = async () => {
         const proceed = await handleLeaveSession();
         if (proceed) {
-            try { leave(); } catch { /* already disconnected */ }
+            disconnectFromMeeting();
         }
     };
 
@@ -1024,6 +1075,7 @@ function ClassroomMeetingView({
         // Stop local media on tab close — the SDK's own beforeunload doesn't
         // reliably stop getUserMedia tracks, leaving the camera light on.
         const onUnload = () => {
+            stopLocalMedia();
             try { leave(); } catch { /* noop */ }
         };
         window.addEventListener('beforeunload', onUnload);
@@ -1088,6 +1140,80 @@ function ClassroomMeetingView({
 
     // Real-time Whiteboard Toggle using VideoSDK PubSub
     const { publish: publishWhiteboard, messages: whiteboardMessages } = usePubSub("WHITEBOARD_TOGGLE");
+
+    // Share a whiteboard with the whole class. We set our OWN state directly
+    // instead of waiting for the pubSub message to loop back — VideoSDK does not
+    // reliably deliver a publish to its own sender, so the tutor who clicked a
+    // board would often watch it never appear (the reported "clicking a
+    // whiteboard doesn't show it"). Publishing + the DB sync still drive the
+    // students. Screen sharing and the whiteboard are mutually exclusive on the
+    // main stage, so starting a board stops any active screen share.
+    const shareWhiteboardForAll = (wb: any) => {
+        if (!wb) return;
+        setSelectedWhiteboard(wb);
+        setShowWhiteboard(true);
+        if (localScreenShareOn) {
+            try { toggleScreenShare(); } catch { /* stopping never fails loudly */ }
+        }
+        publishWhiteboard(JSON.stringify({ showWhiteboard: true, whiteboardId: wb.id }), { persist: true });
+        syncWhiteboardStateToDB(true, wb.id);
+    };
+
+    const stopWhiteboardForAll = () => {
+        setShowWhiteboard(false);
+        publishWhiteboard(JSON.stringify({ showWhiteboard: false, whiteboardId: selectedWhiteboard?.id }), { persist: true });
+        syncWhiteboardStateToDB(false, selectedWhiteboard?.id || null);
+    };
+
+    // Enforce the other direction of exclusivity: when the tutor starts a screen
+    // share while a whiteboard is on stage, stop sharing the board so it isn't
+    // left silently hidden behind the presentation (and reappears on stop).
+    useEffect(() => {
+        if (isTutor && localScreenShareOn && showWhiteboard) {
+            stopWhiteboardForAll();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [localScreenShareOn]);
+
+    // Tutor moderation. Remotely muting a participant relies on the tutor's
+    // `allow_mod` token permission (see lib/videosdk); the SDK forces the
+    // target's mic off. These controls are only ever rendered for the tutor.
+    const handleMuteParticipant = (p: any) => {
+        try {
+            p.disableMic();
+            toast.success(`Muted ${p.displayName || 'participant'}`);
+        } catch (err) {
+            console.error('[videosdk] disableMic failed:', err);
+            toast.error('Could not mute that participant.');
+        }
+    };
+
+    const handleMuteEveryone = () => {
+        let muted = 0;
+        uniqueParticipants.forEach((p: any) => {
+            if (p.local) return;
+            if (participantUserId(p.id) === String(tutorId)) return;
+            if (!p.micOn) return;
+            try { p.disableMic(); muted++; } catch { /* skip individual failures */ }
+        });
+        toast.success(
+            muted > 0
+                ? `Muted ${muted} participant${muted > 1 ? 's' : ''}`
+                : 'Everyone is already muted.',
+        );
+    };
+
+    // Grant/revoke student drawing on the shared whiteboard. Persisted to the
+    // session so students' status polls pick it up (and the slide-write auth
+    // honours it).
+    const handleToggleWhiteboardWritable = () => {
+        const next = !whiteboardWritable;
+        setWhiteboardWritable(next);
+        syncWhiteboardStateToDB(showWhiteboard, selectedWhiteboard?.id ?? null, next);
+        toast.success(
+            next ? 'Students can now draw on the whiteboard.' : 'Drawing is now tutor-only.',
+        );
+    };
 
     // Scroll chat to bottom when new messages arrive
     useEffect(() => {
@@ -1239,11 +1365,7 @@ function ClassroomMeetingView({
         if (wb) {
             // Immediately share the freshly created whiteboard with the whole class.
             if (isTutor) {
-                publishWhiteboard(JSON.stringify({
-                    showWhiteboard: true,
-                    whiteboardId: wb.id,
-                }), { persist: true });
-                syncWhiteboardStateToDB(true, wb.id);
+                shareWhiteboardForAll(wb);
             }
             setNewWbTitle('');
             setCreateWbOpen(false);
@@ -1279,11 +1401,7 @@ function ClassroomMeetingView({
                                 onClick={() => {
                                     if (showWhiteboard) {
                                         // Currently sharing → stop sharing for everyone.
-                                        publishWhiteboard(JSON.stringify({
-                                            showWhiteboard: false,
-                                            whiteboardId: selectedWhiteboard?.id
-                                        }), { persist: true });
-                                        syncWhiteboardStateToDB(false, selectedWhiteboard?.id || null);
+                                        stopWhiteboardForAll();
                                     } else {
                                         // Not sharing → open the create-whiteboard popup.
                                         setCreateWbOpen(true);
@@ -1416,6 +1534,7 @@ function ClassroomMeetingView({
                                             key={isWhiteboardFullScreen ? 'whiteboard-fullscreen' : 'whiteboard-inline'}
                                             whiteboardId={selectedWhiteboard.id}
                                             isTutor={isTutor}
+                                            canDraw={isTutor || whiteboardWritable}
                                             initialSlides={selectedWhiteboard.slides}
                                         />
                                     </div>
@@ -1518,6 +1637,17 @@ function ClassroomMeetingView({
                                     <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                                         <HiOutlineUserGroup className="h-4 w-4 text-muted-foreground" /> Participants ({uniqueParticipants.length})
                                     </h3>
+                                    {isTutor && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={handleMuteEveryone}
+                                            className="h-7 px-2 text-[10px] font-semibold border-border text-foreground hover:bg-muted cursor-pointer flex items-center gap-1"
+                                            title="Mute everyone's microphone"
+                                        >
+                                            <HiOutlineMicrophone className="h-3.5 w-3.5" /> Mute all
+                                        </Button>
+                                    )}
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
                                     {uniqueParticipants.map((p: any) => {
@@ -1547,19 +1677,31 @@ function ClassroomMeetingView({
                                                         <HiOutlineVideoCamera className="h-3.5 w-3.5" />
                                                     </span>
                                                     {isTutor && !p.local && !isParticipantTutor && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() => {
-                                                                if (window.confirm(`Are you sure you want to remove ${p.displayName} from the call?`)) {
-                                                                    p.remove();
-                                                                    toast.success(`${p.displayName} removed.`);
-                                                                }
-                                                            }}
-                                                            className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0 cursor-pointer ml-1"
-                                                        >
-                                                            Kick
-                                                        </Button>
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                disabled={!p.micOn}
+                                                                onClick={() => handleMuteParticipant(p)}
+                                                                className="h-6 px-1.5 text-[10px] text-foreground hover:bg-muted shrink-0 cursor-pointer ml-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                title={p.micOn ? `Mute ${p.displayName}` : 'Already muted'}
+                                                            >
+                                                                Mute
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => {
+                                                                    if (window.confirm(`Are you sure you want to remove ${p.displayName} from the call?`)) {
+                                                                        p.remove();
+                                                                        toast.success(`${p.displayName} removed.`);
+                                                                    }
+                                                                }}
+                                                                className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0 cursor-pointer"
+                                                            >
+                                                                Kick
+                                                            </Button>
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
@@ -1573,10 +1715,32 @@ function ClassroomMeetingView({
                             <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4">
                                 <div className="border-b border-border pb-3 flex items-center justify-between">
                                     <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                        <HiOutlineWrenchScrewdriver className="h-4 w-4 text-muted-foreground" /> Tools
+                                        <HiOutlineDocumentText className="h-4 w-4 text-muted-foreground" /> Whiteboard
                                     </h3>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-3">
+                                    {/* Tutor-only class controls for the whiteboard. */}
+                                    {isTutor && (
+                                        <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-semibold text-foreground">Allow students to draw</span>
+                                                    <span className="text-[10px] text-muted-foreground">Let everyone write on the shared board</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={whiteboardWritable}
+                                                    onClick={handleToggleWhiteboardWritable}
+                                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors cursor-pointer ${whiteboardWritable ? 'bg-secondary' : 'bg-muted-foreground/30'}`}
+                                                    title={whiteboardWritable ? 'Students can draw' : 'Only you can draw'}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform ${whiteboardWritable ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <h3 className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
                                         <HiOutlineUser className="h-4 w-4" /> Whiteboards
                                     </h3>
@@ -1587,11 +1751,7 @@ function ClassroomMeetingView({
                                                 key={wb.id}
                                                 onClick={() => {
                                                     if (isTutor) {
-                                                        publishWhiteboard(JSON.stringify({
-                                                            showWhiteboard: true,
-                                                            whiteboardId: wb.id
-                                                        }), { persist: true });
-                                                        syncWhiteboardStateToDB(true, wb.id);
+                                                        shareWhiteboardForAll(wb);
                                                     } else {
                                                         setSelectedWhiteboard(wb);
                                                         setShowWhiteboard(true);
@@ -1615,10 +1775,7 @@ function ClassroomMeetingView({
                                             size="sm"
                                             onClick={() => {
                                                 if (isTutor) {
-                                                    publishWhiteboard(JSON.stringify({
-                                                        showWhiteboard: false
-                                                    }), { persist: true });
-                                                    syncWhiteboardStateToDB(false, null);
+                                                    stopWhiteboardForAll();
                                                 } else {
                                                     setShowWhiteboard(false);
                                                 }
@@ -1679,9 +1836,9 @@ function ClassroomMeetingView({
                             ? 'bg-secondary text-secondary-foreground shadow-md shadow-secondary/20'
                             : 'text-muted-foreground hover:bg-primary/30 hover:text-foreground'
                             }`}
-                        title="Tools"
+                        title="Whiteboard"
                     >
-                        <HiOutlineWrenchScrewdriver className="h-5 w-5" />
+                        <HiOutlineDocumentText className="h-5 w-5" />
                     </button>
                 </div>
             </div>

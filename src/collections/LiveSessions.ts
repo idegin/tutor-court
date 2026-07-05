@@ -124,6 +124,15 @@ export const LiveSessions: CollectionConfig = {
       relationTo: 'whiteboards',
     },
     {
+      name: 'whiteboardWritable',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description:
+          'When enabled, enrolled students may draw on the shared whiteboard (not just the tutor).',
+      },
+    },
+    {
       name: 'coinsConsumed',
       type: 'number',
       defaultValue: 0,

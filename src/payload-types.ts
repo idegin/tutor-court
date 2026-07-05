@@ -571,6 +571,10 @@ export interface LiveSession {
   attendees?: (number | User)[] | null;
   showWhiteboard?: boolean | null;
   activeWhiteboard?: (number | null) | Whiteboard;
+  /**
+   * When enabled, enrolled students may draw on the shared whiteboard (not just the tutor).
+   */
+  whiteboardWritable?: boolean | null;
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
   updatedAt: string;
@@ -1562,6 +1566,7 @@ export interface LiveSessionsSelect<T extends boolean = true> {
   attendees?: T;
   showWhiteboard?: T;
   activeWhiteboard?: T;
+  whiteboardWritable?: T;
   coinsConsumed?: T;
   durationMinutes?: T;
   updatedAt?: T;

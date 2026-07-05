@@ -3,17 +3,28 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { toIntId } from '@/lib/id'
-import { getWhiteboardAccess } from '@/lib/whiteboard-access'
+import { getWhiteboardAccess, canDrawViaLiveSession } from '@/lib/whiteboard-access'
 
 // Loads the slide and confirms it actually belongs to the whiteboard in the URL
 // AND the caller may write to that whiteboard. Prevents editing/deleting another
 // board's slide by pairing a board you own with a victim's slideId.
+//
+// `dataOnly` is true when the caller is not the owner/admin but is a student the
+// tutor allowed to draw during a live session: they may update slide DATA
+// (strokes) only — never the title, order, or deletion.
 async function authorizeSlide(payload: any, whiteboardId: number, slideId: number, user: any) {
   const { whiteboard, canWrite } = await getWhiteboardAccess(payload, whiteboardId, user)
   if (!whiteboard) return { error: 'Whiteboard not found', status: 404 as const }
+
+  let dataOnly = false
   if (!canWrite) {
-    return { error: 'Forbidden: Only the owner of this whiteboard can modify slides', status: 403 as const }
+    const drawGrant = await canDrawViaLiveSession(payload, whiteboard, user)
+    if (!drawGrant) {
+      return { error: 'Forbidden: Only the owner of this whiteboard can modify slides', status: 403 as const }
+    }
+    dataOnly = true
   }
+
   const slide = await payload
     .findByID({ collection: 'whiteboard-slides', id: slideId, depth: 0 })
     .catch(() => null)
@@ -23,7 +34,7 @@ async function authorizeSlide(payload: any, whiteboardId: number, slideId: numbe
   if (slideWhiteboardId !== whiteboardId) {
     return { error: 'Slide does not belong to this whiteboard.', status: 404 as const }
   }
-  return { slide }
+  return { slide, dataOnly }
 }
 
 export async function PATCH(
@@ -58,13 +69,15 @@ export async function PATCH(
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
+    // Students granted live-session draw rights may only change stroke data —
+    // never the slide's title or order.
     const updatedSlide = await payload.update({
       collection: 'whiteboard-slides',
       id: slideId,
       data: {
-        title: body.title !== undefined ? body.title : undefined,
+        title: !auth.dataOnly && body.title !== undefined ? body.title : undefined,
         data: body.data !== undefined ? body.data : undefined,
-        order: body.order !== undefined ? Number(body.order) : undefined,
+        order: !auth.dataOnly && body.order !== undefined ? Number(body.order) : undefined,
       } as any,
     })
 
@@ -98,6 +111,13 @@ export async function DELETE(
     const auth = await authorizeSlide(payload, id, slideId, user)
     if ('error' in auth) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    // A live-session draw grant never allows deleting slides — owner/admin only.
+    if (auth.dataOnly) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only the owner of this whiteboard can delete slides' },
+        { status: 403 },
+      )
     }
 
     await payload.delete({

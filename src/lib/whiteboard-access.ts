@@ -38,3 +38,44 @@ export async function getWhiteboardAccess(
   const canRead = canWrite || isMember || Boolean(whiteboard.isPublic)
   return { whiteboard, canRead, canWrite }
 }
+
+/**
+ * Whether an enrolled student/parent may draw on this whiteboard right now via a
+ * live-session grant. True only when there is a LIVE session for the board's
+ * class that has `whiteboardWritable` enabled AND is currently sharing THIS
+ * board (`activeWhiteboard`). This scopes student drawing to exactly the board
+ * the tutor is presenting, and only while the tutor has opted in — it never
+ * grants title/order edits or deletion (see the slide route's `dataOnly`).
+ */
+export async function canDrawViaLiveSession(
+  payload: any,
+  whiteboard: any,
+  user: any,
+): Promise<boolean> {
+  if (!user || !whiteboard) return false
+  const classId = typeof whiteboard.class === 'object' ? whiteboard.class?.id : whiteboard.class
+  if (!classId) return false
+
+  const cls = await payload
+    .findByID({ collection: 'classes', id: classId, depth: 0 })
+    .catch(() => null)
+  if (!cls) return false
+  const studentIds = (cls.students || []).map((s: any) => (typeof s === 'object' ? s.id : s))
+  const parentIds = (cls.parents || []).map((p: any) => (typeof p === 'object' ? p.id : p))
+  if (!studentIds.includes(user.id) && !parentIds.includes(user.id)) return false
+
+  const sessions = await payload.find({
+    collection: 'live-sessions',
+    where: {
+      and: [
+        { class: { equals: classId } },
+        { status: { equals: 'live' } },
+        { whiteboardWritable: { equals: true } },
+        { activeWhiteboard: { equals: whiteboard.id } },
+      ],
+    },
+    limit: 1,
+    depth: 0,
+  })
+  return sessions.totalDocs > 0
+}

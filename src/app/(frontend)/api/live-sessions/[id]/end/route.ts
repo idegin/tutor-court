@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { toIntId } from '@/lib/id'
+import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
 
 function deriveEngagementFlag(
   attendanceMinutes: number,
@@ -175,25 +176,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       depth: 0,
     })
 
-    let totalParticipantMinutes = 0
-    for (const log of participantLogs.docs as any[]) {
-      // durationSeconds is the accumulated total across rejoins (all logs were
-      // closed just above); fall back to the last interval if it's absent.
-      const logSeconds =
-        Number(log.durationSeconds) ||
-        Math.max(
-          0,
-          ((log.leftAt ? new Date(log.leftAt).getTime() : endedTime) -
-            new Date(log.joinedAt).getTime()) /
-            1000,
-        )
-      totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
-    }
-
     // If no students/parents joined, charge a baseline of 1 credit/min of tutor's session duration.
     // Otherwise, charge based on the total student/parent participant minutes.
-    const billableMinutes =
-      totalParticipantMinutes > 0 ? totalParticipantMinutes : sessionDurationMinutes
+    const billableMinutes = computeBillableMinutes(participantLogs.docs as any[], session, endedTime)
     const cost = billableMinutes * CREDIT_RATE.coinsPerMinute
 
     // Find tutor wallet
@@ -204,37 +189,36 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       depth: 0,
     })
 
+    // The wallet was already drawn down incrementally by the status poll while
+    // the class ran; only settle the remaining delta here (`cost` minus what was
+    // already charged). `claimed` is re-read above, so its coinsConsumed is the
+    // freshest running total — using the stale top-of-request value could let a
+    // last-second poll's charge be lost or double-booked.
+    let consumed = Number((claimed as any).coinsConsumed) || 0
     if (wallets.docs.length > 0) {
       const wallet = wallets.docs[0]
-      const currentCoinBalance = (wallet.creditBalance as number) || 0
-      const newCoinBalance = Math.max(0, currentCoinBalance - cost)
+      const result = await chargeSessionDelta(payload, claimed, cost, wallet)
+      consumed = result.consumed
 
-      // Update wallet
-      await payload.update({
-        collection: 'wallets',
-        id: wallet.id,
-        data: {
-          creditBalance: newCoinBalance,
-        } as any,
-      })
-
-      // Create transaction record for credit consumption (NGN value is cost * nairaPerCoin)
-      await payload.create({
-        collection: 'transactions',
-        data: {
-          reference: `session-${session.id}-${Date.now()}`,
-          gateway: 'wallet',
-          type: 'payment',
-          sender: session.tutor,
-          receiver: session.tutor,
-          tutor: session.tutor,
-          relatedLiveSession: session.id,
-          amount: cost * CREDIT_RATE.nairaPerCoin,
-          currency: 'ngn',
-          status: 'success',
-          description: `Live session credit consumption (${cost} credits).`,
-        } as any,
-      })
+      // Book a single transaction for the whole session's charged total.
+      if (consumed > 0) {
+        await payload.create({
+          collection: 'transactions',
+          data: {
+            reference: `session-${session.id}-${Date.now()}`,
+            gateway: 'wallet',
+            type: 'payment',
+            sender: session.tutor,
+            receiver: session.tutor,
+            tutor: session.tutor,
+            relatedLiveSession: session.id,
+            amount: consumed * CREDIT_RATE.nairaPerCoin,
+            currency: 'ngn',
+            status: 'success',
+            description: `Live session credit consumption (${consumed} credits).`,
+          } as any,
+        })
+      }
     }
 
     // Update live session status
@@ -244,7 +228,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       data: {
         endedAt: endedIso,
         status: 'ended',
-        coinsConsumed: cost,
+        coinsConsumed: consumed,
         durationMinutes: sessionDurationMinutes,
       } as any,
     })
