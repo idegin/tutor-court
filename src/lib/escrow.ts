@@ -97,12 +97,12 @@ export async function holdBookingEscrow({
     return { ok: false, status: 400, error: 'Wallet currency does not match the booking currency.' }
   }
 
-  // (2) Booking already funded by an EARLIER hold (a different reference).
-  if (booking.paymentStatus === 'held' || booking.paymentStatus === 'paid') {
+  // (2) If the booking can't be held right now (already held/paid, cancelled,
+  //     refunded, or no longer confirmed), a real Paystack charge must NOT be
+  //     dropped — credit the collected amount to the booker's wallet instead.
+  const canHold = booking.status === 'confirmed' && booking.paymentStatus === 'unpaid'
+  if (!canHold) {
     if (source === 'paystack') {
-      // A real card charge landed for an already-paid booking (double pay). Do
-      // NOT drop it — credit the collected amount to the booker's wallet so no
-      // money is lost. (An admin can refund it out-of-band.)
       const collected = metadata?.amount ? Number(metadata.amount) / 100 : price
       return await creditToWallet({
         payload,
@@ -113,15 +113,13 @@ export async function holdBookingEscrow({
         userId: bookerUserId,
         currency,
         metadata,
-        note: 'Overpayment for an already-funded booking (credited to wallet)',
+        note: 'Payment for a booking that could not be escrowed (credited to wallet)',
       })
     }
-    return { ok: true, alreadyHeld: true }
-  }
-
-  // (3) Must be confirmed to fund.
-  if (booking.status !== 'confirmed') {
-    return { ok: false, status: 409, error: 'Only a confirmed booking can be paid.' }
+    if (booking.paymentStatus === 'held' || booking.paymentStatus === 'paid') {
+      return { ok: true, alreadyHeld: true }
+    }
+    return { ok: false, status: 409, error: 'This booking is no longer awaiting payment.' }
   }
 
   // Atomicity is REQUIRED for money — refuse rather than write non-atomically.
@@ -131,6 +129,31 @@ export async function holdBookingEscrow({
   }
   const req = { transactionID } as any
   try {
+    // Re-read the booking inside the transaction — if it was cancelled/paid by a
+    // concurrent request, abort (don't hold a cancelled booking; preserve any
+    // real Paystack money to the wallet).
+    const freshBooking: any = await payload
+      .findByID({ collection: 'bookings', id: bookingId, depth: 0, overrideAccess: true, req })
+      .catch(() => null)
+    if (!freshBooking || freshBooking.status !== 'confirmed' || freshBooking.paymentStatus !== 'unpaid') {
+      await payload.db.rollbackTransaction(transactionID)
+      if (source === 'paystack') {
+        const collected = metadata?.amount ? Number(metadata.amount) / 100 : price
+        return await creditToWallet({
+          payload,
+          walletId: wallet.id,
+          currentBalance: Number(wallet.balance) || 0,
+          amount: collected,
+          reference,
+          userId: bookerUserId,
+          currency,
+          metadata,
+          note: 'Payment for a booking that could not be escrowed (credited to wallet)',
+        })
+      }
+      return { ok: true, alreadyHeld: true }
+    }
+
     // Re-read the wallet inside the transaction so the funds check uses a fresh
     // value (narrows the concurrent-hold window).
     const freshRes = await payload.find({
@@ -219,6 +242,8 @@ async function creditToWallet({
   if (!transactionID) return { ok: false, status: 500, error: 'Could not process atomically.' }
   const req = { transactionID } as any
   try {
+    // Create the txn first — its unique `reference` blocks a duplicate credit
+    // before any balance is touched.
     await payload.create({
       collection: 'transactions',
       data: {
@@ -236,10 +261,16 @@ async function creditToWallet({
       req,
       overrideAccess: true,
     })
+    // Re-read the balance inside the transaction (avoid a stale outer read
+    // clobbering a concurrent credit).
+    const fresh: any = await payload
+      .findByID({ collection: 'wallets', id: walletId, depth: 0, overrideAccess: true, req })
+      .catch(() => null)
+    const base = Number(fresh?.balance)
     await payload.update({
       collection: 'wallets',
       id: walletId,
-      data: { balance: currentBalance + amount } as any,
+      data: { balance: (isNaN(base) ? currentBalance : base) + amount } as any,
       req,
       overrideAccess: true,
     })
@@ -276,6 +307,7 @@ export async function releaseBookingEscrow({
   const price = Number(booking.price) || 0
   const currency = booking.currency || 'ngn'
   const bookerUserId = booking.parent ? idOf(booking.parent) : idOf(booking.student)
+  if (!bookerUserId) return { ok: false, status: 400, error: 'Booking has no booker.' }
   const reference = `escrow-refund-${bookingId}`
 
   const existing = await payload.find({

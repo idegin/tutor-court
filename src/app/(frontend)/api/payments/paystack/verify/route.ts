@@ -96,33 +96,43 @@ export async function GET(request: Request) {
     let updatedWallet = wallet
 
     if (existingTransactions.docs.length === 0) {
-      const currentBalance = (wallet.balance as number) || 0
-
-      // Update wallet balance
-      updatedWallet = await payload.update({
-        collection: 'wallets',
-        id: wallet.id,
-        data: {
-          balance: currentBalance + amountNaira,
-        } as any,
-      })
-
-      // Create transaction record
-      await payload.create({
-        collection: 'transactions',
-        data: {
-          reference,
-          gateway: 'paystack',
-          type: 'deposit',
-          sender: user.id,
-          receiver: user.id,
-          amount: amountNaira,
-          currency: 'ngn',
-          status: 'success',
-          description: 'Paystack wallet funding (verified)',
-          metadata: data,
-        } as any,
-      })
+      // Atomic + txn-first: the unique `reference` blocks a concurrent double
+      // credit before any balance is touched (two verify calls can't both fund).
+      const transactionID = (await payload.db.beginTransaction()) || undefined
+      const txReq = transactionID ? ({ transactionID } as any) : undefined
+      try {
+        await payload.create({
+          collection: 'transactions',
+          data: {
+            reference,
+            gateway: 'paystack',
+            type: 'deposit',
+            sender: user.id,
+            receiver: user.id,
+            amount: amountNaira,
+            currency: 'ngn',
+            status: 'success',
+            description: 'Paystack wallet funding (verified)',
+            metadata: data,
+          } as any,
+          req: txReq,
+        })
+        const fresh: any = await payload
+          .findByID({ collection: 'wallets', id: wallet.id, depth: 0, overrideAccess: true, req: txReq })
+          .catch(() => null)
+        const currentBalance = Number(fresh?.balance ?? wallet.balance) || 0
+        updatedWallet = await payload.update({
+          collection: 'wallets',
+          id: wallet.id,
+          data: { balance: currentBalance + amountNaira } as any,
+          req: txReq,
+        })
+        if (transactionID) await payload.db.commitTransaction(transactionID)
+      } catch (e: any) {
+        if (transactionID) await payload.db.rollbackTransaction(transactionID)
+        // Duplicate reference (a concurrent verify already funded) — safe to ignore.
+        if (e?.code !== '23505' && !/reference|unique/i.test(String(e?.message || ''))) throw e
+      }
 
       console.log(`Verified & successfully funded wallet for user ${user.id} with ₦${amountNaira}`)
     }
