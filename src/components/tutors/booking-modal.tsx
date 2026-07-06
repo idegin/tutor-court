@@ -48,6 +48,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     // Closing after a successful request triggers the parent's onSuccess (which
     // refreshes the page) — so the user actually sees the success step first.
     const handleClose = () => {
+        if (isSubmitting) return; // don't tear down the modal mid-request
         if (submitted && onSuccess) onSuccess();
         else onClose();
     };

@@ -112,14 +112,15 @@ export async function POST(req: Request) {
     // Prevent duplicate/spam requests: one active (pending|confirmed) booking
     // per booker+tutor. A declined/cancelled/completed booking does not block a
     // new request. Mirrors the profile CTA's "active booking" definition.
+    // Scope the check to the specific student (the child for a parent booking,
+    // or the student themselves) so a parent can still book a DIFFERENT child
+    // with the same tutor.
     const existingActive = await payload.find({
       collection: 'bookings',
       where: {
         and: [
           { tutor: { equals: tutorProfile.id } },
-          {
-            or: [{ student: { equals: studentId } }, { parent: { equals: user.id } }],
-          },
+          { student: { equals: studentId } },
           {
             or: [{ status: { equals: 'pending' } }, { status: { equals: 'confirmed' } }],
           },

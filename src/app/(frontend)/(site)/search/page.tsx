@@ -102,15 +102,17 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
 
     // Free-text keyword search across headline/bio and the related user's name.
     if (q) {
+        // Match each word against first OR last name so a full name
+        // ("Jane Doe") resolves, not just a single token.
+        const tokens = q.split(/\s+/).filter(Boolean);
         const { docs: userDocs } = await payload.find({
             collection: 'users',
             where: {
                 and: [
                     { accountType: { equals: 'tutor' } },
-                    { or: [
-                        { firstName: { like: q } },
-                        { lastName: { like: q } },
-                    ] },
+                    ...tokens.map((tok: string) => ({
+                        or: [{ firstName: { like: tok } }, { lastName: { like: tok } }],
+                    })) as any,
                 ],
             },
             limit: 200,

@@ -208,7 +208,7 @@ export function TutorBookingSidebar({
                 pricePerHour={pricePerHour}
                 offeredSubjects={offeredSubjects}
                 childrenOptions={childrenOptions}
-                onSuccess={() => window.location.reload()}
+                onSuccess={() => router.push(bookingsHref)}
             />
         </>
     );

@@ -16,11 +16,12 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
     const payload = await getPayload({ config: configPromise });
     const { user: currentUser } = await getServerSideUser();
 
-    const isObjectId = /^[0-9a-fA-F]{24}$/.test(decodedSlug);
+    // Support lookup by slug, numeric (Postgres) id, or legacy 24-char ObjectId.
+    const isById = /^\d+$/.test(decodedSlug) || /^[0-9a-fA-F]{24}$/.test(decodedSlug);
 
     const { docs } = await payload.find({
         collection: 'tutor-profiles',
-        where: isObjectId ? { id: { equals: decodedSlug } } : { slug: { equals: decodedSlug } },
+        where: isById ? { id: { equals: decodedSlug } } : { slug: { equals: decodedSlug } },
         depth: 2
     });
 
@@ -43,28 +44,28 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
     let hasActiveBooking = false;
     let parentChildren: { id: string; name: string }[] = [];
     if (currentUser) {
-        const activeBookings = await payload.find({
-            collection: 'bookings',
-            where: {
-                and: [
-                    { tutor: { equals: tutorProfile.id } },
-                    {
-                        or: [
-                            { student: { equals: currentUser.id } },
-                            { parent: { equals: currentUser.id } }
-                        ]
-                    },
-                    {
-                        or: [
-                            { status: { equals: 'pending' } },
-                            { status: { equals: 'confirmed' } }
-                        ]
-                    }
-                ]
-            },
-            depth: 0,
-        });
-        hasActiveBooking = activeBookings.totalDocs > 0;
+        // Only a self-booking student is blocked from re-booking the same tutor.
+        // A parent may have multiple children, so the per-child guard is enforced
+        // server-side at booking time — the CTA stays available for them.
+        if (currentUser.accountType === 'student') {
+            const activeBookings = await payload.find({
+                collection: 'bookings',
+                where: {
+                    and: [
+                        { tutor: { equals: tutorProfile.id } },
+                        { student: { equals: currentUser.id } },
+                        {
+                            or: [
+                                { status: { equals: 'pending' } },
+                                { status: { equals: 'confirmed' } }
+                            ]
+                        }
+                    ]
+                },
+                depth: 0,
+            });
+            hasActiveBooking = activeBookings.totalDocs > 0;
+        }
 
         // A parent booking on behalf of a child must pick which child.
         if (currentUser.accountType === 'parent') {
@@ -230,6 +231,7 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                         avatarUrl={avatarUrl}
                         pricePerHour={pricePerHour}
                         responseTimeText={responseTimeText}
+                        isVerified={Boolean(tutorProfile.isApproved)}
                         offeredSubjects={tutorProfile.subjects?.map((s: any) => s.name) || []}
                         availability={tutorProfile.weeklyAvailability || []}
                         gradesTaught={tutorProfile.gradesTaught || []}

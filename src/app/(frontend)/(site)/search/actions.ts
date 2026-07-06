@@ -52,12 +52,15 @@ export async function fetchTutors(searchParams: any, page: number = 1) {
 
   // Free-text keyword search across headline/bio and the related user's name.
   if (q) {
+    const tokens = q.split(/\s+/).filter(Boolean)
     const { docs: userDocs } = await payload.find({
       collection: 'users',
       where: {
         and: [
           { accountType: { equals: 'tutor' } },
-          { or: [{ firstName: { like: q } }, { lastName: { like: q } }] },
+          ...tokens.map((tok: string) => ({
+            or: [{ firstName: { like: tok } }, { lastName: { like: tok } }],
+          })) as any,
         ],
       },
       limit: 200,
