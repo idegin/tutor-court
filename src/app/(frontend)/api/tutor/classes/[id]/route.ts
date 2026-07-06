@@ -134,6 +134,22 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       )
     }
 
+    // A marketplace class the student PAID for can't be deleted (that would
+    // strand the held escrow). The booking must be cancelled/refunded first.
+    if ((existingClass as any).booking) {
+      const bkId =
+        typeof (existingClass as any).booking === 'object'
+          ? (existingClass as any).booking.id
+          : (existingClass as any).booking
+      const bk = await payload.findByID({ collection: 'bookings', id: bkId, depth: 0 }).catch(() => null)
+      if ((bk as any)?.paymentStatus === 'held') {
+        return NextResponse.json(
+          { error: 'This class was paid for via a booking. Cancel the booking (which refunds it) instead.' },
+          { status: 409 },
+        )
+      }
+    }
+
     // Helper: run a delete but never let one failing/empty delete abort the
     // whole cascade — log and continue.
     const safeDelete = async (fn: () => Promise<any>, label: string) => {

@@ -97,6 +97,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     }
 
+    // Cancelling a booking must also cancel its materialized class, otherwise a
+    // refunded engagement's live room could still be started/run (for free).
+    if (action === 'cancel' && booking.class) {
+      const classId = typeof booking.class === 'object' ? booking.class.id : booking.class
+      await payload
+        .update({
+          collection: 'classes',
+          id: classId,
+          data: { status: 'cancelled' } as any,
+          overrideAccess: true,
+        })
+        .catch((e) => console.error('[bookings/cancel] failed to cancel class:', e?.message))
+    }
+
     const updated = await payload.update({
       collection: 'bookings',
       id,

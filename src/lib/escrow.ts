@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { materializeClassFromBooking } from './booking-to-class'
+import { countSessions } from './booking-pricing'
 
 /**
  * Booking escrow.
@@ -46,6 +47,8 @@ export interface HoldEscrowResult {
   held?: boolean
   /** A real payment arrived for an already-funded booking; credited to the wallet instead. */
   creditedToWallet?: boolean
+  /** No escrow action was applicable (e.g. a non-booking / SaaS class). */
+  skipped?: boolean
 }
 
 export async function holdBookingEscrow({
@@ -387,5 +390,160 @@ export async function releaseBookingEscrow({
     await payload.db.rollbackTransaction(transactionID)
     if (isDupRef(e)) return { ok: true, alreadyHeld: true }
     return { ok: false, status: 500, error: e?.message || 'Escrow release failed.' }
+  }
+}
+
+/**
+ * Stage 6 (option a — "burn escrow per completed session"): when a booking-backed
+ * live session ends, release that session's share of the held escrow FROM the
+ * booker TO the tutor. Idempotent per session (`payout-session-{sessionId}`),
+ * caps total released at the booking price, and marks the booking paid/completed
+ * once fully released. No-op for SaaS (non-booking) classes.
+ */
+export async function payoutSessionEscrow({
+  payload,
+  sessionId,
+  classId,
+}: {
+  payload: Payload
+  sessionId: string | number
+  classId: string | number
+}): Promise<HoldEscrowResult> {
+  let cls: any
+  try {
+    cls = await payload.findByID({ collection: 'classes', id: classId, depth: 0, overrideAccess: true })
+  } catch {
+    return { ok: false, status: 404, error: 'Class not found.' }
+  }
+  const bookingId = idOf(cls?.booking)
+  if (!bookingId) return { ok: true, skipped: true } // SaaS class — nothing to release
+
+  const booking: any = await payload
+    .findByID({ collection: 'bookings', id: bookingId, depth: 2, overrideAccess: true })
+    .catch(() => null)
+  if (!booking || booking.paymentStatus !== 'held') return { ok: true, skipped: true }
+
+  const reference = `payout-session-${sessionId}`
+  const existing = await payload.find({
+    collection: 'transactions',
+    where: { reference: { equals: reference } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (existing.totalDocs > 0) return { ok: true, alreadyHeld: true } // this session already paid out
+
+  const price = Number(booking.price) || 0
+  const currency = booking.currency || 'ngn'
+  const bookerUserId = booking.parent ? idOf(booking.parent) : idOf(booking.student)
+  const tutorUserId =
+    booking.tutor && typeof booking.tutor === 'object' ? idOf(booking.tutor.user) : null
+  if (!bookerUserId || !tutorUserId) return { ok: false, status: 400, error: 'Could not resolve booker/tutor.' }
+
+  const totalSessions = Math.max(
+    1,
+    countSessions(booking.date, booking.endDate, booking.daysOfWeek || []),
+  )
+
+  // How much has already been released for this booking.
+  const releasedRes = await payload.find({
+    collection: 'transactions',
+    where: { and: [{ relatedBooking: { equals: bookingId } }, { type: { equals: 'payout' } }] },
+    limit: 1000,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const alreadyReleased = releasedRes.docs.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0)
+  const remaining = Math.max(0, price - alreadyReleased)
+  const share = Math.min(Math.round(price / totalSessions), remaining)
+
+  // Nothing left to release — mark the engagement complete/paid out if not already.
+  if (share <= 0) {
+    if (booking.status !== 'completed' || booking.paymentStatus !== 'paid') {
+      await payload
+        .update({
+          collection: 'bookings',
+          id: bookingId,
+          data: { paymentStatus: 'paid', status: 'completed' } as any,
+          overrideAccess: true,
+        })
+        .catch(() => {})
+    }
+    return { ok: true }
+  }
+
+  const bookerWallet: any = (
+    await payload.find({ collection: 'wallets', where: { user: { equals: bookerUserId } }, limit: 1, depth: 0, overrideAccess: true })
+  ).docs[0]
+  const tutorWallet: any = (
+    await payload.find({ collection: 'wallets', where: { user: { equals: tutorUserId } }, limit: 1, depth: 0, overrideAccess: true })
+  ).docs[0]
+  if (!bookerWallet || !tutorWallet) return { ok: false, status: 400, error: 'Wallet not found.' }
+
+  const willComplete = alreadyReleased + share >= price
+
+  const transactionID = await payload.db.beginTransaction()
+  if (!transactionID) return { ok: false, status: 500, error: 'Could not process atomically.' }
+  const req = { transactionID } as any
+  try {
+    await payload.create({
+      collection: 'transactions',
+      data: {
+        reference,
+        gateway: 'wallet',
+        type: 'payout',
+        sender: numericId(bookerUserId),
+        receiver: numericId(tutorUserId),
+        tutor: numericId(tutorUserId),
+        relatedBooking: numericId(bookingId),
+        relatedLiveSession: numericId(sessionId),
+        amount: share,
+        currency,
+        status: 'success',
+        description: 'Escrow released to tutor for a completed session',
+      } as any,
+      req,
+      overrideAccess: true,
+    })
+
+    // Booker: the released funds leave the wallet entirely (total + reserved down).
+    const bFresh: any = await payload.findByID({ collection: 'wallets', id: bookerWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
+    const bBal = Number(bFresh?.balance ?? bookerWallet.balance) || 0
+    const bLocked = Number(bFresh?.lockedBalance ?? bookerWallet.lockedBalance) || 0
+    await payload.update({
+      collection: 'wallets',
+      id: bookerWallet.id,
+      data: { balance: Math.max(0, bBal - share), lockedBalance: Math.max(0, bLocked - share) } as any,
+      req,
+      overrideAccess: true,
+    })
+
+    // Tutor: earns the released funds (spendable).
+    const tFresh: any = await payload.findByID({ collection: 'wallets', id: tutorWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
+    const tBal = Number(tFresh?.balance ?? tutorWallet.balance) || 0
+    await payload.update({
+      collection: 'wallets',
+      id: tutorWallet.id,
+      data: { balance: tBal + share } as any,
+      req,
+      overrideAccess: true,
+    })
+
+    if (willComplete) {
+      await payload.update({
+        collection: 'bookings',
+        id: bookingId,
+        data: { paymentStatus: 'paid', status: 'completed' } as any,
+        req,
+        overrideAccess: true,
+      })
+    }
+
+    await payload.db.commitTransaction(transactionID)
+    return { ok: true, held: false }
+  } catch (e: any) {
+    await payload.db.rollbackTransaction(transactionID)
+    if (isDupRef(e)) return { ok: true, alreadyHeld: true }
+    return { ok: false, status: 500, error: e?.message || 'Escrow payout failed.' }
   }
 }

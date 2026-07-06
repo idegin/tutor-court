@@ -83,9 +83,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'You are not the tutor of this class.' }, { status: 403 })
     }
 
+    if (cls.status === 'cancelled' || cls.status === 'completed') {
+      return NextResponse.json({ error: 'This class is no longer active.' }, { status: 409 })
+    }
+
     // A marketplace (booking-backed) class is paid up-front via escrow, so the
-    // tutor does NOT need live-class credits to start it.
-    const isBookingBacked = Boolean((cls as any).booking)
+    // tutor does NOT need live-class credits to start it — but only while the
+    // booking is actually funded (held). A refunded/unfunded booking is NOT free.
+    let isBookingBacked = false
+    const bookingId = (cls as any).booking
+      ? typeof (cls as any).booking === 'object'
+        ? (cls as any).booking.id
+        : (cls as any).booking
+      : null
+    if (bookingId) {
+      const bk = await payload
+        .findByID({ collection: 'bookings', id: bookingId, depth: 0 })
+        .catch(() => null)
+      isBookingBacked = (bk as any)?.paymentStatus === 'held'
+    }
 
     // Check tutor credit balance (SaaS classes only).
     const wallets = await payload.find({

@@ -75,8 +75,22 @@ export async function chargeSessionDelta(
   // are NOT billed per-minute against the tutor's live-class credits.
   const classId = typeof session.class === 'object' ? session.class?.id : session.class
   if (classId) {
-    const cls = await payload.findByID({ collection: 'classes', id: classId, depth: 0 }).catch(() => null)
-    if (cls?.booking) {
+    const cls = await payload
+      .findByID({ collection: 'classes', id: classId, depth: 1 })
+      .catch(() => null)
+    if (!cls) {
+      // Fail SAFE on a transient class-read failure: skip this poll's charge
+      // (and the zero-credit auto-end). `coinsConsumed` is not advanced, so the
+      // minutes are simply charged on the next successful poll — no loss for a
+      // SaaS class, no wrongful bill/auto-end for a booking-backed one.
+      return { charged: 0, newBalance: currentBalance, consumed: prevConsumed, skipped: true }
+    }
+    const booking = (cls as any).booking
+    // Escrow-funded only while the booking is actually held (a refunded booking's
+    // class is cancelled, but guard anyway).
+    const isEscrowFunded =
+      booking && (typeof booking === 'object' ? booking.paymentStatus === 'held' : true)
+    if (isEscrowFunded) {
       return { charged: 0, newBalance: currentBalance, consumed: prevConsumed, skipped: true }
     }
   }

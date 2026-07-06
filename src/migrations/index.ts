@@ -9,6 +9,7 @@ import * as migration_20260705_000000_live_session_whiteboard_writable from './2
 import * as migration_20260706_000000_assessment_results_pending_manual_grading from './20260706_000000_assessment_results_pending_manual_grading';
 import * as migration_20260706_000001_tutor_weekly_availability from './20260706_000001_tutor_weekly_availability';
 import * as migration_20260706_000002_booking_class_link from './20260706_000002_booking_class_link';
+import * as migration_20260706_000003_class_booking_unique from './20260706_000003_class_booking_unique';
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20260706_000002_booking_class_link.up,
     down: migration_20260706_000002_booking_class_link.down,
     name: '20260706_000002_booking_class_link',
+  },
+  {
+    up: migration_20260706_000003_class_booking_unique.up,
+    down: migration_20260706_000003_class_booking_unique.down,
+    name: '20260706_000003_class_booking_unique',
   },
 ];

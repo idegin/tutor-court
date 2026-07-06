@@ -6,6 +6,7 @@ import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { toIntId } from '@/lib/id'
 import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
+import { payoutSessionEscrow } from '@/lib/escrow'
 
 function deriveEngagementFlag(
   attendanceMinutes: number,
@@ -232,6 +233,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         durationMinutes: sessionDurationMinutes,
       } as any,
     })
+
+    // Stage 6: for a booking-backed (escrow-funded) class, release this session's
+    // share of the held escrow to the tutor (idempotent per session; no-op for
+    // SaaS classes). Non-blocking — a payout hiccup must not fail ending the class.
+    const endedClassId =
+      typeof session.class === 'object' ? (session.class as any).id : session.class
+    if (endedClassId) {
+      await payoutSessionEscrow({ payload, sessionId: session.id, classId: endedClassId }).catch(
+        (e) => console.error('[live-sessions/end] escrow payout failed:', e?.message),
+      )
+    }
 
     // Activity logs — write one row per participating student (subject = student)
     // plus one row for the tutor (subject = tutor), so each role's feed reflects

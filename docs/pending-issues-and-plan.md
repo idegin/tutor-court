@@ -84,6 +84,19 @@ Built the "fund a booking into escrow" flow (`src/lib/escrow.ts`): a booker pays
 
 **Known limitation (documented, shared with existing wallet flows):** two concurrent holds of *different* bookings from the same wallet could over-commit under high concurrency (reads are re-done inside the transaction to narrow the window, but true serialization needs row-level locking / an atomic conditional `UPDATE`). Also deferred: escrow **release to the tutor on completion** (Stage 4/7 payout), per-tutor **USD** currency, and Paystack **refund-to-card** (refunds currently return to the wallet). D1 money-model reconciliation (escrow-per-booking vs per-minute live-class credits) still needs a founder call before wiring escrow into the live-class engine.
 
+### Stage 5 (booking→class) + Stage 6 (billing reconciliation) — 2026-07-06
+
+**Stage 5:** a paid (held) booking now materializes a schedulable `Class` (`src/lib/booking-to-class.ts`, triggered post-commit from the escrow hold). It resolves the tutor-profile→user, maps subject/dates/grade, derives the weekly schedule from `daysOfWeek`+`hoursPerDay` anchored to the tutor's `weeklyAvailability` (default 09:00), enrols the student/parent, and links `Classes.booking` ↔ `Bookings.class` (migration + a partial-unique index so one booking → at most one class). _Verified: pay → class created (tutor=user, schedule derived, student enrolled)._
+
+**Stage 6 (D1 decision — escrow for marketplace):** booking-backed classes are **not** billed against the tutor's live-class credits (the credit model stays for SaaS/tutor-created classes). `chargeSessionDelta` skips them (fail-safe on a transient class read), the zero-credit auto-close is suppressed, and the 60-credit start gate is waived — but only while the booking is actually `held`. And **per completed session the held escrow is released to the tutor** (`payoutSessionEscrow`, idempotent per session), marking the booking `paid`/`completed` once fully released. _Verified: end session → tutor paid, booker's locked released, booking completed._
+
+**Deep-audit fixes (all verified):**
+- 🔴 **Free-class-after-refund:** cancelling a held booking now also **cancels its class**, and the live-session start refuses cancelled/unfunded classes (billing checks gate on `paymentStatus === 'held'`, not merely a booking link).
+- 🔴 **No payout:** implemented the per-session escrow release to the tutor (above) — the marketplace value exchange is now complete.
+- 🟠 fail-safe billing on a transient class-read; partial-unique index prevents double-materialization; class-delete refuses a class whose booking is still `held`.
+
+**Deferred (documented):** a completion **sweep** (release remaining escrow / mark paid when `endDate` passes even if the tutor never formally ends the last session) — today release happens per `/end`; concurrent different-booking wallet over-commit still needs row-level locking; per-tutor USD currency and Paystack refund-to-card.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

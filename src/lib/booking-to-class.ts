@@ -104,6 +104,15 @@ export async function materializeClassFromBooking(
 
     return { ok: true, classId: created.id }
   } catch (e: any) {
+    // A concurrent materialize already created the class (unique booking_id) —
+    // idempotent success.
+    if (e?.code === '23505' || /unique|duplicate/i.test(String(e?.message || ''))) {
+      const existing = await payload
+        .find({ collection: 'classes', where: { booking: { equals: bookingId } }, limit: 1, overrideAccess: true })
+        .catch(() => null)
+      const found = existing?.docs?.[0]
+      if (found) return { ok: true, classId: found.id, skipped: true }
+    }
     return { ok: false, error: e?.message || 'Failed to create class from booking.' }
   }
 }
