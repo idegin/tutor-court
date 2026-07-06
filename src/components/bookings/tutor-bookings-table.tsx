@@ -307,12 +307,31 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                             <span className="font-semibold text-foreground">{formatNaira(booking.raw.price || 0)}</span>
                                         </TableCell>
                                         <TableCell className="py-4">
-                                            <Badge
-                                                variant="secondary"
-                                                className={`font-medium shadow-none px-2.5 py-0.5 rounded-full ${STATUS_STYLES[booking.status] || "bg-muted text-muted-foreground"}`}
-                                            >
-                                                {STATUS_LABEL[booking.status] || booking.status}
-                                            </Badge>
+                                            <div className="flex flex-col items-start gap-1.5">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className={`font-medium shadow-none px-2.5 py-0.5 rounded-full ${STATUS_STYLES[booking.status] || "bg-muted text-muted-foreground"}`}
+                                                >
+                                                    {STATUS_LABEL[booking.status] || booking.status}
+                                                </Badge>
+                                                {(booking.status === "confirmed" ||
+                                                    booking.status === "in_progress") && (
+                                                    <span
+                                                        className={
+                                                            "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                                                            (booking.raw.paymentStatus === "held" ||
+                                                            booking.raw.paymentStatus === "paid"
+                                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400")
+                                                        }
+                                                    >
+                                                        {booking.raw.paymentStatus === "held" ||
+                                                        booking.raw.paymentStatus === "paid"
+                                                            ? "Funded"
+                                                            : "Awaiting payment"}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="py-4 text-right">
                                             {booking.status === "pending" ? (

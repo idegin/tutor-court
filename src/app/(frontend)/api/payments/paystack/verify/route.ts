@@ -2,6 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { holdBookingEscrow } from '@/lib/escrow'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -48,7 +49,26 @@ export async function GET(request: Request) {
     const userId = metadata?.userId
     const purpose = metadata?.purpose
 
-    if (String(userId) !== String(user.id) || purpose !== 'wallet_funding') {
+    if (String(userId) !== String(user.id)) {
+      return NextResponse.json({ error: 'Invalid transaction metadata.' }, { status: 400 })
+    }
+
+    // Direct booking payment → hold in escrow (idempotent + atomic).
+    if (purpose === 'booking_escrow' && metadata?.bookingId) {
+      const result = await holdBookingEscrow({
+        payload,
+        bookingId: metadata.bookingId,
+        source: 'paystack',
+        reference,
+        metadata: data,
+      })
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status || 400 })
+      }
+      return NextResponse.json({ success: true, booking: metadata.bookingId })
+    }
+
+    if (purpose !== 'wallet_funding') {
       return NextResponse.json({ error: 'Invalid transaction metadata.' }, { status: 400 })
     }
 

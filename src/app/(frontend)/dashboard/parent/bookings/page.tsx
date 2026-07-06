@@ -24,6 +24,14 @@ export default async function ParentBookingsPage() {
 
   const bookings = JSON.parse(JSON.stringify(res.docs))
 
+  const walletRes = await payload.find({
+    collection: 'wallets',
+    where: { user: { equals: user.id } },
+    limit: 1,
+  })
+  const wallet = walletRes.docs[0]
+  const walletBalance = wallet ? (wallet.balance || 0) - (wallet.lockedBalance || 0) : 0
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 lg:px-8">
       <div className="flex flex-col gap-1">
@@ -34,7 +42,7 @@ export default async function ParentBookingsPage() {
         </p>
       </div>
 
-      <MyBookingsList role="parent" bookings={bookings} />
+      <MyBookingsList role="parent" bookings={bookings} walletBalance={walletBalance} />
     </div>
   )
 }

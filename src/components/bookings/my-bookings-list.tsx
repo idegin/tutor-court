@@ -11,7 +11,7 @@ const fmtUTCDate = (iso: string) =>
         day: "numeric",
         year: "numeric",
     });
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
     HiOutlineCalendarDays,
@@ -19,6 +19,8 @@ import {
     HiOutlineBookOpen,
     HiOutlineChatBubbleLeftRight,
     HiOutlineMagnifyingGlass,
+    HiOutlineWallet,
+    HiOutlineCreditCard,
 } from "react-icons/hi2";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +38,14 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { formatNaira } from "@/lib/constants";
 import { countSessions } from "@/lib/booking-pricing";
 
@@ -67,6 +77,22 @@ const STATUS_LABEL: Record<string, string> = {
     refunded: "Refunded",
 };
 
+const PAYMENT_STYLES: Record<string, string> = {
+    unpaid: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400",
+    held: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400",
+    paid: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
+    refunded: "bg-muted text-muted-foreground border-border",
+    failed: "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400",
+};
+
+const PAYMENT_LABEL: Record<string, string> = {
+    unpaid: "Payment due",
+    held: "Paid · in escrow",
+    paid: "Paid out",
+    refunded: "Refunded",
+    failed: "Payment failed",
+};
+
 function tutorDisplayName(tutor: any): string {
     if (!tutor || typeof tutor !== "object") return "Tutor";
     const u = tutor.user;
@@ -87,12 +113,108 @@ function initials(name: string): string {
 export function MyBookingsList({
     bookings = [],
     role,
+    walletBalance = 0,
 }: {
     bookings?: any[];
     role: "parent" | "student";
+    walletBalance?: number;
 }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [loadingId, setLoadingId] = React.useState<string | null>(null);
+
+    // Payment dialog state
+    const [payOpen, setPayOpen] = React.useState(false);
+    const [payBooking, setPayBooking] = React.useState<any | null>(null);
+    const [payAction, setPayAction] = React.useState<"wallet" | "paystack" | null>(null);
+
+    const cleanPath = role === "parent" ? "/dashboard/parent/bookings" : "/dashboard/student/bookings";
+
+    // Paystack return handler: verify the payment then strip the query.
+    React.useEffect(() => {
+        const reference = searchParams.get("reference");
+        if (!reference) return;
+
+        const promise = fetch(`/api/payments/paystack/verify?reference=${reference}`).then(
+            async (res) => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Verification failed");
+                return data;
+            },
+        );
+
+        toast.promise(promise, {
+            loading: "Verifying payment...",
+            success: () => {
+                router.refresh();
+                router.replace(cleanPath);
+                return "Booking paid — funds held in escrow";
+            },
+            error: (err) => {
+                router.replace(cleanPath);
+                return err?.message || "Verification failed. Please contact support.";
+            },
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, router]);
+
+    const openPayDialog = (b: any) => {
+        setPayBooking(b);
+        setPayOpen(true);
+    };
+
+    const payFromWallet = async () => {
+        if (!payBooking) return;
+        setPayAction("wallet");
+        try {
+            const res = await fetch(`/api/private/bookings/${payBooking.id}/pay`, {
+                method: "POST",
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 400 && typeof data.shortfall === "number") {
+                    toast.error(`Insufficient balance — top up ${formatNaira(data.shortfall)}`);
+                } else {
+                    toast.error(data.error || "Something went wrong");
+                }
+                return;
+            }
+            toast.success("Booking paid — funds held in escrow");
+            setPayOpen(false);
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err?.message || "Something went wrong");
+        } finally {
+            setPayAction(null);
+        }
+    };
+
+    const payWithPaystack = async () => {
+        if (!payBooking) return;
+        setPayAction("paystack");
+        try {
+            const res = await fetch("/api/payments/paystack/initialize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bookingId: payBooking.id,
+                    callbackUrl: window.location.href,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || "Initialization failed");
+            }
+            if (data.authorizationUrl) {
+                window.location.href = data.authorizationUrl;
+            } else {
+                throw new Error("No checkout URL received.");
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Could not start payment.");
+            setPayAction(null);
+        }
+    };
 
     const cancelBooking = async (id: string) => {
         setLoadingId(id);
@@ -167,12 +289,22 @@ export function MyBookingsList({
                                         )}
                                     </div>
                                 </div>
-                                <Badge
-                                    variant="outline"
-                                    className={`shrink-0 font-medium border ${STATUS_STYLES[b.status] || "bg-muted text-muted-foreground border-border"}`}
-                                >
-                                    {STATUS_LABEL[b.status] || b.status}
-                                </Badge>
+                                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                    <Badge
+                                        variant="outline"
+                                        className={`font-medium border ${STATUS_STYLES[b.status] || "bg-muted text-muted-foreground border-border"}`}
+                                    >
+                                        {STATUS_LABEL[b.status] || b.status}
+                                    </Badge>
+                                    {b.paymentStatus && (
+                                        <Badge
+                                            variant="outline"
+                                            className={`font-medium border ${PAYMENT_STYLES[b.paymentStatus] || "bg-muted text-muted-foreground border-border"}`}
+                                        >
+                                            {PAYMENT_LABEL[b.paymentStatus] || b.paymentStatus}
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
 
                             {subjectNames.length > 0 && (
@@ -214,6 +346,16 @@ export function MyBookingsList({
                                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Total</p>
                                     <p className="text-lg font-black text-foreground">{formatNaira(b.price || 0)}</p>
                                 </div>
+                                <div className="flex items-center gap-2">
+                                {b.status === "confirmed" && b.paymentStatus === "unpaid" && (
+                                    <Button
+                                        size="sm"
+                                        className="bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+                                        onClick={() => openPayDialog(b)}
+                                    >
+                                        Pay now
+                                    </Button>
+                                )}
                                 {canCancel && (
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
@@ -245,11 +387,67 @@ export function MyBookingsList({
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 )}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
                 );
             })}
+
+            {/* Payment dialog */}
+            <Dialog open={payOpen} onOpenChange={(open) => { if (!payAction) setPayOpen(open); }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Pay for this booking</DialogTitle>
+                        <DialogDescription>
+                            Funds are held securely in escrow and only released to the tutor after your sessions.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Amount due</span>
+                            <span className="text-lg font-black text-foreground">
+                                {formatNaira(payBooking?.price || 0)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between px-1 text-sm">
+                            <span className="text-muted-foreground">Wallet balance</span>
+                            <span className="font-semibold text-foreground">{formatNaira(walletBalance)}</span>
+                        </div>
+
+                        {payBooking && walletBalance < (payBooking.price || 0) && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                Your wallet balance is too low to cover this booking. Top up your wallet or pay with Paystack.
+                            </p>
+                        )}
+                    </div>
+
+                    <DialogFooter className="flex-col gap-2 sm:flex-col">
+                        <Button
+                            className="w-full bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+                            onClick={payFromWallet}
+                            disabled={
+                                payAction !== null ||
+                                !payBooking ||
+                                walletBalance < (payBooking?.price || 0)
+                            }
+                        >
+                            <HiOutlineWallet className="h-4 w-4" />
+                            {payAction === "wallet" ? "Processing..." : "Pay from wallet"}
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={payWithPaystack}
+                            disabled={payAction !== null || !payBooking}
+                        >
+                            <HiOutlineCreditCard className="h-4 w-4" />
+                            {payAction === "paystack" ? "Redirecting..." : "Pay with Paystack"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
