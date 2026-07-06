@@ -6,6 +6,7 @@ import { getServerSideUser } from '@/lib/auth'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
+import { releaseBookingEscrow } from '@/lib/escrow'
 
 type Action = 'accept' | 'decline' | 'cancel'
 
@@ -82,6 +83,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         )
       }
       nextStatus = 'cancelled'
+    }
+
+    // If a FUNDED booking is being cancelled, release the escrow back to the
+    // booker's wallet first (refund) so the money isn't trapped.
+    if (action === 'cancel' && booking.paymentStatus === 'held') {
+      const release = await releaseBookingEscrow({ payload, bookingId: id })
+      if (!release.ok) {
+        return NextResponse.json(
+          { error: release.error || 'Could not release the escrowed funds.' },
+          { status: release.status || 500 },
+        )
+      }
     }
 
     const updated = await payload.update({

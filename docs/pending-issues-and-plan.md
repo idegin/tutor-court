@@ -69,6 +69,21 @@ Audited the three "verify before you build" items. Two had real, user-facing bug
 - 🟡 Invalid tutorId returned 500 → now 404; misleading "no sessions" message now distinguishes a 0/null rate; client validates past start date; modal got a11y (role/aria, ESC, backdrop close); true-empty vs filtered-empty states.
 - **Deferred (documented):** per-tutor USD currency (needs a data-model decision — all bookings are NGN today), pagination beyond 100 bookings, decline-reason capture, and stale-price-on-rate-change. Counter-offer is explicitly a later phase.
 
+### Stage 4 — Payment & escrow (2026-07-06)
+
+Built the "fund a booking into escrow" flow (`src/lib/escrow.ts`): a booker pays a confirmed booking from wallet balance or via direct Paystack checkout; funds move into `wallet.lockedBalance`, the booking flips to `paymentStatus:'held'`, and a linked `payment` transaction is recorded — atomic (Payload DB transaction) and idempotent (unique `transactions.reference`). New `POST /api/private/bookings/[id]/pay`; Paystack `initialize`/`verify`/`webhook` extended for `booking_escrow`; UI pay dialog + payment-status badges.
+
+**Deep money-audit fixes (all verified):**
+- 🔴 Fixed an inconsistent wallet accounting model — the code decremented `balance` on a wallet hold while the invariant is `available = balance − lockedBalance`, double-counting the lock. Now: wallet hold reserves (`lockedBalance += price`, balance unchanged); Paystack hold adds fresh funds (`balance += price` AND `lockedBalance += price`).
+- 🔴 Cancelling a **held** booking now **releases the escrow** back to the booker (`releaseBookingEscrow`: `lockedBalance -= price`, `paymentStatus:'refunded'`, a `refund` transaction) — previously the funds were trapped.
+- 🔴 A second real Paystack charge on an already-funded booking is now **credited to the wallet** (never silently dropped).
+- 🟠 Escrow refuses to write non-atomically (hard error if a DB transaction can't be started); currency guard (wallet vs booking); zero-price bookings rejected.
+- 🟡 The Paystack return handler is scoped to booking payments (a `tc_purpose=booking` marker) so an unrelated `?reference=` can't trigger a bad verify.
+
+**Verified:** wallet hold keeps `balance` intact + reserves into `lockedBalance`; idempotent re-pay (no double-charge); insufficient funds → 400 + shortfall; cancel of a held booking fully refunds (both payment + refund txns recorded); Chrome-verified the pay dialog + escrow badge.
+
+**Known limitation (documented, shared with existing wallet flows):** two concurrent holds of *different* bookings from the same wallet could over-commit under high concurrency (reads are re-done inside the transaction to narrow the window, but true serialization needs row-level locking / an atomic conditional `UPDATE`). Also deferred: escrow **release to the tutor on completion** (Stage 4/7 payout), per-tutor **USD** currency, and Paystack **refund-to-card** (refunds currently return to the wallet). D1 money-model reconciliation (escrow-per-booking vs per-minute live-class credits) still needs a founder call before wiring escrow into the live-class engine.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

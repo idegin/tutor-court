@@ -130,10 +130,12 @@ export function MyBookingsList({
 
     const cleanPath = role === "parent" ? "/dashboard/parent/bookings" : "/dashboard/student/bookings";
 
-    // Paystack return handler: verify the payment then strip the query.
+    // Paystack return handler: verify the payment then strip the query. Scoped
+    // to booking payments we initiated (the `tc_purpose=booking` marker on the
+    // callback URL) so an unrelated `?reference=` doesn't trigger a bad verify.
     React.useEffect(() => {
         const reference = searchParams.get("reference");
-        if (!reference) return;
+        if (!reference || searchParams.get("tc_purpose") !== "booking") return;
 
         const promise = fetch(`/api/payments/paystack/verify?reference=${reference}`).then(
             async (res) => {
@@ -198,7 +200,8 @@ export function MyBookingsList({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     bookingId: payBooking.id,
-                    callbackUrl: window.location.href,
+                    // Marker so the return handler only verifies booking payments.
+                    callbackUrl: `${window.location.origin}${cleanPath}?tc_purpose=booking`,
                 }),
             });
             const data = await res.json();
