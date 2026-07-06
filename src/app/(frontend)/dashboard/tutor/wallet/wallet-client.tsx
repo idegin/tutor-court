@@ -50,6 +50,13 @@ export function TutorWalletClient({
   const [buyingCredits, setBuyingCredits] = React.useState('')
   const [isBuyingLoading, setIsBuyingLoading] = React.useState(false)
 
+  const [isWithdrawOpen, setIsWithdrawOpen] = React.useState(false)
+  const [withdrawAmount, setWithdrawAmount] = React.useState('')
+  const [bankName, setBankName] = React.useState('')
+  const [accountNumber, setAccountNumber] = React.useState('')
+  const [accountName, setAccountName] = React.useState('')
+  const [isWithdrawLoading, setIsWithdrawLoading] = React.useState(false)
+
   React.useEffect(() => {
     setWallet(initialWallet)
     setTransactions(initialTransactions)
@@ -165,7 +172,43 @@ export function TutorWalletClient({
   }
 
   const balance = wallet?.balance || 0
+  const locked = wallet?.lockedBalance || 0
+  const spendable = Math.max(0, balance - locked)
   const credits = wallet?.creditBalance || 0
+
+  const onWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = Number(withdrawAmount)
+    if (!(amount > 0)) {
+      toast.error('Enter a valid amount.')
+      return
+    }
+    if (amount > spendable) {
+      toast.error(`You can withdraw up to ${formatNaira(spendable)}.`)
+      return
+    }
+    setIsWithdrawLoading(true)
+    try {
+      const res = await fetch('/api/private/withdrawals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, bankName, accountNumber, accountName }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Withdrawal request failed.')
+      toast.success('Withdrawal requested — pending admin approval.')
+      setIsWithdrawOpen(false)
+      setWithdrawAmount('')
+      setBankName('')
+      setAccountNumber('')
+      setAccountName('')
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message || 'Could not request withdrawal.')
+    } finally {
+      setIsWithdrawLoading(false)
+    }
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -188,6 +231,14 @@ export function TutorWalletClient({
           >
             Buy Credits
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsWithdrawOpen(true)}
+            disabled={spendable <= 0}
+            className="rounded-full px-5"
+          >
+            Withdraw
+          </Button>
         </div>
       </div>
 
@@ -203,8 +254,11 @@ export function TutorWalletClient({
           <div className="space-y-1">
             <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Available Balance</p>
             <h2 className="text-3xl font-semibold tracking-tight text-gray-900">
-              {formatNaira(balance)}
+              {formatNaira(spendable)}
             </h2>
+            {locked > 0 && (
+              <p className="text-xs text-gray-500">{formatNaira(locked)} reserved (escrow / pending payout)</p>
+            )}
           </div>
         </div>
 
@@ -394,6 +448,54 @@ export function TutorWalletClient({
                 className="bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
               >
                 {isBuyingLoading ? 'Purchasing...' : 'Confirm Purchase'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Modal */}
+      <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
+        <DialogContent className="max-w-md">
+          <form onSubmit={onWithdraw}>
+            <DialogHeader>
+              <DialogTitle>Withdraw earnings</DialogTitle>
+              <DialogDescription>
+                Request a payout of your available balance to a bank account. An admin reviews and
+                processes it. Available: {formatNaira(spendable)}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="withdrawAmount">Amount</Label>
+                <CurrencyInput
+                  id="withdrawAmount"
+                  value={withdrawAmount}
+                  onValueChange={(val) => setWithdrawAmount(val.replace(/,/g, ''))}
+                  prefix="₦"
+                  placeholder="5,000"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankName">Bank name</Label>
+                <Input id="bankName" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="accountNumber">Account number</Label>
+                <Input id="accountNumber" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="accountName">Account name</Label>
+                <Input id="accountName" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Account holder name" required />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsWithdrawOpen(false)} disabled={isWithdrawLoading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isWithdrawLoading} className="bg-gray-900 text-white hover:bg-gray-800">
+                {isWithdrawLoading ? 'Requesting...' : 'Request Withdrawal'}
               </Button>
             </DialogFooter>
           </form>

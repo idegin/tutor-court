@@ -21,6 +21,9 @@ import {
     HiOutlineMagnifyingGlass,
     HiOutlineWallet,
     HiOutlineCreditCard,
+    HiStar,
+    HiOutlineStar,
+    HiArrowPath,
 } from "react-icons/hi2";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,6 +49,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { formatNaira } from "@/lib/constants";
 import { countSessions } from "@/lib/booking-pricing";
 
@@ -127,6 +132,18 @@ export function MyBookingsList({
     const [payOpen, setPayOpen] = React.useState(false);
     const [payBooking, setPayBooking] = React.useState<any | null>(null);
     const [payAction, setPayAction] = React.useState<"wallet" | "paystack" | null>(null);
+
+    // Review dialog state
+    const [reviewOpen, setReviewOpen] = React.useState(false);
+    const [reviewBooking, setReviewBooking] = React.useState<any | null>(null);
+    const [rating, setRating] = React.useState(0);
+    const [hoverRating, setHoverRating] = React.useState(0);
+    const [reviewText, setReviewText] = React.useState("");
+    const [reviewSubmitting, setReviewSubmitting] = React.useState(false);
+    const [reviewError, setReviewError] = React.useState<string | null>(null);
+    // Bookings the user has already reviewed (locally tracked so the button
+    // flips to "Reviewed" without a full refetch).
+    const [reviewedIds, setReviewedIds] = React.useState<Set<string>>(new Set());
 
     const cleanPath = role === "parent" ? "/dashboard/parent/bookings" : "/dashboard/student/bookings";
 
@@ -238,6 +255,59 @@ export function MyBookingsList({
             toast.error(err?.message || "Something went wrong");
         } finally {
             setLoadingId(null);
+        }
+    };
+
+    const openReviewDialog = (b: any) => {
+        setReviewBooking(b);
+        setRating(0);
+        setHoverRating(0);
+        setReviewText("");
+        setReviewError(null);
+        setReviewOpen(true);
+    };
+
+    const submitReview = async () => {
+        if (!reviewBooking) return;
+        if (rating < 1 || rating > 5) {
+            setReviewError("Please select a rating.");
+            return;
+        }
+        if (reviewText.trim().length < 10) {
+            setReviewError("Your review must be at least 10 characters.");
+            return;
+        }
+        setReviewSubmitting(true);
+        setReviewError(null);
+        try {
+            const res = await fetch("/api/private/reviews", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bookingId: reviewBooking.id,
+                    rating,
+                    review: reviewText.trim(),
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 409) {
+                    // Already reviewed (or not completed) — reflect it and lock the button.
+                    setReviewedIds((prev) => new Set(prev).add(reviewBooking.id));
+                    setReviewError(data.error || "You've already reviewed this booking.");
+                    return;
+                }
+                setReviewError(data.error || "Something went wrong");
+                return;
+            }
+            setReviewedIds((prev) => new Set(prev).add(reviewBooking.id));
+            toast.success("Thanks for your review!");
+            setReviewOpen(false);
+            router.refresh();
+        } catch (err: any) {
+            setReviewError(err?.message || "Something went wrong");
+        } finally {
+            setReviewSubmitting(false);
         }
     };
 
@@ -390,6 +460,43 @@ export function MyBookingsList({
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 )}
+                                {b.status === "completed" && (
+                                    <>
+                                        {reviewedIds.has(b.id) ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-border text-muted-foreground"
+                                                disabled
+                                            >
+                                                <HiStar className="h-4 w-4 text-yellow-400" />
+                                                Reviewed
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-border"
+                                                onClick={() => openReviewDialog(b)}
+                                            >
+                                                <HiOutlineStar className="h-4 w-4" />
+                                                Leave a review
+                                            </Button>
+                                        )}
+                                        {b.tutor?.slug && (
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                className="bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+                                            >
+                                                <Link href={`/tutors/${b.tutor.slug}?rebook=${b.id}`}>
+                                                    <HiArrowPath className="h-4 w-4" />
+                                                    Book again
+                                                </Link>
+                                            </Button>
+                                        )}
+                                    </>
+                                )}
                                 </div>
                             </div>
                         </CardContent>
@@ -447,6 +554,84 @@ export function MyBookingsList({
                         >
                             <HiOutlineCreditCard className="h-4 w-4" />
                             {payAction === "paystack" ? "Redirecting..." : "Pay with Paystack"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Review dialog */}
+            <Dialog
+                open={reviewOpen}
+                onOpenChange={(open) => {
+                    if (!reviewSubmitting) setReviewOpen(open);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Leave a review</DialogTitle>
+                        <DialogDescription>
+                            Share how your sessions with {tutorDisplayName(reviewBooking?.tutor)} went. Your feedback helps other learners.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => {
+                                    const active = star <= (hoverRating || rating);
+                                    return (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            className="p-0.5 transition-transform hover:scale-110"
+                                            onMouseEnter={() => setHoverRating(star)}
+                                            onMouseLeave={() => setHoverRating(0)}
+                                            onClick={() => {
+                                                setRating(star);
+                                                setReviewError(null);
+                                            }}
+                                            aria-label={`${star} star${star !== 1 ? "s" : ""}`}
+                                        >
+                                            <HiStar
+                                                className={cn(
+                                                    "h-8 w-8 transition-colors",
+                                                    active ? "text-yellow-400" : "text-muted-foreground/30",
+                                                )}
+                                            />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                                {rating > 0 ? `${rating} out of 5` : "Tap to rate"}
+                            </span>
+                        </div>
+
+                        <Textarea
+                            placeholder="Tell us about your experience (at least 10 characters)..."
+                            rows={4}
+                            value={reviewText}
+                            onChange={(e) => {
+                                setReviewText(e.target.value);
+                                if (reviewError) setReviewError(null);
+                            }}
+                        />
+
+                        {reviewError && (
+                            <p className="text-xs text-red-600 dark:text-red-400">{reviewError}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            className="w-full bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+                            onClick={submitReview}
+                            disabled={
+                                reviewSubmitting ||
+                                (reviewBooking ? reviewedIds.has(reviewBooking.id) : false)
+                            }
+                        >
+                            {reviewSubmitting ? "Submitting..." : "Submit review"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

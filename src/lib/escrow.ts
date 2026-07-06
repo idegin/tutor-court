@@ -445,33 +445,6 @@ export async function payoutSessionEscrow({
     countSessions(booking.date, booking.endDate, booking.daysOfWeek || []),
   )
 
-  // How much has already been released for this booking.
-  const releasedRes = await payload.find({
-    collection: 'transactions',
-    where: { and: [{ relatedBooking: { equals: bookingId } }, { type: { equals: 'payout' } }] },
-    limit: 1000,
-    depth: 0,
-    overrideAccess: true,
-  })
-  const alreadyReleased = releasedRes.docs.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0)
-  const remaining = Math.max(0, price - alreadyReleased)
-  const share = Math.min(Math.round(price / totalSessions), remaining)
-
-  // Nothing left to release — mark the engagement complete/paid out if not already.
-  if (share <= 0) {
-    if (booking.status !== 'completed' || booking.paymentStatus !== 'paid') {
-      await payload
-        .update({
-          collection: 'bookings',
-          id: bookingId,
-          data: { paymentStatus: 'paid', status: 'completed' } as any,
-          overrideAccess: true,
-        })
-        .catch(() => {})
-    }
-    return { ok: true }
-  }
-
   const bookerWallet: any = (
     await payload.find({ collection: 'wallets', where: { user: { equals: bookerUserId } }, limit: 1, depth: 0, overrideAccess: true })
   ).docs[0]
@@ -480,12 +453,42 @@ export async function payoutSessionEscrow({
   ).docs[0]
   if (!bookerWallet || !tutorWallet) return { ok: false, status: 400, error: 'Wallet not found.' }
 
-  const willComplete = alreadyReleased + share >= price
-
   const transactionID = await payload.db.beginTransaction()
   if (!transactionID) return { ok: false, status: 500, error: 'Could not process atomically.' }
   const req = { transactionID } as any
   try {
+    // Re-read the released total INSIDE the transaction so concurrent session
+    // ends can't over-release (narrows the TOCTOU window).
+    const relRes = await payload.find({
+      collection: 'transactions',
+      where: { and: [{ relatedBooking: { equals: bookingId } }, { type: { equals: 'payout' } }] },
+      limit: 1000,
+      depth: 0,
+      overrideAccess: true,
+      req,
+    })
+    const alreadyReleased = relRes.docs.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0)
+    const remaining = Math.max(0, price - alreadyReleased)
+    // On the last planned session (or when the drip would otherwise leave dust),
+    // release the EXACT remainder so nothing stays locked and the booking
+    // actually completes.
+    const isLastPlanned = relRes.docs.length + 1 >= totalSessions
+    let share = isLastPlanned ? remaining : Math.min(Math.round(price / totalSessions), remaining)
+    share = Math.min(share, remaining)
+    const willComplete = alreadyReleased + share >= price
+
+    if (share <= 0) {
+      // Already fully released — just ensure the booking + class read as complete.
+      await payload
+        .update({ collection: 'bookings', id: bookingId, data: { paymentStatus: 'paid', status: 'completed' } as any, req, overrideAccess: true })
+        .catch(() => {})
+      await payload
+        .update({ collection: 'classes', id: classId, data: { status: 'completed' } as any, req, overrideAccess: true })
+        .catch(() => {})
+      await payload.db.commitTransaction(transactionID)
+      return { ok: true }
+    }
+
     await payload.create({
       collection: 'transactions',
       data: {
@@ -537,6 +540,11 @@ export async function payoutSessionEscrow({
         req,
         overrideAccess: true,
       })
+      // A fully-paid class is done — mark it completed so it can't be re-started
+      // (and won't fall through to the SaaS credit gate).
+      await payload
+        .update({ collection: 'classes', id: classId, data: { status: 'completed' } as any, req, overrideAccess: true })
+        .catch(() => {})
     }
 
     await payload.db.commitTransaction(transactionID)
@@ -545,5 +553,101 @@ export async function payoutSessionEscrow({
     await payload.db.rollbackTransaction(transactionID)
     if (isDupRef(e)) return { ok: true, alreadyHeld: true }
     return { ok: false, status: 500, error: e?.message || 'Escrow payout failed.' }
+  }
+}
+
+/**
+ * Stage 7 — explicit completion: release ALL remaining held escrow for a booking
+ * to the tutor and mark the booking paid/completed + its class completed. This is
+ * the guarantee that a marketplace engagement always settles (even if sessions
+ * were never formally ended). Idempotent (`payout-complete-{bookingId}`).
+ */
+export async function releaseRemainingEscrowToTutor({
+  payload,
+  bookingId,
+}: {
+  payload: Payload
+  bookingId: string | number
+}): Promise<HoldEscrowResult> {
+  let booking: any
+  try {
+    booking = await payload.findByID({ collection: 'bookings', id: bookingId, depth: 2, overrideAccess: true })
+  } catch {
+    return { ok: false, status: 404, error: 'Booking not found.' }
+  }
+  if (!booking) return { ok: false, status: 404, error: 'Booking not found.' }
+  if (booking.paymentStatus === 'paid') return { ok: true, alreadyHeld: true } // already settled
+  if (booking.paymentStatus !== 'held') return { ok: false, status: 409, error: 'Booking is not funded.' }
+
+  const price = Number(booking.price) || 0
+  const currency = booking.currency || 'ngn'
+  const bookerUserId = booking.parent ? idOf(booking.parent) : idOf(booking.student)
+  const tutorUserId =
+    booking.tutor && typeof booking.tutor === 'object' ? idOf(booking.tutor.user) : null
+  const classId = idOf(booking.class)
+  if (!bookerUserId || !tutorUserId) return { ok: false, status: 400, error: 'Could not resolve booker/tutor.' }
+
+  const reference = `payout-complete-${bookingId}`
+  const existing = await payload.find({ collection: 'transactions', where: { reference: { equals: reference } }, limit: 1, depth: 0, overrideAccess: true })
+  if (existing.totalDocs > 0) return { ok: true, alreadyHeld: true }
+
+  const bookerWallet: any = (await payload.find({ collection: 'wallets', where: { user: { equals: bookerUserId } }, limit: 1, depth: 0, overrideAccess: true })).docs[0]
+  const tutorWallet: any = (await payload.find({ collection: 'wallets', where: { user: { equals: tutorUserId } }, limit: 1, depth: 0, overrideAccess: true })).docs[0]
+  if (!bookerWallet || !tutorWallet) return { ok: false, status: 400, error: 'Wallet not found.' }
+
+  const transactionID = await payload.db.beginTransaction()
+  if (!transactionID) return { ok: false, status: 500, error: 'Could not process atomically.' }
+  const req = { transactionID } as any
+  try {
+    const relRes = await payload.find({
+      collection: 'transactions',
+      where: { and: [{ relatedBooking: { equals: bookingId } }, { type: { equals: 'payout' } }] },
+      limit: 1000,
+      depth: 0,
+      overrideAccess: true,
+      req,
+    })
+    const alreadyReleased = relRes.docs.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0)
+    const remaining = Math.max(0, price - alreadyReleased)
+
+    if (remaining > 0) {
+      await payload.create({
+        collection: 'transactions',
+        data: {
+          reference,
+          gateway: 'wallet',
+          type: 'payout',
+          sender: numericId(bookerUserId),
+          receiver: numericId(tutorUserId),
+          tutor: numericId(tutorUserId),
+          relatedBooking: numericId(bookingId),
+          amount: remaining,
+          currency,
+          status: 'success',
+          description: 'Escrow released to tutor on engagement completion',
+        } as any,
+        req,
+        overrideAccess: true,
+      })
+      const bFresh: any = await payload.findByID({ collection: 'wallets', id: bookerWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
+      const bBal = Number(bFresh?.balance ?? bookerWallet.balance) || 0
+      const bLocked = Number(bFresh?.lockedBalance ?? bookerWallet.lockedBalance) || 0
+      await payload.update({ collection: 'wallets', id: bookerWallet.id, data: { balance: Math.max(0, bBal - remaining), lockedBalance: Math.max(0, bLocked - remaining) } as any, req, overrideAccess: true })
+      const tFresh: any = await payload.findByID({ collection: 'wallets', id: tutorWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
+      const tBal = Number(tFresh?.balance ?? tutorWallet.balance) || 0
+      await payload.update({ collection: 'wallets', id: tutorWallet.id, data: { balance: tBal + remaining } as any, req, overrideAccess: true })
+    }
+
+    await payload.update({ collection: 'bookings', id: bookingId, data: { paymentStatus: 'paid', status: 'completed' } as any, req, overrideAccess: true })
+    if (classId) {
+      await payload.update({ collection: 'classes', id: classId, data: { status: 'completed' } as any, req, overrideAccess: true }).catch(() => {})
+    }
+
+    await payload.db.commitTransaction(transactionID)
+    return { ok: true, held: false }
+  } catch (e: any) {
+    await payload.db.rollbackTransaction(transactionID)
+    if (isDupRef(e)) return { ok: true, alreadyHeld: true }
+    return { ok: false, status: 500, error: e?.message || 'Escrow completion payout failed.' }
   }
 }

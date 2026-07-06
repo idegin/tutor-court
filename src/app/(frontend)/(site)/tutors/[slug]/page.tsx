@@ -10,8 +10,15 @@ import { notFound } from 'next/navigation';
 import { getServerSideUser } from '@/lib/auth';
 import { TutorReviews } from '@/components/tutors/tutor-reviews';
 
-export default async function TutorDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function TutorDetailsPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ rebook?: string }>;
+}) {
     const { slug } = await params;
+    const { rebook } = await searchParams;
     const decodedSlug = decodeURIComponent(slug);
     const payload = await getPayload({ config: configPromise });
     const { user: currentUser } = await getServerSideUser();
@@ -84,6 +91,41 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                 id: c.id,
                 name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email || 'Student',
             }));
+        }
+    }
+
+    // Rebook prefill: if `?rebook=<bookingId>` is present and the booking belongs
+    // to the current user (booker or their parent account), seed the booking modal
+    // from it and auto-open. Dates are left blank (past dates fail validation).
+    let rebookInitial:
+        | { subjects: string[]; daysOfWeek: string[]; hoursPerDay: number }
+        | null = null;
+    if (rebook && currentUser) {
+        try {
+            const priorBooking = (await payload.findByID({
+                collection: 'bookings',
+                id: rebook,
+                depth: 2,
+            })) as any;
+            if (priorBooking) {
+                const studentId = priorBooking.student?.id ?? priorBooking.student;
+                const parentId = priorBooking.parent?.id ?? priorBooking.parent;
+                const isBooker =
+                    String(studentId) === String(currentUser.id) ||
+                    String(parentId) === String(currentUser.id);
+                if (isBooker) {
+                    rebookInitial = {
+                        subjects: (priorBooking.subjects || [])
+                            .map((s: any) => (typeof s === 'object' ? s?.name : s))
+                            .filter(Boolean),
+                        daysOfWeek: priorBooking.daysOfWeek || [],
+                        hoursPerDay: priorBooking.hoursPerDay || 1,
+                    };
+                }
+            }
+        } catch {
+            // Unknown / inaccessible booking id — ignore the rebook hint silently.
+            rebookInitial = null;
         }
     }
 
@@ -238,6 +280,10 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                         hasActiveBooking={hasActiveBooking}
                         currentUserRole={currentUser?.accountType}
                         childrenOptions={parentChildren}
+                        initialSubjects={rebookInitial?.subjects}
+                        initialDaysOfWeek={rebookInitial?.daysOfWeek}
+                        initialHoursPerDay={rebookInitial?.hoursPerDay}
+                        autoOpen={Boolean(rebookInitial)}
                     />
                 </div>
             </div>

@@ -97,6 +97,21 @@ Built the "fund a booking into escrow" flow (`src/lib/escrow.ts`): a booker pays
 
 **Deferred (documented):** a completion **sweep** (release remaining escrow / mark paid when `endDate` passes even if the tutor never formally ends the last session) — today release happens per `/end`; concurrent different-booking wallet over-commit still needs row-level locking; per-tutor USD currency and Paystack refund-to-card.
 
+### Stage 7 (complete the engagement) + Stage 8 (after) — 2026-07-06
+
+**Payout deep-audit fixes (all verified):** the per-session escrow release now releases the **exact remainder on the last planned session** (no dust left locked, booking actually completes), re-reads the released total **inside the transaction** (TOCTOU), and marks the **class completed** on full payout.
+
+**Stage 7:**
+- **Mark complete** — `PATCH /api/private/bookings/[id]` `{action:'complete'}` (tutor): `releaseRemainingEscrowToTutor()` releases ALL remaining held escrow to the tutor, sets booking `paid`/`completed` + class `completed`, and notifies the booker with a review prompt. This is the settlement guarantee for engagements whose sessions were never formally ended. _Verified: mark complete → tutor paid full price, booking + class completed, both `payment` + `payout` txns._
+- **Reviews** — `POST /api/private/reviews` (booker, one per completed booking, auto-approved as a verified purchase → counts toward the tutor's rating). "Leave a review" star dialog + "Reviewed" state in my-bookings. _Verified: review created + approved; duplicate → 409._
+
+**Stage 8:**
+- **Tutor withdrawal** — new `PayoutRequests` collection (+ migration) + `POST /api/private/withdrawals`: reserves the amount (`lockedBalance += amount`) and creates a request; an admin approving it in the Payload admin (status→paid) triggers a hook that debits the wallet and books a `manual` `payout` transaction; rejecting releases the reservation. "Withdraw" dialog + a spendable/reserved breakdown in the tutor wallet. _Verified: request reserves funds; admin approve → funds leave + payout txn; reject would release._
+- **Rebook** — "Book again" on a completed booking deep-links to `/tutors/[slug]?rebook={id}`; the profile prefills the modal (subjects/days/hours) and auto-opens for the booker.
+- **Receipts/history** — the wallet transaction list surfaces the payout/refund/withdrawal/deposit/payment transactions on both sides.
+
+**Deferred (documented):** automated Paystack **bank transfers** (payouts are admin-approved/manual, per D5); a first-class **Disputes** collection (admins can already refund via `releaseBookingEscrow`); an `endDate`-passed completion **cron** (today the tutor marks complete, or the last session's payout completes it); concurrent different-booking wallet over-commit (row-level locking). Automated payouts + disputes are Phase 6 "later" per the PRD.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

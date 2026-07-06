@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HiCheckCircle, HiChevronLeft, HiChevronRight, HiClock, HiUsers } from 'react-icons/hi2';
 import { BookingModal } from './booking-modal';
 import { HiCheckBadge } from 'react-icons/hi2';
@@ -24,6 +24,11 @@ export interface TutorBookingSidebarProps {
     availability?: { day?: string; startTime?: string; endTime?: string }[];
     gradesTaught?: string[];
     childrenOptions?: { id: string; name: string }[];
+    // Rebook prefill (threaded into the BookingModal).
+    initialSubjects?: string[];
+    initialDaysOfWeek?: string[];
+    initialHoursPerDay?: number;
+    autoOpen?: boolean;
 }
 
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -53,7 +58,11 @@ export function TutorBookingSidebar({
     currentUserRole,
     availability = [],
     gradesTaught = [],
-    childrenOptions = []
+    childrenOptions = [],
+    initialSubjects,
+    initialDaysOfWeek,
+    initialHoursPerDay,
+    autoOpen = false,
 }: TutorBookingSidebarProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { user } = useAuth();
@@ -65,6 +74,15 @@ export function TutorBookingSidebar({
     // up) can book. A tutor/admin viewing a profile shouldn't see a booking CTA.
     const canBook = !user || role === 'student' || role === 'parent';
     const bookingsHref = role === 'parent' ? '/dashboard/parent/bookings' : '/dashboard/student/bookings';
+
+    // Rebook deep-link: auto-open the prefilled modal once, but only for a
+    // logged-in student/parent who doesn't already have an active booking.
+    useEffect(() => {
+        if (autoOpen && user && (role === 'student' || role === 'parent') && !hasActiveBooking) {
+            setIsModalOpen(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoOpen, user, role, hasActiveBooking]);
 
     const sortedAvailability = [...availability]
         .filter((a) => a?.day && a?.startTime && a?.endTime)
@@ -208,6 +226,9 @@ export function TutorBookingSidebar({
                 pricePerHour={pricePerHour}
                 offeredSubjects={offeredSubjects}
                 childrenOptions={childrenOptions}
+                initialSubjects={initialSubjects}
+                initialDaysOfWeek={initialDaysOfWeek}
+                initialHoursPerDay={initialHoursPerDay}
                 onSuccess={() => router.push(bookingsHref)}
             />
         </>

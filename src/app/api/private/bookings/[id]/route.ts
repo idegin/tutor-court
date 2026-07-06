@@ -6,9 +6,9 @@ import { getServerSideUser } from '@/lib/auth'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
-import { releaseBookingEscrow } from '@/lib/escrow'
+import { releaseBookingEscrow, releaseRemainingEscrowToTutor } from '@/lib/escrow'
 
-type Action = 'accept' | 'decline' | 'cancel'
+type Action = 'accept' | 'decline' | 'cancel' | 'complete'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params
     const body = await req.json().catch(() => ({}))
     const action = body?.action as Action
-    if (!['accept', 'decline', 'cancel'].includes(action)) {
+    if (!['accept', 'decline', 'cancel', 'complete'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
     }
 
@@ -59,6 +59,41 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // Authorize the action against the actor + current status.
     const status = booking.status
+
+    // Stage 7 — the tutor marks the engagement complete: release the remaining
+    // escrow to the tutor and settle the booking. Handled separately (its own
+    // escrow helper sets status/paymentStatus + completes the class).
+    if (action === 'complete') {
+      if (!isTutor) {
+        return NextResponse.json({ error: 'Only the tutor can complete an engagement.' }, { status: 403 })
+      }
+      if (status !== 'confirmed' && status !== 'in_progress') {
+        return NextResponse.json({ error: 'This booking cannot be completed.' }, { status: 409 })
+      }
+      if (booking.paymentStatus !== 'held') {
+        return NextResponse.json({ error: 'This booking has not been paid.' }, { status: 409 })
+      }
+      const settle = await releaseRemainingEscrowToTutor({ payload, bookingId: id })
+      if (!settle.ok) {
+        return NextResponse.json({ error: settle.error || 'Could not complete the engagement.' }, { status: settle.status || 500 })
+      }
+      // Notify the booker: engagement done + prompt a review.
+      const bookerId = parentUserId || studentUserId
+      if (bookerId) {
+        await createNotification({
+          recipientId: String(bookerId),
+          type: 'general',
+          title: 'Engagement completed',
+          message: `Your tutoring engagement is complete. Leave a review to help other learners.`,
+          link: parentUserId ? '/dashboard/parent/bookings' : '/dashboard/student/bookings',
+          relatedCollection: 'bookings',
+          relatedId: String(id),
+        })
+      }
+      const updatedBooking = await payload.findByID({ collection: 'bookings', id, depth: 0, overrideAccess: true })
+      return NextResponse.json({ success: true, booking: updatedBooking })
+    }
+
     let nextStatus: string | null = null
 
     if (action === 'accept' || action === 'decline') {

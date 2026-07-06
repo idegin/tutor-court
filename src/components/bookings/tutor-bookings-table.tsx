@@ -153,7 +153,7 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
         return matchesSearch && matchesStatus && matchesType;
     });
 
-    const runAction = async (id: string, action: "accept" | "decline") => {
+    const runAction = async (id: string, action: "accept" | "decline" | "complete") => {
         setLoadingId(id);
         try {
             const res = await fetch(`/api/private/bookings/${id}`, {
@@ -166,7 +166,13 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                 toast.error(data.error || "Something went wrong");
                 return;
             }
-            toast.success(action === "accept" ? "Booking accepted" : "Booking declined");
+            toast.success(
+                action === "accept"
+                    ? "Booking accepted"
+                    : action === "decline"
+                        ? "Booking declined"
+                        : "Engagement completed — payout released",
+            );
             router.refresh();
         } catch (err: any) {
             toast.error(err?.message || "Something went wrong");
@@ -369,6 +375,39 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                                     onClick={() => runAction(booking.id, "decline")}
                                                                 >
                                                                     Decline booking
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                            ) : (booking.raw.status === "confirmed" ||
+                                                  booking.raw.status === "in_progress") &&
+                                              booking.raw.paymentStatus === "held" ? (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-none"
+                                                                disabled={loadingId === booking.id}
+                                                            >
+                                                                <Check className="h-4 w-4" /> Mark complete
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Mark this engagement complete?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This releases the remaining escrow to you and marks the engagement with {booking.bookerName} as complete. This action cannot be undone.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Not yet</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                                                    onClick={() => runAction(booking.id, "complete")}
+                                                                >
+                                                                    Complete & release payout
                                                                 </AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>

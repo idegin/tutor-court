@@ -75,6 +75,7 @@ export interface Config {
     reviews: Review;
     wallets: Wallet;
     transactions: Transaction;
+    'payout-requests': PayoutRequest;
     bookings: Booking;
     students: Student;
     classes: Class;
@@ -106,6 +107,7 @@ export interface Config {
     reviews: ReviewsSelect<false> | ReviewsSelect<true>;
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
+    'payout-requests': PayoutRequestsSelect<false> | PayoutRequestsSelect<true>;
     bookings: BookingsSelect<false> | BookingsSelect<true>;
     students: StudentsSelect<false> | StudentsSelect<true>;
     classes: ClassesSelect<false> | ClassesSelect<true>;
@@ -731,6 +733,24 @@ export interface Wallet {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payout-requests".
+ */
+export interface PayoutRequest {
+  id: number;
+  tutor: number | User;
+  amount: number;
+  currency: 'ngn' | 'usd';
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountName?: string | null;
+  status: 'requested' | 'paid' | 'rejected';
+  transaction?: (number | null) | Transaction;
+  adminNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "students".
  */
 export interface Student {
@@ -1167,6 +1187,10 @@ export interface PayloadLockedDocument {
         value: number | Transaction;
       } | null)
     | ({
+        relationTo: 'payout-requests';
+        value: number | PayoutRequest;
+      } | null)
+    | ({
         relationTo: 'bookings';
         value: number | Booking;
       } | null)
@@ -1473,6 +1497,23 @@ export interface TransactionsSelect<T extends boolean = true> {
   status?: T;
   description?: T;
   metadata?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payout-requests_select".
+ */
+export interface PayoutRequestsSelect<T extends boolean = true> {
+  tutor?: T;
+  amount?: T;
+  currency?: T;
+  bankName?: T;
+  accountNumber?: T;
+  accountName?: T;
+  status?: T;
+  transaction?: T;
+  adminNote?: T;
   updatedAt?: T;
   createdAt?: T;
 }

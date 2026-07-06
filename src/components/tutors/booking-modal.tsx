@@ -17,6 +17,11 @@ export interface BookingModalProps {
     offeredSubjects?: string[];
     childrenOptions?: { id: string; name: string }[];
     onSuccess?: () => void;
+    // Prefill from a prior booking (rebook). Dates are intentionally NOT seeded —
+    // past dates fail validation, so the booker re-picks a fresh range.
+    initialSubjects?: string[];
+    initialDaysOfWeek?: string[];
+    initialHoursPerDay?: number;
 }
 
 interface BookingValues {
@@ -40,7 +45,7 @@ const DAYS_OF_WEEK = [
     { label: 'Sun', value: 'sunday' },
 ];
 
-export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], childrenOptions = [], onSuccess }: BookingModalProps) {
+export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], childrenOptions = [], onSuccess, initialSubjects, initialDaysOfWeek, initialHoursPerDay }: BookingModalProps) {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -68,12 +73,14 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     const [selectedChildId, setSelectedChildId] = useState<string>(childrenOptions.length === 1 ? childrenOptions[0].id : '');
 
     const [values, setValues] = useState<BookingValues>({
-        subjects: [],
+        // Only seed subjects the tutor still offers, so every prefilled chip is
+        // visible and deselectable in the UI.
+        subjects: (initialSubjects ?? []).filter((s) => offeredSubjects.includes(s)),
         message: '',
         startDate: '',
         endDate: '',
-        hoursPerDay: 1,
-        daysOfWeek: [],
+        hoursPerDay: initialHoursPerDay && initialHoursPerDay >= 1 ? initialHoursPerDay : 1,
+        daysOfWeek: initialDaysOfWeek ?? [],
     });
 
     const [errors, setErrors] = useState<BookingErrors>({});
