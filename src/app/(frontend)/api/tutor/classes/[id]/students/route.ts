@@ -36,16 +36,94 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return NextResponse.json({ error: 'Not authorized to modify this class.' }, { status: 403 })
     }
 
-    const newStudents = (classDoc.students || [])
-      .map((s: any) => (typeof s === 'object' ? s.id : s))
-      .filter((sid: any) => String(sid) !== String(studentId))
+    // Coerce a numeric-string studentId to a number so relationship comparisons
+    // and Postgres integer ids line up (the array stores integer ids).
+    const numericStudentId = /^\d+$/.test(String(studentId))
+      ? Number(studentId)
+      : studentId
+
+    const currentStudents = (classDoc.students || []).map((s: any) =>
+      typeof s === 'object' ? s.id : s,
+    )
+
+    const newStudents = currentStudents.filter(
+      (sid: any) => String(sid) !== String(studentId),
+    )
+
+    // If nothing changed, the student was never enrolled.
+    if (newStudents.length === currentStudents.length) {
+      return NextResponse.json(
+        { error: 'Student is not enrolled in this class.' },
+        { status: 404 },
+      )
+    }
+
+    // Dangling-parent cleanup: if the removed student's parent has no other
+    // child left in the class, drop that parent too (so they lose live-room
+    // access). Resolve the removed student's parent id first.
+    const currentParents = (classDoc.parents || []).map((p: any) =>
+      typeof p === 'object' ? p.id : p,
+    )
+    let newParents = currentParents
+    try {
+      const removedStudent: any = await payload.findByID({
+        collection: 'users',
+        id: numericStudentId,
+        depth: 0,
+      })
+      const removedParentId =
+        removedStudent?.parent && typeof removedStudent.parent === 'object'
+          ? removedStudent.parent.id
+          : removedStudent?.parent
+      if (removedParentId != null) {
+        let parentStillHasChild = false
+        if (newStudents.length > 0) {
+          const remaining = await payload.find({
+            collection: 'users',
+            where: { id: { in: newStudents } },
+            limit: 1000,
+            depth: 0,
+            overrideAccess: true,
+          })
+          parentStillHasChild = remaining.docs.some((u: any) => {
+            const pid = u?.parent && typeof u.parent === 'object' ? u.parent.id : u?.parent
+            return String(pid) === String(removedParentId)
+          })
+        }
+        if (!parentStillHasChild) {
+          newParents = currentParents.filter(
+            (pid: any) => String(pid) !== String(removedParentId),
+          )
+        }
+      }
+    } catch (err: any) {
+      console.error('[remove-student] parent cleanup failed:', err?.message || err)
+    }
 
     await payload.update({
       collection: 'classes',
       id,
-      data: { students: newStudents } as any,
+      data: { students: newStudents, parents: newParents } as any,
       overrideAccess: true,
     })
+
+    // Revoke assessment access: delete the removed student's non-completed
+    // tutor-assessments for this class.
+    try {
+      await payload.delete({
+        collection: 'tutor-assessments',
+        where: {
+          and: [
+            { class: { equals: id } },
+            { student: { equals: numericStudentId } },
+            { status: { not_equals: 'completed' } },
+          ],
+        },
+        overrideAccess: true,
+      })
+    } catch (err: any) {
+      console.error('[remove-student] assessment cleanup failed:', err?.message || err)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

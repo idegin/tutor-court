@@ -564,4 +564,72 @@ async function seedAssessments(
     }
   }
   console.log(`Seeded assessment + ${resultCount} results for the progress dashboard.`)
+
+  // A second assessment with an essay question + a submitted-but-ungraded
+  // result, so the "Needs grading" badge and manual-grading UI are testable.
+  const firstStudent = students[0]
+  if (firstStudent) {
+    const essayAssessment = await payload.create({
+      collection: 'assessments',
+      data: {
+        title: 'Essay: Explain a Concept',
+        description: 'A short written-response question graded by the tutor.',
+        subject: subjectId,
+        tutor: tutor.id,
+        type: 'homework',
+        gradeLevel: 'grade_6',
+        passingScore: 70,
+        isPublished: true,
+      } as any,
+    })
+    const essayQ = await payload.create({
+      collection: 'assessment-questions',
+      data: {
+        assessment: essayAssessment.id,
+        questionText: 'Explain, in your own words, what a variable is in algebra.',
+        type: 'essay',
+        points: 10,
+        order: 0,
+      } as any,
+    })
+    const essayTa = await payload.create({
+      collection: 'tutor-assessments',
+      data: {
+        assessment: essayAssessment.id,
+        tutor: tutor.id,
+        student: firstStudent.id,
+        class: classId,
+        selectedQuestions: [essayQ.id],
+        status: 'completed',
+        maxAttempts: 1,
+      } as any,
+    })
+    const submittedAt = new Date()
+    submittedAt.setDate(submittedAt.getDate() - 1)
+    await payload.create({
+      collection: 'assessment-results',
+      data: {
+        tutorAssessment: essayTa.id,
+        student: firstStudent.id,
+        tutor: tutor.id,
+        answers: [
+          {
+            question: essayQ.id,
+            textAnswer:
+              'A variable is a symbol (like x) that stands for a number we do not know yet.',
+            isCorrect: false,
+            pointsEarned: 0,
+          },
+        ],
+        totalPoints: 10,
+        earnedPoints: 0,
+        score: 0,
+        passed: false,
+        pendingManualGrading: true,
+        submittedAt: submittedAt.toISOString(),
+        timeTakenSeconds: 240,
+      } as any,
+    })
+    console.log('Seeded 1 pending-review essay result for manual-grading testing.')
+  }
 }

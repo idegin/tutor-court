@@ -462,7 +462,13 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                     disabled={isLoading}
                                     className="bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white"
                                 >
-                                    {isLoading ? 'Creating...' : 'Create Class'}
+                                    {isLoading
+                                        ? editingClassId
+                                            ? 'Saving...'
+                                            : 'Creating...'
+                                        : editingClassId
+                                          ? 'Save Changes'
+                                          : 'Create Class'}
                                 </Button>
                             </SheetFooter>
                         </form>

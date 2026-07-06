@@ -284,9 +284,15 @@ export function AssessmentDetail({ tutorAssessment, result, canGrade = false }: 
                             </div>
                             <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
                                 <p
-                                    className={`text-xl font-bold ${result.passed ? 'text-emerald-600' : 'text-red-600'}`}
+                                    className={`text-xl font-bold ${
+                                        pending
+                                            ? 'text-amber-600'
+                                            : result.passed
+                                              ? 'text-emerald-600'
+                                              : 'text-red-600'
+                                    }`}
                                 >
-                                    {result.passed ? 'Passed' : 'Failed'}
+                                    {pending ? 'Pending' : result.passed ? 'Passed' : 'Failed'}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Passing: {assessment.passingScore ?? 70}%

@@ -134,13 +134,140 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       )
     }
 
-    // Cascade cleanup: remove pending invitations for this class
-    await payload.delete({
-      collection: 'class-invitations',
+    // Helper: run a delete but never let one failing/empty delete abort the
+    // whole cascade — log and continue.
+    const safeDelete = async (fn: () => Promise<any>, label: string) => {
+      try {
+        await fn()
+      } catch (err: any) {
+        console.error(`[class DELETE cascade] ${label} failed:`, err?.message || err)
+      }
+    }
+
+    // 1. assessment-results -> tutor-assessments (results reference tutorAssessment,
+    //    not class, so resolve the class's tutor-assessment ids first).
+    const tutorAssessments = await payload.find({
+      collection: 'tutor-assessments',
       where: { class: { equals: id } },
+      limit: 1000,
+      depth: 0,
       overrideAccess: true,
     })
+    const tutorAssessmentIds = tutorAssessments.docs.map((d: any) => d.id)
+    if (tutorAssessmentIds.length > 0) {
+      await safeDelete(
+        () =>
+          payload.delete({
+            collection: 'assessment-results',
+            where: { tutorAssessment: { in: tutorAssessmentIds } },
+            overrideAccess: true,
+          }),
+        'assessment-results',
+      )
+    }
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'tutor-assessments',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'tutor-assessments',
+    )
 
+    // 2. whiteboard-slides -> whiteboards (slides reference whiteboard, not class).
+    const whiteboards = await payload.find({
+      collection: 'whiteboards',
+      where: { class: { equals: id } },
+      limit: 1000,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const whiteboardIds = whiteboards.docs.map((d: any) => d.id)
+    if (whiteboardIds.length > 0) {
+      await safeDelete(
+        () =>
+          payload.delete({
+            collection: 'whiteboard-slides',
+            where: { whiteboard: { in: whiteboardIds } },
+            overrideAccess: true,
+          }),
+        'whiteboard-slides',
+      )
+    }
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'whiteboards',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'whiteboards',
+    )
+
+    // 3. attendance (has a direct class field).
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'attendance',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'attendance',
+    )
+
+    // 4. live-session-participants (has a class field) and live-session-messages
+    //    (no class field — reference liveSession only, so resolve session ids).
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'live-session-participants',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'live-session-participants',
+    )
+    const liveSessions = await payload.find({
+      collection: 'live-sessions',
+      where: { class: { equals: id } },
+      limit: 1000,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const liveSessionIds = liveSessions.docs.map((d: any) => d.id)
+    if (liveSessionIds.length > 0) {
+      await safeDelete(
+        () =>
+          payload.delete({
+            collection: 'live-session-messages',
+            where: { liveSession: { in: liveSessionIds } },
+            overrideAccess: true,
+          }),
+        'live-session-messages',
+      )
+    }
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'live-sessions',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'live-sessions',
+    )
+
+    // 5. Cascade cleanup: remove pending invitations for this class
+    await safeDelete(
+      () =>
+        payload.delete({
+          collection: 'class-invitations',
+          where: { class: { equals: id } },
+          overrideAccess: true,
+        }),
+      'class-invitations',
+    )
+
+    // 6. Finally delete the class itself.
     await payload.delete({
       collection: 'classes',
       id,

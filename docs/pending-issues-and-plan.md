@@ -43,6 +43,19 @@ Audited the three "verify before you build" items. Two had real, user-facing bug
 - The billing **arithmetic is correct**: per-pupil summation, incremental non-re-charging delta accounting, no negative/over-draft, idempotent across reconnects/`/end`. SUB-142's actual scope passes.
 - Known structural issues (documented for a dedicated hardening pass, not fixed here to avoid destabilising recently-hardened code): billing is driven only by the tutor's browser poll (no server-side tick → stops if the tab closes), the wallet write is a non-atomic read-modify-write, and a parent observing alongside their child is currently billed as a second pupil. These need a server-side billing scheduler + atomic wallet decrement and a product decision on parent-as-observer.
 
+### Phase 1 & 2 audit + fixes (2026-07-06)
+
+**Phase 1 (invite link, progress dashboard) — audited & fixed:** expired invites are now rejected (INV-058); the register page no longer drops the invite token; parent accept+enroll is atomic; the missing parent `inviteeType` check was added; progress excludes/labels pending-grading results. All Chrome-verified (acceptance page, expired screen, progress charts).
+
+**Phase 2 (delete class, remove student, quiz manual-grading, sender) — audited & fixed:**
+- 🔴 **Security (pre-existing):** `GET /api/assessments/questions` leaked the answer key (`isCorrect`) to any authenticated user — now stripped for non-owners. `PATCH`/`DELETE` on questions had no ownership check (any tutor could edit/delete another tutor's questions, IDOR) — ownership now enforced. _Verified: student sees no key; cross-tutor PATCH/DELETE → 403._
+- 🟠 **Delete class orphaned data:** with `ON DELETE set null` FKs, deleting a class left orphaned live-sessions, whiteboards, tutor-assessments, results, attendance. Now cascades them (children-first). Also cleans scheduled/ended sessions. _Verified: deleting a class removed its 3 tutor-assessments + 5 results, 0 orphans._
+- 🔴 **Removed student kept assessment access:** unenroll now deletes the student's non-completed tutor-assessments for the class, and auto-removes a now-childless parent from the class (revoking their live-room access). Returns 404 if the student wasn't enrolled. _Verified: removing the child also dropped the childless parent._
+- 🟠 **Grading display:** the class-results table and the result summary showed ungraded essays as a provisional "Failed"; now show "Needs grading" / "Pending" and exclude them from pass/average stats. _Verified: essay result shows "Needs grading"; grading it rescored to 80% + passed + cleared the flag._
+- 🟡 Coerced `assessmentId` in the questions POST (Postgres string-id trap); fixed the create/edit button label in the class form.
+
+**Documented as intentional / out-of-scope (not defects):** short-answer/essay are graded manually by design (no fragile exact-match auto-grader); assessments are single-attempt by design. Live-billing structural hardening (server-side tick, atomic wallet decrement, parent-as-observer) remains a separate tracked effort.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

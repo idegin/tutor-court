@@ -126,9 +126,12 @@ export default async function AssessmentPerformancePage({
 
   const completedCount = rows.filter((r) => r.status === 'completed' && r.result).length
   const submitted = rows.filter((r) => r.result)
-  const passedCount = submitted.filter((r) => r.result.passed).length
-  const avgScore = submitted.length
-    ? Math.round(submitted.reduce((acc, r) => acc + (r.result.score || 0), 0) / submitted.length)
+  // Exclude results still awaiting manual grading from pass/average stats —
+  // their provisional score is not final.
+  const graded = submitted.filter((r) => !r.result.pendingManualGrading)
+  const passedCount = graded.filter((r) => r.result.passed).length
+  const avgScore = graded.length
+    ? Math.round(graded.reduce((acc, r) => acc + (r.result.score || 0), 0) / graded.length)
     : 0
 
   const subjectName =
@@ -230,13 +233,19 @@ export default async function AssessmentPerformancePage({
                           </span>
                         </td>
                         <td className="py-3 pr-4 font-bold">
-                          {r ? `${Math.round(r.score || 0)}%` : '—'}
+                          {r ? (r.pendingManualGrading ? '—' : `${Math.round(r.score || 0)}%`) : '—'}
                         </td>
                         <td className="py-3 pr-4">
                           {r ? (
-                            <span className={r.passed ? 'text-emerald-600' : 'text-red-600'}>
-                              {r.passed ? 'Passed' : 'Failed'}
-                            </span>
+                            r.pendingManualGrading ? (
+                              <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                Needs grading
+                              </span>
+                            ) : (
+                              <span className={r.passed ? 'text-emerald-600' : 'text-red-600'}>
+                                {r.passed ? 'Passed' : 'Failed'}
+                              </span>
+                            )
                           ) : (
                             '—'
                           )}

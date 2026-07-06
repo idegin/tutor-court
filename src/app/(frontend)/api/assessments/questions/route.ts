@@ -3,6 +3,25 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+// Postgres integer PKs: a stringified relationship id fails on create/update.
+const numericId = (v: any) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v)
+
+const relTutorId = (assessment: any) =>
+  assessment && typeof assessment.tutor === 'object' ? assessment.tutor?.id : assessment?.tutor
+
+/** Load a question with its assessment and assert the caller owns it. */
+async function loadOwnedQuestion(payload: any, questionId: any, user: any) {
+  const question = await payload
+    .findByID({ collection: 'assessment-questions', id: questionId, depth: 1 })
+    .catch(() => null)
+  if (!question) return { error: 'Question not found.', status: 404 as const }
+  const tutorId = relTutorId(question.assessment)
+  if (user.accountType !== 'admin' && String(tutorId) !== String(user.id)) {
+    return { error: 'Forbidden.', status: 403 as const }
+  }
+  return { question }
+}
+
 // GET – list questions for an assessment
 export async function GET(request: Request) {
   const payload = await getPayload({ config })
@@ -26,6 +45,24 @@ export async function GET(request: Request) {
     depth: 0,
   })
 
+  // Only the owning tutor (or an admin) may see the answer key. For anyone
+  // else, strip `isCorrect` from the options so students can't read the
+  // answers by calling this endpoint directly.
+  const assessment = await payload
+    .findByID({ collection: 'assessments', id: assessmentId, depth: 0 })
+    .catch(() => null)
+  const tutorId = relTutorId(assessment)
+  const isOwner = user.accountType === 'admin' || String(tutorId) === String(user.id)
+
+  if (!isOwner) {
+    result.docs = result.docs.map((q: any) => ({
+      ...q,
+      options: Array.isArray(q.options)
+        ? q.options.map((o: any) => ({ optionText: o.optionText }))
+        : q.options,
+    }))
+  }
+
   return NextResponse.json(result)
 }
 
@@ -40,7 +77,9 @@ export async function POST(request: Request) {
   }
 
   let body: any
-  try { body = await request.json() } catch {
+  try {
+    body = await request.json()
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
@@ -55,7 +94,7 @@ export async function POST(request: Request) {
   const CHOICE_TYPES = ['single_choice', 'multiple_choice', 'true_false']
   const opts: { optionText: string; isCorrect?: boolean }[] = options || []
   if (CHOICE_TYPES.includes(type)) {
-    const hasCorrect = opts.some(o => o.isCorrect === true)
+    const hasCorrect = opts.some((o) => o.isCorrect === true)
     if (!hasCorrect) {
       return NextResponse.json({ error: 'At least one option must be marked as correct.' }, { status: 400 })
     }
@@ -68,18 +107,16 @@ export async function POST(request: Request) {
     depth: 0,
   })
 
-  const tutorId = typeof (assessment as any).tutor === 'object'
-    ? (assessment as any).tutor.id
-    : (assessment as any).tutor
+  const tutorId = relTutorId(assessment)
 
-  if (tutorId !== user.id) {
+  if (String(tutorId) !== String(user.id)) {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
   }
 
   const question = await payload.create({
     collection: 'assessment-questions',
     data: {
-      assessment: assessmentId,
+      assessment: numericId(assessmentId),
       questionText,
       type,
       options: options || [],
@@ -103,7 +140,9 @@ export async function PATCH(request: Request) {
   }
 
   let body: any
-  try { body = await request.json() } catch {
+  try {
+    body = await request.json()
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
@@ -112,10 +151,19 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'questionId is required.' }, { status: 400 })
   }
 
+  const owned = await loadOwnedQuestion(payload, questionId, user)
+  if ('error' in owned) {
+    return NextResponse.json({ error: owned.error }, { status: owned.status })
+  }
+
+  // Never allow the assessment relationship to be reassigned via PATCH.
+  delete (updates as any).assessment
+
   const updated = await payload.update({
     collection: 'assessment-questions',
     id: questionId,
     data: updates as any,
+    overrideAccess: true,
   })
 
   return NextResponse.json({ success: true, question: updated })
@@ -137,6 +185,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'questionId is required.' }, { status: 400 })
   }
 
-  await payload.delete({ collection: 'assessment-questions', id: questionId })
+  const owned = await loadOwnedQuestion(payload, questionId, user)
+  if ('error' in owned) {
+    return NextResponse.json({ error: owned.error }, { status: owned.status })
+  }
+
+  await payload.delete({ collection: 'assessment-questions', id: questionId, overrideAccess: true })
   return NextResponse.json({ success: true })
 }
