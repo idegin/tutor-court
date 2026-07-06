@@ -28,6 +28,26 @@ const numericId = (v: any): string | number =>
 const isDupRef = (e: any): boolean =>
   e?.code === '23505' || /reference/i.test(String(e?.message || '')) || /unique/i.test(String(e?.message || ''))
 
+/**
+ * True if the booking has an OPEN dispute. While a dispute is open the escrow is
+ * frozen — no per-session payout and no tutor "mark complete" — so money can't
+ * leave until an admin resolves it (refund to booker or release to tutor).
+ */
+export async function hasOpenDispute(payload: Payload, bookingId: string | number): Promise<boolean> {
+  try {
+    const res = await payload.find({
+      collection: 'disputes',
+      where: { and: [{ booking: { equals: bookingId } }, { status: { equals: 'open' } }] },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    return res.totalDocs > 0
+  } catch {
+    return false
+  }
+}
+
 export interface HoldEscrowParams {
   payload: Payload
   bookingId: string | number
@@ -422,6 +442,10 @@ export async function payoutSessionEscrow({
     .findByID({ collection: 'bookings', id: bookingId, depth: 2, overrideAccess: true })
     .catch(() => null)
   if (!booking || booking.paymentStatus !== 'held') return { ok: true, skipped: true }
+
+  // Freeze payouts while a dispute is open — money stays in escrow until an
+  // admin resolves it.
+  if (await hasOpenDispute(payload, bookingId)) return { ok: true, held: true, skipped: true }
 
   const reference = `payout-session-${sessionId}`
   const existing = await payload.find({

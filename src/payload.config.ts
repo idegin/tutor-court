@@ -17,6 +17,7 @@ import { Reviews } from './collections/Reviews'
 import { Wallets } from './collections/Wallets'
 import { Transactions } from './collections/Transactions'
 import { PayoutRequests } from './collections/PayoutRequests'
+import { Disputes } from './collections/Disputes'
 import { Bookings } from './collections/Bookings'
 import { Students } from './collections/Students'
 import { Classes } from './collections/Classes'
@@ -117,6 +118,7 @@ export default buildConfig({
     Wallets,
     Transactions,
     PayoutRequests,
+    Disputes,
     Bookings,
     Students,
     Classes,

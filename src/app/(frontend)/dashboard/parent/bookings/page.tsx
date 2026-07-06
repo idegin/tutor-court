@@ -24,6 +24,24 @@ export default async function ParentBookingsPage() {
 
   const bookings = JSON.parse(JSON.stringify(res.docs))
 
+  // Flag bookings that currently have an open dispute (freezes escrow; drives UI).
+  const bookingIds = bookings.map((b: any) => b.id)
+  if (bookingIds.length > 0) {
+    const openDisputes = await payload.find({
+      collection: 'disputes',
+      where: { and: [{ booking: { in: bookingIds } }, { status: { equals: 'open' } }] },
+      depth: 0,
+      limit: 200,
+      overrideAccess: true,
+    })
+    const disputed = new Set(
+      openDisputes.docs.map((d: any) => String(typeof d.booking === 'object' ? d.booking.id : d.booking)),
+    )
+    bookings.forEach((b: any) => {
+      b.hasOpenDispute = disputed.has(String(b.id))
+    })
+  }
+
   const walletRes = await payload.find({
     collection: 'wallets',
     where: { user: { equals: user.id } },

@@ -145,6 +145,19 @@ export function MyBookingsList({
     // flips to "Reviewed" without a full refetch).
     const [reviewedIds, setReviewedIds] = React.useState<Set<string>>(new Set());
 
+    // Dispute dialog state
+    const [disputeOpen, setDisputeOpen] = React.useState(false);
+    const [disputeBooking, setDisputeBooking] = React.useState<any | null>(null);
+    const [disputeReason, setDisputeReason] = React.useState<string>("");
+    const [disputeDetails, setDisputeDetails] = React.useState("");
+    const [disputeSubmitting, setDisputeSubmitting] = React.useState(false);
+    const [disputeError, setDisputeError] = React.useState<string | null>(null);
+    // Bookings with a freshly-opened dispute (locally tracked so the button
+    // flips to "Dispute open" without a full refetch). Seeded from server data.
+    const [disputedIds, setDisputedIds] = React.useState<Set<string>>(
+        () => new Set(bookings.filter((b: any) => b?.hasOpenDispute).map((b: any) => String(b.id))),
+    );
+
     const cleanPath = role === "parent" ? "/dashboard/parent/bookings" : "/dashboard/student/bookings";
 
     // Paystack return handler: verify the payment then strip the query. Scoped
@@ -311,6 +324,62 @@ export function MyBookingsList({
         }
     };
 
+    const DISPUTE_REASONS: { value: string; label: string }[] = [
+        { value: "no_show", label: "Tutor didn't show up" },
+        { value: "quality", label: "Quality of tutoring" },
+        { value: "scheduling", label: "Scheduling problems" },
+        { value: "other", label: "Something else" },
+    ];
+
+    const openDisputeDialog = (b: any) => {
+        setDisputeBooking(b);
+        setDisputeReason("");
+        setDisputeDetails("");
+        setDisputeError(null);
+        setDisputeOpen(true);
+    };
+
+    const submitDispute = async () => {
+        if (!disputeBooking) return;
+        if (!disputeReason) {
+            setDisputeError("Please choose a reason.");
+            return;
+        }
+        if (disputeDetails.trim().length < 15) {
+            setDisputeError("Please describe the problem (at least 15 characters).");
+            return;
+        }
+        setDisputeSubmitting(true);
+        setDisputeError(null);
+        try {
+            const res = await fetch("/api/private/disputes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bookingId: disputeBooking.id,
+                    reason: disputeReason,
+                    details: disputeDetails.trim(),
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 409) {
+                    setDisputedIds((prev) => new Set(prev).add(String(disputeBooking.id)));
+                }
+                setDisputeError(data.error || "Something went wrong");
+                return;
+            }
+            setDisputedIds((prev) => new Set(prev).add(String(disputeBooking.id)));
+            toast.success("Dispute submitted — our team will review it and the payout is paused.");
+            setDisputeOpen(false);
+            router.refresh();
+        } catch (err: any) {
+            setDisputeError(err?.message || "Something went wrong");
+        } finally {
+            setDisputeSubmitting(false);
+        }
+    };
+
     if (bookings.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-16 text-center bg-card">
@@ -460,6 +529,28 @@ export function MyBookingsList({
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 )}
+                                {b.paymentStatus === "held" &&
+                                    (b.status === "confirmed" || b.status === "in_progress") && (
+                                        disputedIds.has(String(b.id)) ? (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-border text-muted-foreground"
+                                                disabled
+                                            >
+                                                Dispute open
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-border text-amber-600 hover:bg-amber-500/10 dark:text-amber-400"
+                                                onClick={() => openDisputeDialog(b)}
+                                            >
+                                                Report a problem
+                                            </Button>
+                                        )
+                                    )}
                                 {b.status === "completed" && (
                                     <>
                                         {reviewedIds.has(b.id) ? (
@@ -632,6 +723,72 @@ export function MyBookingsList({
                             }
                         >
                             {reviewSubmitting ? "Submitting..." : "Submit review"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dispute dialog */}
+            <Dialog
+                open={disputeOpen}
+                onOpenChange={(open) => {
+                    if (!disputeSubmitting) setDisputeOpen(open);
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Report a problem</DialogTitle>
+                        <DialogDescription>
+                            Tell us what went wrong with your engagement
+                            {disputeBooking ? ` with ${tutorDisplayName(disputeBooking.tutor)}` : ""}. Your
+                            payment stays safely in escrow while our team reviews it.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            {DISPUTE_REASONS.map((r) => (
+                                <button
+                                    key={r.value}
+                                    type="button"
+                                    onClick={() => {
+                                        setDisputeReason(r.value);
+                                        if (disputeError) setDisputeError(null);
+                                    }}
+                                    className={cn(
+                                        "rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors",
+                                        disputeReason === r.value
+                                            ? "border-tutor-purple-500 bg-tutor-purple-50 text-tutor-purple-700"
+                                            : "border-border text-muted-foreground hover:bg-muted/50",
+                                    )}
+                                >
+                                    {r.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <Textarea
+                            placeholder="Describe what happened (at least 15 characters)..."
+                            rows={4}
+                            value={disputeDetails}
+                            onChange={(e) => {
+                                setDisputeDetails(e.target.value);
+                                if (disputeError) setDisputeError(null);
+                            }}
+                        />
+
+                        {disputeError && (
+                            <p className="text-xs text-red-600 dark:text-red-400">{disputeError}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            className="w-full bg-amber-600 text-white hover:bg-amber-700"
+                            onClick={submitDispute}
+                            disabled={disputeSubmitting}
+                        >
+                            {disputeSubmitting ? "Submitting..." : "Submit dispute"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

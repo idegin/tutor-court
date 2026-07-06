@@ -76,6 +76,7 @@ export interface Config {
     wallets: Wallet;
     transactions: Transaction;
     'payout-requests': PayoutRequest;
+    disputes: Dispute;
     bookings: Booking;
     students: Student;
     classes: Class;
@@ -108,6 +109,7 @@ export interface Config {
     wallets: WalletsSelect<false> | WalletsSelect<true>;
     transactions: TransactionsSelect<false> | TransactionsSelect<true>;
     'payout-requests': PayoutRequestsSelect<false> | PayoutRequestsSelect<true>;
+    disputes: DisputesSelect<false> | DisputesSelect<true>;
     bookings: BookingsSelect<false> | BookingsSelect<true>;
     students: StudentsSelect<false> | StudentsSelect<true>;
     classes: ClassesSelect<false> | ClassesSelect<true>;
@@ -751,6 +753,23 @@ export interface PayoutRequest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "disputes".
+ */
+export interface Dispute {
+  id: number;
+  booking: number | Booking;
+  raisedBy: number | User;
+  against?: (number | null) | User;
+  reason: 'no_show' | 'quality' | 'scheduling' | 'other';
+  details: string;
+  status: 'open' | 'resolved_refund' | 'resolved_release' | 'rejected';
+  resolutionNote?: string | null;
+  resolvedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "students".
  */
 export interface Student {
@@ -1191,6 +1210,10 @@ export interface PayloadLockedDocument {
         value: number | PayoutRequest;
       } | null)
     | ({
+        relationTo: 'disputes';
+        value: number | Dispute;
+      } | null)
+    | ({
         relationTo: 'bookings';
         value: number | Booking;
       } | null)
@@ -1514,6 +1537,22 @@ export interface PayoutRequestsSelect<T extends boolean = true> {
   status?: T;
   transaction?: T;
   adminNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "disputes_select".
+ */
+export interface DisputesSelect<T extends boolean = true> {
+  booking?: T;
+  raisedBy?: T;
+  against?: T;
+  reason?: T;
+  details?: T;
+  status?: T;
+  resolutionNote?: T;
+  resolvedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

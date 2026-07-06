@@ -6,7 +6,7 @@ import { getServerSideUser } from '@/lib/auth'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
-import { releaseBookingEscrow, releaseRemainingEscrowToTutor } from '@/lib/escrow'
+import { releaseBookingEscrow, releaseRemainingEscrowToTutor, hasOpenDispute } from '@/lib/escrow'
 
 type Action = 'accept' | 'decline' | 'cancel' | 'complete'
 
@@ -72,6 +72,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       if (booking.paymentStatus !== 'held') {
         return NextResponse.json({ error: 'This booking has not been paid.' }, { status: 409 })
+      }
+      // Frozen while a dispute is open — an admin must resolve it first.
+      if (await hasOpenDispute(payload, id)) {
+        return NextResponse.json(
+          { error: 'This engagement has an open dispute and cannot be completed until it is resolved.' },
+          { status: 409 },
+        )
       }
       const settle = await releaseRemainingEscrowToTutor({ payload, bookingId: id })
       if (!settle.ok) {
