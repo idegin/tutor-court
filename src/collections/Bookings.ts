@@ -12,7 +12,11 @@ export const Bookings: CollectionConfig = {
       if (!user) return false
       if (user?.accountType === 'admin') return true
       return {
-        or: [{ student: { equals: user?.id } }, { 'tutor.user': { equals: user?.id } }],
+        or: [
+          { student: { equals: user?.id } },
+          { parent: { equals: user?.id } },
+          { 'tutor.user': { equals: user?.id } },
+        ],
       } as any
     },
     create: ({ req: { user } }) =>
@@ -21,7 +25,11 @@ export const Bookings: CollectionConfig = {
       if (!user) return false
       if (user.accountType === 'admin') return true
       return {
-        or: [{ student: { equals: user.id } }, { 'tutor.user': { equals: user.id } }],
+        or: [
+          { student: { equals: user.id } },
+          { parent: { equals: user.id } },
+          { 'tutor.user': { equals: user.id } },
+        ],
       } as any
     },
     delete: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),

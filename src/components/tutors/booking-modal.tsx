@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { HiXMark, HiCheck, HiCheckCircle } from 'react-icons/hi2';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -43,6 +43,25 @@ const DAYS_OF_WEEK = [
 export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], childrenOptions = [], onSuccess }: BookingModalProps) {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+
+    // Closing after a successful request triggers the parent's onSuccess (which
+    // refreshes the page) — so the user actually sees the success step first.
+    const handleClose = () => {
+        if (submitted && onSuccess) onSuccess();
+        else onClose();
+    };
+
+    // Close on Escape for keyboard/screen-reader users.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') handleClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, submitted]);
 
     const needsChildSelection = childrenOptions.length > 1;
     const [selectedChildId, setSelectedChildId] = useState<string>(childrenOptions.length === 1 ? childrenOptions[0].id : '');
@@ -77,6 +96,12 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     const validateStep2 = (): boolean => {
         const newErrors: BookingErrors = {};
         if (!values.startDate) newErrors.startDate = 'Start date is required.';
+        else {
+            const start = new Date(values.startDate);
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            if (start < startOfToday) newErrors.startDate = 'Start date cannot be in the past.';
+        }
         if (!values.endDate) newErrors.endDate = 'End date is required.';
         else if (new Date(values.endDate) < new Date(values.startDate)) newErrors.endDate = 'End date cannot be before start date.';
 
@@ -131,8 +156,8 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
             }
 
             setIsSubmitting(false);
+            setSubmitted(true);
             setStep(4);
-            if (onSuccess) onSuccess();
         } catch (error: any) {
             setErrors({ form: error?.message || 'An error occurred' });
             setIsSubmitting(false);
@@ -142,12 +167,21 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 backdrop-blur-sm p-4">
-            <div className="w-full max-w-lg bg-background border-[3px] border-foreground rounded-[2rem] overflow-hidden flex flex-col max-h-[90vh]">
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/20 backdrop-blur-sm p-4"
+            onClick={handleClose}
+        >
+            <div
+                className="w-full max-w-lg bg-background border-[3px] border-foreground rounded-[2rem] overflow-hidden flex flex-col max-h-[90vh]"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Book ${tutorName}`}
+                onClick={(e) => e.stopPropagation()}
+            >
                 {step < 4 ? (
                     <div className="flex items-center justify-between p-6 border-b-2 border-foreground bg-tutor-purple-50">
                         <h2 className="text-2xl font-black text-foreground">Book {tutorName.split(' ')[0]}</h2>
-                        <button onClick={onClose} className="p-1 hover:bg-foreground hover:text-background rounded transition-colors text-foreground">
+                        <button onClick={handleClose} className="p-1 hover:bg-foreground hover:text-background rounded transition-colors text-foreground">
                             <HiXMark className="w-6 h-6" />
                         </button>
                     </div>
@@ -368,7 +402,9 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                             </div>
                             {!price.valid && (
                                 <p className="text-xs font-bold text-tutor-red-500 text-center">
-                                    No sessions fall within this date range and schedule. Adjust your dates or selected days.
+                                    {price.hourlyRate <= 0
+                                        ? "This tutor hasn't set an hourly rate yet, so a booking can't be priced. Please try another tutor."
+                                        : 'No sessions fall within this date range and schedule. Adjust your dates or selected days.'}
                                 </p>
                             )}
                             <p className="text-xs font-bold text-muted-foreground text-center">
@@ -412,10 +448,10 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                         </>
                     ) : (
                         <Button
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="w-full px-6 py-4 rounded-xl border-[3px] border-foreground bg-foreground text-background font-black transition-colors text-lg hover:bg-foreground/90"
                         >
-                            Close
+                            View My Bookings
                         </Button>
                     )}
                 </div>

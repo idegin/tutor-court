@@ -56,6 +56,19 @@ Audited the three "verify before you build" items. Two had real, user-facing bug
 
 **Documented as intentional / out-of-scope (not defects):** short-answer/essay are graded manually by design (no fragile exact-match auto-grader); assessments are single-attempt by design. Live-billing structural hardening (server-side tick, atomic wallet decrement, parent-as-observer) remains a separate tracked effort.
 
+### Marketplace Stages 1–3 audit + fixes (2026-07-06)
+
+**Stage 1 — Discover:** completed end-to-end. Fixed 🔴 unapproved profiles/reviews leaking (profile now 404s for unapproved unless owner/admin; reviews + rating aggregation are approved-only), added keyword search + sort + mobile filter drawer + null-rate handling, added the missing **weekly-availability** model + profile preview (+ migration), `/tutors`→`/search` redirect and dead-link repointing, and a role-gated Book CTA. Build passes; Chrome-verified.
+
+**Stage 2 — Request a booking (tighten) & Stage 3 — Accept/decline:** audited; core flow was correct. Fixes:
+- 🔴 **The booking modal was silently broken** — the zod schema required a string `tutorId` but the UI passes a numeric (Postgres) id, so every real submit 400'd. Schema now accepts both. _Verified end-to-end in Chrome: modal → POST 200 → booking created → success screen._
+- 🟠 Added a server-side **duplicate/spam guard** (one active booking per booker+tutor → 409); the CTA guard was UI-only before.
+- 🟠 `Bookings` collection read/update access omitted the `parent` — added (was masked by `overrideAccess`).
+- 🟡 Success screen was destroyed by an immediate page reload → now the "Request Sent!" step persists and refreshes on close.
+- 🟡 Booking dates displayed in local time (off-by-one west of UTC) → now formatted in UTC.
+- 🟡 Invalid tutorId returned 500 → now 404; misleading "no sessions" message now distinguishes a 0/null rate; client validates past start date; modal got a11y (role/aria, ESC, backdrop close); true-empty vs filtered-empty states.
+- **Deferred (documented):** per-tutor USD currency (needs a data-model decision — all bookings are NGN today), pagination beyond 100 bookings, decline-reason capture, and stale-price-on-rate-change. Counter-offer is explicitly a later phase.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

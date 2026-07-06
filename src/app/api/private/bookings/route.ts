@@ -10,7 +10,8 @@ import { createNotification } from '@/lib/notification-service'
 import { computeBookingPrice } from '@/lib/booking-pricing'
 
 const bookingSchema = z.object({
-  tutorId: z.string(),
+  // ids may arrive as a number (Postgres integer PK) or a string — accept both.
+  tutorId: z.union([z.string(), z.number()]).transform(String),
   startDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Invalid startDate' }),
   endDate: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Invalid endDate' }),
   hoursPerDay: z.number().min(1).max(10),
@@ -19,7 +20,7 @@ const bookingSchema = z.object({
   subjects: z.array(z.string()).min(1),
   message: z.string().optional(),
   // When a parent books on behalf of a managed student, the child's user id.
-  studentId: z.string().optional(),
+  studentId: z.union([z.string(), z.number()]).transform(String).optional(),
 })
 
 type DayOfWeek =
@@ -49,12 +50,17 @@ export async function POST(req: Request) {
 
     const payload = await getPayload({ config })
 
-    const tutorProfile = await payload.findByID({
-      collection: 'tutor-profiles',
-      id: parsed.tutorId,
-      depth: 1,
-      overrideAccess: true,
-    })
+    let tutorProfile: any = null
+    try {
+      tutorProfile = await payload.findByID({
+        collection: 'tutor-profiles',
+        id: parsed.tutorId,
+        depth: 1,
+        overrideAccess: true,
+      })
+    } catch {
+      // findByID throws on a missing/invalid id — treat as not found.
+    }
 
     if (!tutorProfile) {
       return NextResponse.json({ error: 'Tutor not found' }, { status: 404 })
@@ -102,6 +108,33 @@ export async function POST(req: Request) {
     const numericId = (v: string | number): string | number =>
       typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v
     studentId = numericId(studentId)
+
+    // Prevent duplicate/spam requests: one active (pending|confirmed) booking
+    // per booker+tutor. A declined/cancelled/completed booking does not block a
+    // new request. Mirrors the profile CTA's "active booking" definition.
+    const existingActive = await payload.find({
+      collection: 'bookings',
+      where: {
+        and: [
+          { tutor: { equals: tutorProfile.id } },
+          {
+            or: [{ student: { equals: studentId } }, { parent: { equals: user.id } }],
+          },
+          {
+            or: [{ status: { equals: 'pending' } }, { status: { equals: 'confirmed' } }],
+          },
+        ],
+      },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    if (existingActive.totalDocs > 0) {
+      return NextResponse.json(
+        { error: 'You already have an active booking with this tutor.' },
+        { status: 409 },
+      )
+    }
 
     // Authoritative pricing — the server is the source of truth.
     const price = computeBookingPrice({

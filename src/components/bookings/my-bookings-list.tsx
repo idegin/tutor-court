@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { format } from "date-fns";
+// Booking dates are stored as UTC midnight (day-only) — format in UTC so the
+// displayed day never shifts for viewers west of UTC.
+const fmtUTCDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -182,8 +190,8 @@ export function MyBookingsList({
                                 <div className="flex items-center gap-1.5 text-muted-foreground">
                                     <HiOutlineCalendarDays className="h-4 w-4 shrink-0 text-tutor-purple-500" />
                                     <span>
-                                        {b.date ? format(new Date(b.date), "MMM d, yyyy") : "—"}
-                                        {b.endDate ? ` – ${format(new Date(b.endDate), "MMM d, yyyy")}` : ""}
+                                        {b.date ? fmtUTCDate(b.date) : "—"}
+                                        {b.endDate ? ` – ${fmtUTCDate(b.endDate)}` : ""}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-muted-foreground">

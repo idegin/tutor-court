@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -47,6 +46,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatNaira } from "@/lib/constants";
 import { countSessions } from "@/lib/booking-pricing";
+
+// Booking dates are day-only, stored at UTC midnight — format in UTC so the day
+// never shifts for viewers west of UTC.
+const fmtUTCDate = (iso: string, withYear = true) =>
+    new Date(iso).toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        month: "short",
+        day: "numeric",
+        ...(withYear ? { year: "numeric" as const } : {}),
+    });
 
 const DAY_SHORT: Record<string, string> = {
     monday: "Mon",
@@ -228,7 +237,9 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                             {filteredData.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                                        No bookings found matching your filters.
+                                        {rows.length === 0
+                                            ? "You don't have any booking requests yet."
+                                            : "No bookings match your search or filters."}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -279,8 +290,8 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                 <div className="flex items-center gap-1.5 text-foreground/80">
                                                     <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                                                     <span>
-                                                        {booking.raw.date ? format(new Date(booking.raw.date), "MMM d") : "—"}
-                                                        {booking.raw.endDate ? ` – ${format(new Date(booking.raw.endDate), "MMM d, yyyy")}` : ""}
+                                                        {booking.raw.date ? fmtUTCDate(booking.raw.date, false) : "—"}
+                                                        {booking.raw.endDate ? ` – ${fmtUTCDate(booking.raw.endDate)}` : ""}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-muted-foreground">
