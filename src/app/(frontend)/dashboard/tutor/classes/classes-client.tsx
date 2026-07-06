@@ -47,6 +47,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from '@/components/ui/textarea';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const DAYS_OF_WEEK = [
     { id: 'sun', label: 'Sun', name: 'sunday' },
@@ -72,6 +82,16 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
     const [maxStudents, setMaxStudents] = useState('1');
     const [startDate, setStartDate] = useState<Date>();
     const [endDate, setEndDate] = useState<Date>();
+
+    // Delete states
+    const [classToDelete, setClassToDelete] = useState<any | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const startOfToday = React.useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }, []);
 
     const [scheduleState, setScheduleState] = useState<Record<string, { checked: boolean, startTime: string, endTime: string }>>({
         sun: { checked: false, startTime: '09:00', endTime: '10:00' },
@@ -168,6 +188,16 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             return;
         }
 
+        if (endDate <= startDate) {
+            toast.error('End date must be after the start date.');
+            return;
+        }
+
+        if (!editingClassId && startDate < startOfToday) {
+            toast.error('Start date cannot be in the past.');
+            return;
+        }
+
         const schedule = Object.entries(scheduleState)
             .filter(([_, v]) => v.checked)
             .map(([k, v]) => {
@@ -220,6 +250,30 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             toast.error(error.message || 'An error occurred.');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDeleteClass = async () => {
+        if (!classToDelete) return;
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/tutor/classes/${classToDelete.id}`, {
+                method: 'DELETE',
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to delete class.');
+            }
+
+            toast.success('Class deleted');
+            setClasses((prev) => prev.filter((c) => c.id !== classToDelete.id));
+            setClassToDelete(null);
+            router.refresh();
+        } catch (error: any) {
+            toast.error(error.message || 'An error occurred.');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -331,6 +385,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                 mode="single"
                                                 selected={startDate}
                                                 onSelect={setStartDate}
+                                                disabled={editingClassId ? undefined : (date) => date < startOfToday}
                                                 initialFocus
                                             />
                                         </PopoverContent>
@@ -354,6 +409,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                 mode="single"
                                                 selected={endDate}
                                                 onSelect={setEndDate}
+                                                disabled={(date) => date < startOfToday || (startDate ? date <= startDate : false)}
                                                 initialFocus
                                             />
                                         </PopoverContent>
@@ -516,7 +572,12 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                         Edit details
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        variant="destructive"
+                                                        onClick={() => setClassToDelete(cls)}
+                                                    >
+                                                        Delete
+                                                    </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
@@ -533,6 +594,35 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     </TableBody>
                 </Table>
             </div>
+
+            <AlertDialog open={!!classToDelete} onOpenChange={(open) => { if (!open) setClassToDelete(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this class?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {classToDelete && (
+                                <>
+                                    You&apos;re about to permanently delete{' '}
+                                    <span className="font-medium text-foreground">
+                                        {classToDelete.title || (typeof classToDelete.subject === 'object' && classToDelete.subject ? classToDelete.subject.name : 'this class')}
+                                    </span>
+                                    . This action cannot be undone. Any enrolled students and pending invitations will lose access to this class.
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => { e.preventDefault(); handleDeleteClass(); }}
+                            disabled={isDeleting}
+                            className="bg-destructive text-white hover:bg-destructive/90"
+                        >
+                            {isDeleting ? 'Deleting...' : 'Delete Class'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

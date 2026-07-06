@@ -998,6 +998,10 @@ export interface AssessmentResult {
    * Optional tutor feedback on the result
    */
   feedback?: string | null;
+  /**
+   * True when the result contains short-answer/essay questions that still need to be graded by the tutor.
+   */
+  pendingManualGrading?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1709,6 +1713,7 @@ export interface AssessmentResultsSelect<T extends boolean = true> {
   submittedAt?: T;
   timeTakenSeconds?: T;
   feedback?: T;
+  pendingManualGrading?: T;
   updatedAt?: T;
   createdAt?: T;
 }

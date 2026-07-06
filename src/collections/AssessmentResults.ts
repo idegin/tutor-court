@@ -37,8 +37,16 @@ export const AssessmentResults: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      async ({ data, originalDoc, operation, req }) => {
-        if (operation === 'update' && originalDoc?.submittedAt && req.user?.accountType === 'student') {
+      async ({ data, originalDoc, operation, req, context }) => {
+        // Students may never edit their answers once submitted. Tutors (and the
+        // manual-grading endpoint, which passes `context.grading`) are allowed to
+        // update grading fields after submission.
+        if (
+          operation === 'update' &&
+          originalDoc?.submittedAt &&
+          req.user?.accountType === 'student' &&
+          !context?.grading
+        ) {
           throw new Error('Cannot modify an assessment result after submission.')
         }
         if (operation === 'create' && data) {
@@ -187,6 +195,16 @@ export const AssessmentResults: CollectionConfig = {
       type: 'textarea',
       admin: {
         description: 'Optional tutor feedback on the result',
+      },
+    },
+    {
+      name: 'pendingManualGrading',
+      type: 'checkbox',
+      defaultValue: false,
+      index: true,
+      admin: {
+        description:
+          'True when the result contains short-answer/essay questions that still need to be graded by the tutor.',
       },
     },
   ],

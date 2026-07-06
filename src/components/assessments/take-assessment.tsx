@@ -17,14 +17,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 export type TakeQuestion = {
   id: string
   questionText: string
-  type: 'single_choice' | 'multiple_choice' | 'true_false'
+  type: 'single_choice' | 'multiple_choice' | 'true_false' | 'short_answer' | 'essay'
   points: number
   options: { optionText: string }[]
 }
+
+const TEXT_TYPES = ['short_answer', 'essay']
 
 export type TakeAssessmentProps = {
   tutorAssessmentId: string
@@ -66,6 +70,7 @@ export function TakeAssessment(props: TakeAssessmentProps) {
   )
   const [startedAt, setStartedAt] = React.useState<string | null>(initialStartedAt || null)
   const [answers, setAnswers] = React.useState<Answers>({})
+  const [textAnswers, setTextAnswers] = React.useState<Record<string, string>>({})
   const [isStarting, setIsStarting] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [remainingSeconds, setRemainingSeconds] = React.useState<number | null>(null)
@@ -114,7 +119,8 @@ export function TakeAssessment(props: TakeAssessmentProps) {
           tutorAssessmentId,
           answers: questions.map((q) => ({
             questionId: q.id,
-            selectedOptionIndices: answers[q.id] || [],
+            selectedOptionIndices: TEXT_TYPES.includes(q.type) ? [] : answers[q.id] || [],
+            textAnswer: TEXT_TYPES.includes(q.type) ? (textAnswers[q.id] || '').trim() : undefined,
           })),
         }
         const res = await fetch('/api/assessments/results/submit', {
@@ -136,7 +142,7 @@ export function TakeAssessment(props: TakeAssessmentProps) {
         setIsSubmitting(false)
       }
     },
-    [answers, isSubmitting, questions, router, tutorAssessmentId],
+    [answers, textAnswers, isSubmitting, questions, router, tutorAssessmentId],
   )
 
   React.useEffect(() => {
@@ -158,7 +164,16 @@ export function TakeAssessment(props: TakeAssessmentProps) {
     })
   }
 
-  const unansweredCount = questions.filter((q) => !(answers[q.id] && answers[q.id].length > 0)).length
+  const setText = (questionId: string, value: string) => {
+    setTextAnswers((prev) => ({ ...prev, [questionId]: value }))
+  }
+
+  const isAnswered = (q: TakeQuestion) =>
+    TEXT_TYPES.includes(q.type)
+      ? Boolean((textAnswers[q.id] || '').trim())
+      : Boolean(answers[q.id] && answers[q.id].length > 0)
+
+  const unansweredCount = questions.filter((q) => !isAnswered(q)).length
 
   if (questions.length === 0) {
     return (
@@ -253,6 +268,7 @@ export function TakeAssessment(props: TakeAssessmentProps) {
 
       {questions.map((q, idx) => {
         const isMulti = q.type === 'multiple_choice'
+        const isText = TEXT_TYPES.includes(q.type)
         const selected = answers[q.id] || []
         return (
           <Card key={q.id}>
@@ -269,7 +285,29 @@ export function TakeAssessment(props: TakeAssessmentProps) {
                 </span>
               </div>
 
-              {isMulti ? (
+              {isText ? (
+                <div className="space-y-1.5">
+                  {q.type === 'short_answer' ? (
+                    <Input
+                      value={textAnswers[q.id] || ''}
+                      onChange={(e) => setText(q.id, e.target.value)}
+                      placeholder="Type your answer…"
+                      className="text-sm"
+                    />
+                  ) : (
+                    <Textarea
+                      value={textAnswers[q.id] || ''}
+                      onChange={(e) => setText(q.id, e.target.value)}
+                      placeholder="Write your response…"
+                      rows={6}
+                      className="text-sm resize-y"
+                    />
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    This answer will be graded by your tutor.
+                  </p>
+                </div>
+              ) : isMulti ? (
                 <div className="space-y-2">
                   {q.options.map((opt, oi) => {
                     const checked = selected.includes(oi)

@@ -13,3 +13,6 @@ Tutor Court is an online platform that connects students with tutors for online 
 # How to login
 
 Check the seed data to get the credentials of chukwuemeka and idegin media.
+
+# Resources
+There are md files in the docs/PRD that might be helpful

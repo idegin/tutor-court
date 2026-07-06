@@ -13,8 +13,8 @@ const _rawToken = process.env.ZEPTO_MAIL_API_KEY || ''
 const ZEPTO_TOKEN = _rawToken.startsWith('Zoho-enczapikey ')
   ? _rawToken
   : `Zoho-enczapikey ${_rawToken}`
-const FROM_ADDRESS = process.env.ZEPTO_MAIL_FROM || 'noreply@idegin.com'
-const FROM_NAME = 'TutorCourt'
+const FROM_ADDRESS = process.env.ZEPTO_MAIL_FROM || 'noreply@tutorcourt.com'
+const FROM_NAME = process.env.ZEPTO_MAIL_FROM_NAME || 'TutorCourt'
 
 if (!_rawToken) {
   console.warn('[EmailService] ⚠️  ZEPTO_MAIL_API_KEY is not set. Emails will not be sent.')

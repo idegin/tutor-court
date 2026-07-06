@@ -6,6 +6,7 @@ import * as migration_20260612_150356_seed_subject_categories from './20260612_1
 import * as migration_20260701_000000_live_session_unique_live_index from './20260701_000000_live_session_unique_live_index';
 import * as migration_20260703_131950_live_session_messages from './20260703_131950_live_session_messages';
 import * as migration_20260705_000000_live_session_whiteboard_writable from './20260705_000000_live_session_whiteboard_writable';
+import * as migration_20260706_000000_assessment_results_pending_manual_grading from './20260706_000000_assessment_results_pending_manual_grading';
 
 export const migrations = [
   {
@@ -47,5 +48,10 @@ export const migrations = [
     up: migration_20260705_000000_live_session_whiteboard_writable.up,
     down: migration_20260705_000000_live_session_whiteboard_writable.down,
     name: '20260705_000000_live_session_whiteboard_writable',
+  },
+  {
+    up: migration_20260706_000000_assessment_results_pending_manual_grading.up,
+    down: migration_20260706_000000_assessment_results_pending_manual_grading.down,
+    name: '20260706_000000_assessment_results_pending_manual_grading',
   },
 ];

@@ -14,29 +14,40 @@ type SubmittedAnswer = {
   textAnswer?: string
 }
 
-function gradeAnswer(question: any, answer: SubmittedAnswer): { isCorrect: boolean; pointsEarned: number } {
+const MANUAL_TYPES = ['short_answer', 'essay']
+
+function gradeAnswer(
+  question: any,
+  answer: SubmittedAnswer,
+): { isCorrect: boolean; pointsEarned: number; needsReview: boolean } {
   const opts: { isCorrect?: boolean }[] = Array.isArray(question?.options) ? question.options : []
   const points = Number(question?.points ?? 1)
   const selected = new Set((answer.selectedOptionIndices || []).filter((n) => Number.isInteger(n)))
 
+  // Short-answer/essay questions can't be auto-graded. Leave them at 0 points
+  // and flag them for manual review by the tutor rather than marking them wrong.
+  if (MANUAL_TYPES.includes(question?.type)) {
+    return { isCorrect: false, pointsEarned: 0, needsReview: true }
+  }
+
   if (question?.type === 'single_choice' || question?.type === 'true_false') {
-    if (selected.size !== 1) return { isCorrect: false, pointsEarned: 0 }
+    if (selected.size !== 1) return { isCorrect: false, pointsEarned: 0, needsReview: false }
     const idx = [...selected][0]
     const isCorrect = Boolean(opts[idx]?.isCorrect)
-    return { isCorrect, pointsEarned: isCorrect ? points : 0 }
+    return { isCorrect, pointsEarned: isCorrect ? points : 0, needsReview: false }
   }
 
   if (question?.type === 'multiple_choice') {
     const correctIndices = new Set(
       opts.map((o, i) => (o?.isCorrect ? i : -1)).filter((i) => i >= 0),
     )
-    if (correctIndices.size === 0) return { isCorrect: false, pointsEarned: 0 }
+    if (correctIndices.size === 0) return { isCorrect: false, pointsEarned: 0, needsReview: false }
     const sameSize = selected.size === correctIndices.size
     const allMatch = sameSize && [...selected].every((i) => correctIndices.has(i))
-    return { isCorrect: allMatch, pointsEarned: allMatch ? points : 0 }
+    return { isCorrect: allMatch, pointsEarned: allMatch ? points : 0, needsReview: false }
   }
 
-  return { isCorrect: false, pointsEarned: 0 }
+  return { isCorrect: false, pointsEarned: 0, needsReview: false }
 }
 
 /**
@@ -105,17 +116,21 @@ export async function POST(request: Request) {
 
   let totalPoints = 0
   let earnedPoints = 0
+  let pendingManualGrading = false
   const gradedAnswers = selectedQuestionIds.map((qid) => {
     const q = questionById.get(String(qid))
     const submitted = answers.find((a) => String(a.questionId) === String(qid)) || {
       questionId: qid,
       selectedOptionIndices: [],
     }
-    const { isCorrect, pointsEarned } = q
+    const { isCorrect, pointsEarned, needsReview } = q
       ? gradeAnswer(q, submitted)
-      : { isCorrect: false, pointsEarned: 0 }
+      : { isCorrect: false, pointsEarned: 0, needsReview: false }
+    // totalPoints always includes manual questions so the score can reach 100
+    // once the tutor has graded them.
     totalPoints += Number(q?.points ?? 0)
     earnedPoints += pointsEarned
+    if (needsReview) pendingManualGrading = true
     return {
       question: qid,
       selectedOptions: (submitted.selectedOptionIndices || []).map((idx) => ({ optionIndex: idx })),
@@ -125,6 +140,9 @@ export async function POST(request: Request) {
     }
   })
 
+  // Score/passed at submit time reflect only the auto-graded points out of the
+  // full total. When manual questions are pending, this is a provisional score
+  // that will be recomputed by the manual-grading endpoint.
   const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
   const passingScore =
     typeof ta.assessment === 'object' ? Number(ta.assessment?.passingScore ?? 70) : 70
@@ -156,6 +174,7 @@ export async function POST(request: Request) {
     earnedPoints,
     score,
     passed,
+    pendingManualGrading,
     submittedAt: submittedAt.toISOString(),
     timeTakenSeconds,
   }
@@ -197,7 +216,9 @@ export async function POST(request: Request) {
       recipientId: String(tutorId),
       type: 'assessment_completed',
       title: 'Assessment Completed',
-      message: `${studentName} completed "${assessmentTitle}" with a score of ${score}%.`,
+      message: pendingManualGrading
+        ? `${studentName} completed "${assessmentTitle}". Some answers need your grading.`
+        : `${studentName} completed "${assessmentTitle}" with a score of ${score}%.`,
       link: tutorLink,
       relatedCollection: 'tutor-assessments',
       relatedId: String(tutorAssessmentId),

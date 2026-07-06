@@ -34,6 +34,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Missing required class fields.' }, { status: 400 })
   }
 
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return NextResponse.json({ error: 'Invalid start or end date.' }, { status: 400 })
+  }
+  if (end <= start) {
+    return NextResponse.json({ error: 'End date must be after the start date.' }, { status: 400 })
+  }
+
   try {
     // Check if class belongs to this tutor
     const existingClass = await payload.findByID({
@@ -60,8 +69,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         description,
         classType: classType || 'one-on-one',
         maxStudents: classType === 'group' ? Number(maxStudents) : 1,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
         schedule: schedule.map((s: any) => ({
           day: s.day,
           startTime: s.startTime,
@@ -72,6 +81,73 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     })
 
     return NextResponse.json({ success: true, class: updatedClass })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const payload = await getPayload({ config })
+  const headers = await getHeaders()
+  const { user } = await payload.auth({ headers })
+  const { id } = await params
+
+  if (!user || user.accountType !== 'tutor') {
+    return NextResponse.json({ error: 'Only tutors can delete classes.' }, { status: 403 })
+  }
+
+  try {
+    // Check if class belongs to this tutor
+    const existingClass = await payload.findByID({
+      collection: 'classes',
+      id,
+      depth: 0,
+    })
+
+    if (!existingClass) {
+      return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
+    }
+
+    const tutorId = typeof existingClass.tutor === 'object' ? (existingClass.tutor as any).id : existingClass.tutor
+    if (tutorId !== user.id) {
+      return NextResponse.json({ error: 'Not authorized to delete this class.' }, { status: 403 })
+    }
+
+    // Guard against deleting a class with an active live session
+    const activeSessions = await payload.find({
+      collection: 'live-sessions',
+      where: {
+        and: [
+          { class: { equals: id } },
+          { status: { in: ['waiting', 'live'] } },
+        ],
+      },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    if (activeSessions.totalDocs > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete a class with an active live session.' },
+        { status: 409 },
+      )
+    }
+
+    // Cascade cleanup: remove pending invitations for this class
+    await payload.delete({
+      collection: 'class-invitations',
+      where: { class: { equals: id } },
+      overrideAccess: true,
+    })
+
+    await payload.delete({
+      collection: 'classes',
+      id,
+      overrideAccess: true,
+    })
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

@@ -42,7 +42,10 @@ import {
     HiOutlinePencil,
     HiOutlineClipboardDocumentList,
     HiOutlineAcademicCap,
+    HiOutlineLink,
+    HiOutlineTrash,
 } from 'react-icons/hi2';
+import { FaWhatsapp } from 'react-icons/fa6';
 import { CREDIT_RATE } from '@/lib/constants';
 
 function isCloseToSchedule(cls: any): boolean {
@@ -184,6 +187,48 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
     const [inviteeType, setInviteeType] = useState<'parent' | 'student'>('student');
     const [newInviteEmail, setNewInviteEmail] = useState('');
     const [isSubmittingInvite, setIsSubmittingInvite] = useState(false);
+    const [inviteLink, setInviteLink] = useState<string | null>(null);
+
+    // Remove student states
+    const [removeStudent, setRemoveStudent] = useState<any | null>(null);
+    const [isRemovingStudent, setIsRemovingStudent] = useState(false);
+
+    const buildInviteLink = (token: string) =>
+        `${typeof window !== 'undefined' ? window.location.origin : ''}/class-invite/${token}`;
+
+    const copyInviteLink = async (link: string, message = 'Invite link copied') => {
+        try {
+            await navigator.clipboard.writeText(link);
+            toast.success(message);
+        } catch {
+            toast.error('Could not copy link.');
+        }
+    };
+
+    const shareInviteOnWhatsApp = (link: string) => {
+        const text = encodeURIComponent('You are invited to join a class on TutorCourt: ' + link);
+        window.open(`https://wa.me/?text=${text}`, '_blank');
+    };
+
+    const handleRemoveStudent = async (studentId: string) => {
+        setIsRemovingStudent(true);
+        try {
+            const res = await fetch(`/api/tutor/classes/${cls.id}/students?studentId=${studentId}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to remove student.');
+            }
+            toast.success('Student removed from class');
+            setRemoveStudent(null);
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err.message || 'Error removing student.');
+        } finally {
+            setIsRemovingStudent(false);
+        }
+    };
 
     // Fetch tutor credits and check active session on mount
     useEffect(() => {
@@ -465,11 +510,15 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
             }
             if (data.added) {
                 toast.success('User added directly to the class!');
+                setNewInviteEmail('');
+                setIsInviteOpen(false);
             } else {
                 toast.success('Invitation email sent successfully!');
+                // Surface a shareable link as a fallback when email fails.
+                const link = data.inviteUrl || (data.invitation?.token ? buildInviteLink(data.invitation.token) : null);
+                setInviteLink(link);
+                setNewInviteEmail('');
             }
-            setNewInviteEmail('');
-            setIsInviteOpen(false);
             fetchPendingInvites();
             router.refresh();
         } catch (err: any) {
@@ -766,15 +815,27 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                         <p className="text-xs text-muted-foreground">{student.email}</p>
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col items-start md:items-end w-full md:w-auto">
-                                                    <span className="text-xs font-medium text-muted-foreground">Parent</span>
-                                                    <span className="text-xs text-foreground font-semibold mt-0.5">
-                                                        {student.parent && typeof student.parent === 'object'
-                                                            ? `${(student.parent as any).firstName} ${(student.parent as any).lastName}`
-                                                            : cls.parents && cls.parents.length > 0
-                                                                ? cls.parents.map((p: any) => `${p.firstName} ${p.lastName}`).join(', ')
-                                                                : 'None linked'}
-                                                    </span>
+                                                <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                                                    <div className="flex flex-col items-start md:items-end">
+                                                        <span className="text-xs font-medium text-muted-foreground">Parent</span>
+                                                        <span className="text-xs text-foreground font-semibold mt-0.5">
+                                                            {student.parent && typeof student.parent === 'object'
+                                                                ? `${(student.parent as any).firstName} ${(student.parent as any).lastName}`
+                                                                : cls.parents && cls.parents.length > 0
+                                                                    ? cls.parents.map((p: any) => `${p.firstName} ${p.lastName}`).join(', ')
+                                                                    : 'None linked'}
+                                                        </span>
+                                                    </div>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        title="Remove student from class"
+                                                        aria-label="Remove student from class"
+                                                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/5 cursor-pointer"
+                                                        onClick={() => setRemoveStudent(student)}
+                                                    >
+                                                        <HiOutlineTrash className="h-4 w-4" />
+                                                    </Button>
                                                 </div>
                                             </div>
                                         );
@@ -800,6 +861,16 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                     <span className="text-[10px] text-muted-foreground">Expires {format(new Date(inv.expiresAt), 'MMM d, yyyy')}</span>
                                                 </div>
                                                 <div className="flex gap-2">
+                                                    {inv.token && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 text-xs text-tutor-purple-600 hover:text-tutor-purple-700 cursor-pointer px-2 gap-1"
+                                                            onClick={() => copyInviteLink(buildInviteLink(inv.token), 'Invite link copied')}
+                                                        >
+                                                            <HiOutlineLink className="h-3.5 w-3.5" /> Copy link
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
@@ -1007,6 +1078,31 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                 onClick={() => resendConfirmId && handleResendInvite(resendConfirmId)}
                             >
                                 Resend
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Remove Student Confirmation */}
+                <AlertDialog open={!!removeStudent} onOpenChange={(open) => !open && setRemoveStudent(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Student</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Remove {removeStudent ? `${removeStudent.firstName} ${removeStudent.lastName}` : 'this student'} from this class? They will lose access to sessions and assessments for this class.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isRemovingStudent}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                className="bg-destructive text-white hover:bg-destructive/90"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (removeStudent) handleRemoveStudent(removeStudent.id);
+                                }}
+                                disabled={isRemovingStudent}
+                            >
+                                {isRemovingStudent ? 'Removing...' : 'Remove'}
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -1372,7 +1468,13 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
             </Dialog>
 
             {/* Invite Parent/Student Dialog */}
-            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+            <Dialog
+                open={isInviteOpen}
+                onOpenChange={(open) => {
+                    setIsInviteOpen(open);
+                    if (!open) setInviteLink(null);
+                }}
+            >
                 <DialogContent className="max-w-md bg-card border-border">
                     <form onSubmit={handleInviteUser}>
                         <DialogHeader>
@@ -1381,6 +1483,42 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                 Invite a parent or student to this class. If they are registered, they will be added directly. Otherwise, we will email them an invitation link.
                             </DialogDescription>
                         </DialogHeader>
+                        {inviteLink && (
+                            <div className="mt-4 rounded-lg border border-tutor-purple-200 bg-tutor-purple-50/40 p-3 space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                    <HiOutlineLink className="h-4 w-4 text-tutor-purple-600" />
+                                    <p className="text-xs font-semibold text-tutor-purple-900">Shareable invite link</p>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                    We emailed the invitation. If it doesn&apos;t arrive, share this link directly.
+                                </p>
+                                <Input
+                                    readOnly
+                                    value={inviteLink}
+                                    onFocus={(e) => e.currentTarget.select()}
+                                    className="border-input text-foreground text-xs h-9 bg-white"
+                                />
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => copyInviteLink(inviteLink, 'Link copied')}
+                                        className="flex-1 cursor-pointer border-input text-xs h-8 gap-1.5"
+                                    >
+                                        <HiOutlineLink className="h-3.5 w-3.5" /> Copy link
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => shareInviteOnWhatsApp(inviteLink)}
+                                        className="flex-1 cursor-pointer bg-[#25D366] hover:bg-[#1eb955] text-white text-xs h-8 gap-1.5"
+                                    >
+                                        <FaWhatsapp className="h-3.5 w-3.5" /> Share on WhatsApp
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Label className="text-foreground">Role / Account Type</Label>

@@ -13,6 +13,8 @@ import {
   HiBell,
   HiOutlineAcademicCap,
   HiAcademicCap,
+  HiOutlineChartBar,
+  HiChartBar,
 } from 'react-icons/hi2'
 
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout'
@@ -35,6 +37,12 @@ const parentNavItems = [
     href: '/dashboard/parent/classes',
     icon: HiOutlineAcademicCap,
     activeIcon: HiAcademicCap,
+  },
+  {
+    name: 'Progress',
+    href: '/dashboard/parent/progress',
+    icon: HiOutlineChartBar,
+    activeIcon: HiChartBar,
   },
   {
     name: 'Wallet',

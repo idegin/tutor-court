@@ -69,7 +69,7 @@ export default async function TutorAssessmentDetailPage({
                 </Link>
             </div>
 
-            <AssessmentDetail tutorAssessment={tutorAssessment} result={result as any} />
+            <AssessmentDetail tutorAssessment={tutorAssessment} result={result as any} canGrade />
         </div>
     )
 }

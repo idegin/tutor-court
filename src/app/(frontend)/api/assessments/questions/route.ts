@@ -50,11 +50,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'assessmentId, questionText, and type are required.' }, { status: 400 })
   }
 
-  // Require at least one correct option so the system can auto-grade
+  // Choice-based questions are auto-graded, so they must have a correct option.
+  // Short-answer/essay questions are graded manually and carry no options.
+  const CHOICE_TYPES = ['single_choice', 'multiple_choice', 'true_false']
   const opts: { optionText: string; isCorrect?: boolean }[] = options || []
-  const hasCorrect = opts.some(o => o.isCorrect === true)
-  if (!hasCorrect) {
-    return NextResponse.json({ error: 'At least one option must be marked as correct.' }, { status: 400 })
+  if (CHOICE_TYPES.includes(type)) {
+    const hasCorrect = opts.some(o => o.isCorrect === true)
+    if (!hasCorrect) {
+      return NextResponse.json({ error: 'At least one option must be marked as correct.' }, { status: 400 })
+    }
   }
 
   // Verify ownership

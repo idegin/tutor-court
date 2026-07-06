@@ -51,7 +51,10 @@ const Q_TYPES = [
   { value: 'single_choice', label: 'Single Choice' },
   { value: 'multiple_choice', label: 'Multiple Choice' },
   { value: 'true_false', label: 'True / False' },
+  { value: 'short_answer', label: 'Short Answer' },
+  { value: 'essay', label: 'Essay' },
 ]
+const TEXT_TYPES = ['short_answer', 'essay']
 const TYPE_COLORS: Record<string, string> = {
   quiz: 'bg-violet-50 text-violet-700 border-violet-100',
   flashcard: 'bg-sky-50 text-sky-700 border-sky-100',
@@ -61,6 +64,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 function isComplete(q: DraftShape): boolean {
   if (!q.questionText.trim()) return false
+  // Short-answer/essay questions are graded manually and need no options.
+  if (TEXT_TYPES.includes(q.type)) return true
   if (q.options.length < 2) return false
   if (q.options.some(o => !o.optionText.trim())) return false
   if (!q.options.some(o => o.isCorrect)) return false
@@ -91,14 +96,20 @@ function QuestionEditor({
   const setOpt = (i: number, patch: Partial<QuestionOption>) =>
     set({ options: q.options.map((o, ix) => ix === i ? { ...o, ...patch } : o) })
   const isSingle = q.type === 'single_choice' || q.type === 'true_false'
+  const isText = TEXT_TYPES.includes(q.type)
 
   const handleTypeChange = (v: string) => {
     if (v === 'true_false') {
       set({ type: v, options: [{ optionText: 'True', isCorrect: true }, { optionText: 'False', isCorrect: false }] })
+    } else if (TEXT_TYPES.includes(v)) {
+      // Text questions carry no options.
+      set({ type: v, options: [] })
     } else {
-      const resetOpts = q.type === 'true_false'
-        ? [{ optionText: '', isCorrect: false }, { optionText: '', isCorrect: false }]
-        : q.options
+      // Choice type: ensure there are at least two option rows to fill in.
+      const resetOpts =
+        q.options.length >= 2 && q.type !== 'true_false'
+          ? q.options
+          : [{ optionText: '', isCorrect: false }, { optionText: '', isCorrect: false }]
       set({ type: v, options: resetOpts })
     }
   }
@@ -120,7 +131,11 @@ function QuestionEditor({
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${complete
               ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
               : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-              {complete ? '\u2713 complete — ready to save' : '\u26a0 set a correct answer before saving'}
+              {complete
+                ? '\u2713 complete — ready to save'
+                : isText
+                  ? '\u26a0 add question text before saving'
+                  : '\u26a0 set a correct answer before saving'}
             </span>
           )}
         </div>
@@ -159,6 +174,12 @@ function QuestionEditor({
         </div>
       </div>
 
+      {isText ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          {q.type === 'essay' ? 'Essay' : 'Short answer'} questions have no options. Students type
+          their response and you grade it manually after submission.
+        </div>
+      ) : (
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">
           Options – {isSingle ? 'select ONE correct' : 'select ALL correct'}
@@ -194,6 +215,7 @@ function QuestionEditor({
           </Button>
         )}
       </div>
+      )}
     </div>
   )
 }

@@ -43,8 +43,8 @@ console.log('[payload.config] ZEPTO_MAIL_API_KEY set:', Boolean(process.env.ZEPT
 // through the ZeptoMail SDK instead of SMTP, matching how invite emails are sent.
 const zeptoEmailAdapter: PayloadEmailAdapter = () => ({
   name: 'zeptomail-sdk',
-  defaultFromAddress: process.env.ZEPTO_MAIL_FROM || 'noreply@idegin.com',
-  defaultFromName: 'TutorCourt',
+  defaultFromAddress: process.env.ZEPTO_MAIL_FROM || 'noreply@tutorcourt.com',
+  defaultFromName: process.env.ZEPTO_MAIL_FROM_NAME || 'TutorCourt',
   sendEmail: async (message: SendEmailOptions) => {
     const toField = message.to
     const toList = Array.isArray(toField) ? toField : toField ? [toField] : []

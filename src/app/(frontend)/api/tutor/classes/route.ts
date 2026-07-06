@@ -35,6 +35,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required class fields.' }, { status: 400 })
   }
 
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return NextResponse.json({ error: 'Invalid start or end date.' }, { status: 400 })
+  }
+  if (end <= start) {
+    return NextResponse.json({ error: 'End date must be after the start date.' }, { status: 400 })
+  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (start < today) {
+    return NextResponse.json({ error: 'Start date cannot be in the past.' }, { status: 400 })
+  }
+
   try {
     // Create class
     const newClass = await payload.create({
@@ -45,8 +59,8 @@ export async function POST(request: Request) {
         description,
         classType: classType || 'one-on-one',
         maxStudents: maxStudents ? Number(maxStudents) : 1,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
         schedule: schedule.map((s: any) => ({
           day: s.day,
           startTime: s.startTime,

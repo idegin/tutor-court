@@ -188,7 +188,9 @@ export async function POST(request: Request) {
         html: emailHtml,
       }).catch(err => console.error('[invite] Error sending email to invited user:', err))
 
-      return NextResponse.json({ success: true, added: false, invitation })
+      const inviteUrl = `${serverUrl}/class-invite/${invitation.token}`
+
+      return NextResponse.json({ success: true, added: false, invitation, inviteUrl })
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
