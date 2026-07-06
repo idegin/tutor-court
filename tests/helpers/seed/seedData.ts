@@ -362,6 +362,40 @@ export async function seedData() {
         })
       }
       console.log(`Seeded ${pendingBookers.length} pending booking(s) for main tutor (Idegin).`)
+
+      // An active class taught by the main tutor with the child + known student
+      // enrolled, so the calendar / classes / live-class features are testable.
+      const classStudents = [childStudentUser, knownStudentUser].filter(Boolean).map((u: any) => u.id)
+      const classStart = new Date()
+      classStart.setDate(classStart.getDate() - 3)
+      const classEnd = new Date()
+      classEnd.setDate(classEnd.getDate() + 42)
+      try {
+        await payload.create({
+          collection: 'classes',
+          data: {
+            tutor: mainTutorUser.id,
+            subject: mathSubjectId,
+            description: 'Weekly mathematics tutoring — algebra and geometry foundations.',
+            classType: 'group',
+            gradeLevel: 'grade_6',
+            timezone: 'Africa/Lagos',
+            maxStudents: 5,
+            startDate: classStart.toISOString(),
+            endDate: classEnd.toISOString(),
+            schedule: [
+              { day: 'monday', startTime: '09:00', endTime: '10:00' },
+              { day: 'wednesday', startTime: '14:00', endTime: '15:00' },
+            ],
+            students: classStudents,
+            ...(parentUser ? { parents: [parentUser.id] } : {}),
+            status: 'active',
+          } as any,
+        })
+        console.log('Seeded 1 active class for main tutor (Idegin) with enrolled students.')
+      } catch (e) {
+        console.log('Failed to seed test class:', (e as any)?.message)
+      }
     }
   }
 

@@ -49,8 +49,10 @@ export async function createNotification({
         message,
         isRead: false,
         link: link || null,
+        // relatedEntity.id is a TEXT field — keep it as a string. Only the
+        // `recipient` relationship FK needs numeric coercion.
         relatedEntity: relatedCollection && relatedId
-          ? { collection: relatedCollection, id: numericId(relatedId) }
+          ? { collection: relatedCollection, id: relatedId }
           : undefined,
       } as any,
     })
@@ -65,22 +67,22 @@ export async function createNotification({
  */
 export async function markAllNotificationsRead(recipientId: string): Promise<void> {
   const payload = await getPayload({ config })
+  const rid: string | number = /^\d+$/.test(recipientId) ? Number(recipientId) : recipientId
   const unread = await payload.find({
     collection: 'notifications',
     where: {
-      and: [
-        { recipient: { equals: recipientId } },
-        { isRead: { equals: false } },
-      ],
+      and: [{ recipient: { equals: rid } }, { isRead: { equals: false } }],
     },
     limit: 500,
     depth: 0,
+    overrideAccess: true,
   })
   for (const notif of unread.docs) {
     await payload.update({
       collection: 'notifications',
       id: notif.id,
       data: { isRead: true } as any,
+      overrideAccess: true,
     })
   }
 }

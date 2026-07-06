@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
 import { sendEmail } from '@/lib/email-service'
+import { createNotification } from '@/lib/notification-service'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -85,8 +86,21 @@ export async function POST(request: Request) {
     })
 
     const tutor = cls.tutor
+    const tutorId = typeof tutor === 'object' ? tutor?.id : tutor
     const tutorEmail = typeof tutor === 'object' ? tutor?.email : null
     const tutorName = typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
+
+    if (tutorId) {
+      await createNotification({
+        recipientId: String(tutorId),
+        type: 'student_added_to_class',
+        title: 'Student joined your class',
+        message: `${user.firstName} ${user.lastName} accepted your invitation to "${cls.title}".`,
+        link: `/dashboard/tutor/classes/${cls.id}`,
+        relatedCollection: 'classes',
+        relatedId: String(cls.id),
+      })
+    }
 
     if (tutorEmail) {
       const serverUrl = getEmailServerUrl(headers)

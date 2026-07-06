@@ -19,6 +19,30 @@ All confirmed code gaps below have been implemented, type-checked (`tsc --noEmit
 | **CLASS-047** | ✅ Done | Both POST (create) and PATCH (edit) validate valid dates and `endDate > startDate`; create also rejects past start dates. Calendar pickers disable past/invalid ranges + client-side guards. |
 | **NOTIF-165** | ✅ Done | Sender moved off the personal `idegin.com` address to `noreply@tutorcourt.com` (env-overridable via `ZEPTO_MAIL_FROM` / `ZEPTO_MAIL_FROM_NAME`) in both the email service and the Payload auth adapter. |
 
+### Phase 0 audit + fixes (2026-07-06)
+
+Audited the three "verify before you build" items. Two had real, user-facing bugs (now fixed and verified in Chrome); billing was found arithmetically correct.
+
+**Calendar (CLASS-041 / TDASH-026) — bugs fixed:**
+- 🔴 Student & parent calendars queried a `hasMany` relationship with `contains` (matches nothing on Postgres) → both calendars were always empty. Changed to `equals`. _This was the direct cause of "there is no calendar view."_
+- 🟠 Class `timezone` was ignored — event times used the server's local TZ via `setHours`. Now interpreted in the class timezone (new `src/lib/calendar-events.ts` with an Intl-based zoned-time helper).
+- 🟡 Status→colour mapping collapsed everything non-`active` to "pending" and still rendered `cancelled` classes. Now mapped explicitly and cancelled classes are excluded.
+- 🟡 No empty state — a blank grid read as "broken." Added an empty-state banner.
+- Refactored three near-duplicate `generateRecurringEvents` copies into one shared, role-aware helper.
+- ✅ Verified in Chrome: student & parent calendars now render the seeded class's Mon/Wed sessions at the correct times.
+
+**Notifications tab (NOTIF-171) — bugs fixed:**
+- 🔴 Root cause found & fixed earlier: `createNotification` passed stringified ids to a Postgres relationship and lacked `overrideAccess`, so **no in-app notification ever persisted**. (Then a follow-up regression where the fix over-coerced the `relatedEntity.id` text field was also fixed.)
+- 🟠 Coverage gap: parent/student invite-acceptance never notified the tutor (the `parent_accepted_invite` type existed but was never emitted). Added notifications on both accept routes.
+- 🟡 `notifications-list` optimistic UI ignored HTTP failures (`res.ok` unchecked) → UI desynced from the DB on 4xx/5xx. Fixed in fetch + mark-one + mark-all.
+- 🟡 `markAllNotificationsRead` (service) lacked `overrideAccess` and numeric coercion. Hardened.
+- 🟡 Tutor "Bookings" nav was `devOnly` (hidden in prod) while booking notifications deep-link to it. Made it visible (the feature is now real).
+- ✅ Verified in Chrome: the notifications tab now renders real notifications with unread badge, type tags, View links, and mark-read.
+
+**Per-pupil billing (SUB-142) — audited, no code change:**
+- The billing **arithmetic is correct**: per-pupil summation, incremental non-re-charging delta accounting, no negative/over-draft, idempotent across reconnects/`/end`. SUB-142's actual scope passes.
+- Known structural issues (documented for a dedicated hardening pass, not fixed here to avoid destabilising recently-hardened code): billing is driven only by the tutor's browser poll (no server-side tick → stops if the tab closes), the wallet write is a non-atomic read-modify-write, and a parent observing alongside their child is currently billed as a second pupil. These need a server-side billing scheduler + atomic wallet decrement and a product decision on parent-as-observer.
+
 ### Remaining follow-ups (ops / test-execution — not code gaps)
 - **Deploy step:** run `pnpm migrate` in each environment to add the `pending_manual_grading` column (already applied to local dev).
 - **NOTIF-165 ops:** verify `tutorcourt.com` as a sending domain in ZeptoMail so mail from `noreply@tutorcourt.com` actually delivers.

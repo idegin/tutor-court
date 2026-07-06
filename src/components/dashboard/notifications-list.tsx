@@ -57,6 +57,7 @@ export function NotificationsList({ userRole }: NotificationsListProps) {
         ? '/api/notifications?unreadOnly=true&limit=50'
         : '/api/notifications?limit=50'
       const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to load notifications')
       const data = await res.json()
       setNotifications(data?.docs || [])
     } catch {
@@ -72,11 +73,12 @@ export function NotificationsList({ userRole }: NotificationsListProps) {
 
   const markOne = async (id: string) => {
     try {
-      await fetch('/api/notifications/mark-read', {
+      const res = await fetch('/api/notifications/mark-read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notificationId: id }),
       })
+      if (!res.ok) throw new Error('Failed to mark as read')
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))
     } catch {
       toast.error('Failed to mark as read')
@@ -86,11 +88,12 @@ export function NotificationsList({ userRole }: NotificationsListProps) {
   const markAll = async () => {
     setIsMarkingAll(true)
     try {
-      await fetch('/api/notifications/mark-read', {
+      const res = await fetch('/api/notifications/mark-read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markAll: true }),
       })
+      if (!res.ok) throw new Error('Failed to mark all as read')
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
       toast.success('All notifications marked as read')
     } catch {

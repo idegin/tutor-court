@@ -74,7 +74,6 @@ const allTutorNavItems: (NavItem & { devOnly?: boolean })[] = [
         href: '/dashboard/tutor/bookings',
         icon: HiOutlineClipboardDocumentList,
         activeIcon: HiClipboardDocumentList,
-        devOnly: true,
     },
     {
         name: 'Wallet',

@@ -278,6 +278,17 @@ export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendar
             }
           `}
             </style>
+            {events.length === 0 && (
+                <div className="mb-4 flex items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    <HiOutlineCalendar className="h-5 w-5 shrink-0 opacity-70" />
+                    <span>
+                        No classes scheduled yet.{' '}
+                        {userRole === 'tutor'
+                            ? 'Classes you create with enrolled students will appear here.'
+                            : 'Once you are enrolled in a class, its sessions will show up here.'}
+                    </span>
+                </div>
+            )}
             <Calendar
                 localizer={localizer}
                 events={events}
