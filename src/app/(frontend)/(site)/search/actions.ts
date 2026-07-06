@@ -13,8 +13,15 @@ export async function fetchTutors(searchParams: any, page: number = 1) {
   }
 
   // Parse params
-  const minPrice = Number(getParam('minPrice')) || 0
-  const maxPrice = Number(getParam('maxPrice')) || 200000
+  // Only constrain by price when the user has explicitly set a bound. The slider's
+  // ceiling (50,000) is treated as "no upper bound", so it never sets `maxPrice`.
+  const minPriceRaw = getParam('minPrice')
+  const maxPriceRaw = getParam('maxPrice')
+  const hasMinPrice = minPriceRaw !== undefined && minPriceRaw !== ''
+  const hasMaxPrice = maxPriceRaw !== undefined && maxPriceRaw !== ''
+  const minPrice = Number(minPriceRaw) || 0
+  const maxPrice = Number(maxPriceRaw) || 0
+  const q = getParam('q')?.trim()
   const ratingList = Array.isArray(searchParams['rating'])
     ? searchParams['rating']
     : searchParams['rating']
@@ -31,11 +38,38 @@ export async function fetchTutors(searchParams: any, page: number = 1) {
   const subjectIds: string[] = subjects as string[]
 
   const where: any = {
-    and: [
-      { isApproved: { equals: true } },
-      { hourlyRate: { greater_than_equal: minPrice } },
-      { hourlyRate: { less_than_equal: maxPrice } },
-    ],
+    and: [{ isApproved: { equals: true } }],
+  }
+
+  // Only bound by price when explicitly requested, so tutors with a null hourlyRate
+  // (and those above the slider ceiling) are not silently excluded.
+  if (hasMinPrice) {
+    where.and.push({ hourlyRate: { greater_than_equal: minPrice } })
+  }
+  if (hasMaxPrice) {
+    where.and.push({ hourlyRate: { less_than_equal: maxPrice } })
+  }
+
+  // Free-text keyword search across headline/bio and the related user's name.
+  if (q) {
+    const { docs: userDocs } = await payload.find({
+      collection: 'users',
+      where: {
+        and: [
+          { accountType: { equals: 'tutor' } },
+          { or: [{ firstName: { like: q } }, { lastName: { like: q } }] },
+        ],
+      },
+      limit: 200,
+      depth: 0,
+    })
+    const userIds = userDocs.map((u: any) => u.id)
+
+    const orClause: any[] = [{ headline: { like: q } }, { bio: { like: q } }]
+    if (userIds.length > 0) {
+      orClause.push({ user: { in: userIds } })
+    }
+    where.and.push({ or: orClause })
   }
 
   if (ratingParam) {
@@ -62,7 +96,7 @@ export async function fetchTutors(searchParams: any, page: number = 1) {
     where.and.push({ yearsOfExperience: { greater_than_equal: experience } })
   }
 
-  const sort = getParam('sort') || '-createdAt'
+  const sort = getParam('sort') || '-rating'
 
   const {
     docs: tutorDocs,

@@ -438,6 +438,23 @@ export interface TutorProfile {
    */
   hourlyRate?: number | null;
   /**
+   * Recurring weekly time slots when this tutor is available.
+   */
+  weeklyAvailability?:
+    | {
+        day: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+        /**
+         * 24h HH:MM
+         */
+        startTime: string;
+        /**
+         * 24h HH:MM
+         */
+        endTime: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
    * Types of classes standardly offered by this tutor.
    */
   type?: ('one-on-one' | 'group')[] | null;
@@ -1364,6 +1381,14 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   usagePlan?: T;
   subjects?: T;
   hourlyRate?: T;
+  weeklyAvailability?:
+    | T
+    | {
+        day?: T;
+        startTime?: T;
+        endTime?: T;
+        id?: T;
+      };
   type?: T;
   minAge?: T;
   maxAge?: T;

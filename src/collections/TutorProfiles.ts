@@ -245,6 +245,41 @@ export const TutorProfiles: CollectionConfig = {
       },
     },
     {
+      name: 'weeklyAvailability',
+      type: 'array',
+      admin: {
+        description: 'Recurring weekly time slots when this tutor is available.',
+      },
+      fields: [
+        {
+          name: 'day',
+          type: 'select',
+          required: true,
+          options: [
+            { label: 'Monday', value: 'monday' },
+            { label: 'Tuesday', value: 'tuesday' },
+            { label: 'Wednesday', value: 'wednesday' },
+            { label: 'Thursday', value: 'thursday' },
+            { label: 'Friday', value: 'friday' },
+            { label: 'Saturday', value: 'saturday' },
+            { label: 'Sunday', value: 'sunday' },
+          ],
+        },
+        {
+          name: 'startTime',
+          type: 'text',
+          required: true,
+          admin: { description: '24h HH:MM' },
+        },
+        {
+          name: 'endTime',
+          type: 'text',
+          required: true,
+          admin: { description: '24h HH:MM' },
+        },
+      ],
+    },
+    {
       name: 'type',
       type: 'select',
       hasMany: true,

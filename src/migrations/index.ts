@@ -7,6 +7,7 @@ import * as migration_20260701_000000_live_session_unique_live_index from './202
 import * as migration_20260703_131950_live_session_messages from './20260703_131950_live_session_messages';
 import * as migration_20260705_000000_live_session_whiteboard_writable from './20260705_000000_live_session_whiteboard_writable';
 import * as migration_20260706_000000_assessment_results_pending_manual_grading from './20260706_000000_assessment_results_pending_manual_grading';
+import * as migration_20260706_000001_tutor_weekly_availability from './20260706_000001_tutor_weekly_availability';
 
 export const migrations = [
   {
@@ -53,5 +54,10 @@ export const migrations = [
     up: migration_20260706_000000_assessment_results_pending_manual_grading.up,
     down: migration_20260706_000000_assessment_results_pending_manual_grading.down,
     name: '20260706_000000_assessment_results_pending_manual_grading',
+  },
+  {
+    up: migration_20260706_000001_tutor_weekly_availability.up,
+    down: migration_20260706_000001_tutor_weekly_availability.down,
+    name: '20260706_000001_tutor_weekly_availability',
   },
 ];

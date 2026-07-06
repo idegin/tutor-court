@@ -24,9 +24,9 @@ export function SiteFooter() {
                     <div className="space-y-6">
                         <h4 className="text-xs font-bold tracking-widest text-foreground uppercase">PLATFORM</h4>
                         <ul className="space-y-4">
-                            <li><Link href="/find-tutors" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Find Tutors</Link></li>
+                            <li><Link href="/search" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Find Tutors</Link></li>
                             <li><Link href="/parents" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">For Parents</Link></li>
-                            <li><Link href="/tutors" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">For Tutors</Link></li>
+                            <li><Link href="/auth/register" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">For Tutors</Link></li>
                             <li><Link href="/resources" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Resources</Link></li>
                         </ul>
                     </div>

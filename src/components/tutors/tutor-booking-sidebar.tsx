@@ -21,8 +21,23 @@ export interface TutorBookingSidebarProps {
     isVerified?: boolean;
     hasActiveBooking?: boolean;
     currentUserRole?: string;
-    children?: { id: string; name: string }[];
+    availability?: { day?: string; startTime?: string; endTime?: string }[];
+    gradesTaught?: string[];
+    childrenOptions?: { id: string; name: string }[];
 }
+
+const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const to12h = (t?: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    if (isNaN(h)) return t;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    return `${hr}:${String(m || 0).padStart(2, '0')} ${period}`;
+};
+const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+const formatGrade = (g: string) =>
+    g === 'kindergarten' ? 'Kindergarten' : g === 'others' ? 'Others' : cap(g.replace('grade_', 'Grade '));
 
 export function TutorBookingSidebar({
     tutorId,
@@ -36,14 +51,24 @@ export function TutorBookingSidebar({
     isVerified = true,
     hasActiveBooking = false,
     currentUserRole,
-    children = []
+    availability = [],
+    gradesTaught = [],
+    childrenOptions = []
 }: TutorBookingSidebarProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { user } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
-    const bookingsHref = currentUserRole === 'parent' ? '/dashboard/parent/bookings' : '/dashboard/student/bookings';
+    const role = user?.accountType ?? currentUserRole;
+    // Only students and parents (or logged-out visitors, who are routed to sign
+    // up) can book. A tutor/admin viewing a profile shouldn't see a booking CTA.
+    const canBook = !user || role === 'student' || role === 'parent';
+    const bookingsHref = role === 'parent' ? '/dashboard/parent/bookings' : '/dashboard/student/bookings';
+
+    const sortedAvailability = [...availability]
+        .filter((a) => a?.day && a?.startTime && a?.endTime)
+        .sort((a, b) => DAY_ORDER.indexOf(a.day!) - DAY_ORDER.indexOf(b.day!));
 
     const handleBookClick = () => {
         if (!user) {
@@ -107,6 +132,42 @@ export function TutorBookingSidebar({
                             </div>
                         </div>
                     )}
+
+                    {gradesTaught.length > 0 && (
+                        <div className="mt-5">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Grade levels</p>
+                            <div className="flex flex-wrap gap-2">
+                                {gradesTaught.map((g) => (
+                                    <span
+                                        key={g}
+                                        className="px-2.5 py-1 rounded-full border-2 border-border bg-green-50 text-xs font-bold text-green-800"
+                                    >
+                                        {formatGrade(g)}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-5">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Weekly availability</p>
+                        {sortedAvailability.length > 0 ? (
+                            <ul className="flex flex-col gap-1.5">
+                                {sortedAvailability.map((slot, i) => (
+                                    <li key={i} className="flex items-center justify-between text-sm">
+                                        <span className="font-bold text-foreground">{cap(slot.day)}</span>
+                                        <span className="font-semibold text-muted-foreground">
+                                            {to12h(slot.startTime)} – {to12h(slot.endTime)}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm font-semibold text-muted-foreground">
+                                Flexible — message the tutor to arrange a time.
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <div>
@@ -119,13 +180,17 @@ export function TutorBookingSidebar({
                                     View Active Booking
                                 </Button>
                             </Link>
-                        ) : (
+                        ) : canBook ? (
                             <Button
                                 onClick={handleBookClick}
                                 className="w-full bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
                             >
                                 Book This Tutor
                             </Button>
+                        ) : (
+                            <p className="text-center text-sm font-semibold text-muted-foreground rounded-xl border-2 border-dashed border-border py-4 px-3">
+                                Only students and parents can book a tutor.
+                            </p>
                         )}
                     </div>
 
@@ -142,7 +207,7 @@ export function TutorBookingSidebar({
                 tutorName={tutorName}
                 pricePerHour={pricePerHour}
                 offeredSubjects={offeredSubjects}
-                children={children}
+                childrenOptions={childrenOptions}
                 onSuccess={() => window.location.reload()}
             />
         </>

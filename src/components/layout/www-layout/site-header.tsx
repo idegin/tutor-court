@@ -47,7 +47,7 @@ export function SiteHeader() {
                         </Link>
                         <Link
                             href="/search"
-                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/find-tutors')
+                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/search') || pathname?.startsWith('/tutors')
                                 ? 'border-b-2 border-foreground text-foreground'
                                 : 'text-muted-foreground hover:text-foreground'
                                 }`}

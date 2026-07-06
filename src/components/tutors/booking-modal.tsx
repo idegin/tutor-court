@@ -15,7 +15,7 @@ export interface BookingModalProps {
     tutorName: string;
     pricePerHour: number;
     offeredSubjects?: string[];
-    children?: { id: string; name: string }[];
+    childrenOptions?: { id: string; name: string }[];
     onSuccess?: () => void;
 }
 
@@ -40,12 +40,12 @@ const DAYS_OF_WEEK = [
     { label: 'Sun', value: 'sunday' },
 ];
 
-export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], children = [], onSuccess }: BookingModalProps) {
+export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], childrenOptions = [], onSuccess }: BookingModalProps) {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const needsChildSelection = children.length > 1;
-    const [selectedChildId, setSelectedChildId] = useState<string>(children.length === 1 ? children[0].id : '');
+    const needsChildSelection = childrenOptions.length > 1;
+    const [selectedChildId, setSelectedChildId] = useState<string>(childrenOptions.length === 1 ? childrenOptions[0].id : '');
 
     const [values, setValues] = useState<BookingValues>({
         subjects: [],
@@ -172,7 +172,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                                     </FieldLabel>
                                     <FieldContent>
                                         <div className="flex flex-wrap gap-2 mt-1">
-                                            {children.map((child) => {
+                                            {childrenOptions.map((child) => {
                                                 const isSelected = selectedChildId === child.id;
                                                 return (
                                                     <button

@@ -10,10 +10,14 @@ const updateTutorRating = async ({ doc, req }: { doc: any; req: any }) => {
   const tutorId = typeof doc.tutor === 'object' ? doc.tutor.id : doc.tutor
 
   try {
+    // Only approved reviews count toward the public rating / review count.
     const reviews = await req.payload.find({
       collection: 'reviews',
-      where: { tutor: { equals: tutorId } },
+      where: {
+        and: [{ tutor: { equals: tutorId } }, { isApproved: { equals: true } }],
+      },
       limit: 1000,
+      overrideAccess: true,
       req,
     })
 

@@ -184,6 +184,10 @@ export async function seedData() {
       const tutorSubjects = isMainTutor
         ? subjects.slice(0, 2) // Mathematics + Physics
         : faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
+      const availabilityDays = faker.helpers.arrayElements(
+        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
+        { min: 2, max: 4 },
+      )
       const profileData = {
         headline: isMainTutor ? 'Expert Maths & Physics Tutor' : faker.person.jobTitle(),
         bio: faker.lorem.paragraphs(5, '\n\n'),
@@ -192,6 +196,13 @@ export async function seedData() {
         type: faker.helpers.arrayElements(['one-on-one', 'group'], { min: 1, max: 2 }),
         subjects: tutorSubjects,
         hourlyRate: isMainTutor ? 5000 : faker.number.int({ min: 500, max: 50000 }),
+        weeklyAvailability: isMainTutor
+          ? [
+              { day: 'monday', startTime: '16:00', endTime: '19:00' },
+              { day: 'wednesday', startTime: '16:00', endTime: '19:00' },
+              { day: 'saturday', startTime: '10:00', endTime: '14:00' },
+            ]
+          : availabilityDays.map((day) => ({ day, startTime: '15:00', endTime: '18:00' })),
         isApproved: true,
         onboardingCompleted: true,
       }
@@ -455,6 +466,7 @@ export async function seedData() {
           rating,
           user: student.id,
           tutor: tutor.id,
+          isApproved: true,
         },
       })
     }

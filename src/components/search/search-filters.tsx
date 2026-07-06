@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HiOutlineAdjustmentsHorizontal } from 'react-icons/hi2';
+import { HiOutlineAdjustmentsHorizontal, HiOutlineMagnifyingGlass } from 'react-icons/hi2';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
 import { useOptions } from '@/components/providers/options-provider';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
@@ -16,6 +17,7 @@ export function SearchFilters() {
     const { subjects } = useOptions();
 
     // Map URL params to local state
+    const [query, setQuery] = useState<string>(searchParams.get('q') || '');
     const [selectedSubject, setSelectedSubject] = useState<string[]>(
         searchParams.getAll('subject')
     );
@@ -29,6 +31,7 @@ export function SearchFilters() {
 
     // Sync local state when searchParams change (like back navigation)
     useEffect(() => {
+        setQuery(searchParams.get('q') || '');
         setSelectedSubject(searchParams.getAll('subject'));
         setPriceRange([
             Number(searchParams.get('minPrice')) || 0,
@@ -50,6 +53,10 @@ export function SearchFilters() {
     // Debounce the router push when user applies changes (or click apply)
     const applyFilters = () => {
         const params = new URLSearchParams();
+
+        const trimmedQuery = query.trim();
+        if (trimmedQuery) params.set('q', trimmedQuery);
+
         selectedSubject.forEach(s => params.append('subject', s));
 
         if (priceRange[0] > 0) params.set('minPrice', priceRange[0].toString());
@@ -59,16 +66,24 @@ export function SearchFilters() {
         if (selectedClassType) params.set('type', selectedClassType);
         if (selectedRating > 0) params.set('rating', selectedRating.toString());
 
+        // Preserve the active sort, which is controlled outside of this panel.
+        const currentSort = searchParams.get('sort');
+        if (currentSort) params.set('sort', currentSort);
+
         router.push(`${pathname}?${params.toString()}`);
     };
 
     const clearFilters = () => {
+        setQuery('');
         setSelectedSubject([]);
         setPriceRange([0, 50000]);
         setSelectedMode('');
         setSelectedClassType('');
         setSelectedRating(0);
-        router.push(pathname);
+
+        // Keep sort selection when clearing filters.
+        const currentSort = searchParams.get('sort');
+        router.push(currentSort ? `${pathname}?sort=${currentSort}` : pathname);
     };
 
     return (
@@ -91,6 +106,26 @@ export function SearchFilters() {
                 </div>
 
                 <div className="space-y-10 pb-8">
+                    {/* Keyword Search */}
+                    <div>
+                        <h3 className="text-sm font-black text-muted-foreground tracking-widest uppercase mb-4">
+                            Search
+                        </h3>
+                        <div className="relative">
+                            <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+                            <Input
+                                type="search"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') applyFilters();
+                                }}
+                                placeholder="Name, subject or keyword..."
+                                className="pl-10"
+                            />
+                        </div>
+                    </div>
+
                     {/* Subject Filter */}
                     <div>
                         <h3 className="text-sm font-black text-muted-foreground tracking-widest uppercase mb-4">

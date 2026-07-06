@@ -65,8 +65,15 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
     };
 
     // Parse params
-    const minPrice = Number(getParam('minPrice')) || 0;
-    const maxPrice = Number(getParam('maxPrice')) || 200000;
+    // Only constrain by price when the user has explicitly set a bound. The slider's
+    // ceiling (50,000) is treated as "no upper bound", so it never sets `maxPrice`.
+    const minPriceRaw = getParam('minPrice');
+    const maxPriceRaw = getParam('maxPrice');
+    const hasMinPrice = minPriceRaw !== undefined && minPriceRaw !== '';
+    const hasMaxPrice = maxPriceRaw !== undefined && maxPriceRaw !== '';
+    const minPrice = Number(minPriceRaw) || 0;
+    const maxPrice = Number(maxPriceRaw) || 0;
+    const q = getParam('q')?.trim();
     const ratingList = Array.isArray(searchParams['rating']) ? searchParams['rating'] : searchParams['rating'] ? [searchParams['rating']] : [];
     const ratingParam = ratingList.length > 0 ? Math.min(...ratingList.map(Number)) : undefined;
 
@@ -81,10 +88,45 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
         and: [
             { isApproved: { equals: true } },
             // Removed usagePlan filter temporarily since seeded test data does not include usagePlan.
-            { hourlyRate: { greater_than_equal: minPrice } },
-            { hourlyRate: { less_than_equal: maxPrice } }
         ]
     };
+
+    // Only bound by price when explicitly requested, so tutors with a null hourlyRate
+    // (and those above the slider ceiling) are not silently excluded.
+    if (hasMinPrice) {
+        where.and.push({ hourlyRate: { greater_than_equal: minPrice } });
+    }
+    if (hasMaxPrice) {
+        where.and.push({ hourlyRate: { less_than_equal: maxPrice } });
+    }
+
+    // Free-text keyword search across headline/bio and the related user's name.
+    if (q) {
+        const { docs: userDocs } = await payload.find({
+            collection: 'users',
+            where: {
+                and: [
+                    { accountType: { equals: 'tutor' } },
+                    { or: [
+                        { firstName: { like: q } },
+                        { lastName: { like: q } },
+                    ] },
+                ],
+            },
+            limit: 200,
+            depth: 0,
+        });
+        const userIds = userDocs.map((u: any) => u.id);
+
+        const orClause: any[] = [
+            { headline: { like: q } },
+            { bio: { like: q } },
+        ];
+        if (userIds.length > 0) {
+            orClause.push({ user: { in: userIds } });
+        }
+        where.and.push({ or: orClause });
+    }
 
     if (ratingParam) {
         where.and.push({ rating: { greater_than_equal: ratingParam } });
@@ -111,7 +153,7 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
         where.and.push({ yearsOfExperience: { greater_than_equal: experience } });
     }
 
-    const sort = getParam('sort') || '-createdAt';
+    const sort = getParam('sort') || '-rating';
 
     // Fetch all approved tutors
     const { docs: tutorDocs, totalDocs, hasNextPage } = await payload.find({

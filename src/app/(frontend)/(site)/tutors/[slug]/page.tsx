@@ -24,11 +24,19 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
         depth: 2
     });
 
-    console.log(`[TutorDetails] Requested slug: ${decodedSlug} | isObjectId: ${isObjectId} | Docs found: ${docs.length}`);
-
     const tutorProfile = docs[0] as any;
 
     if (!tutorProfile) {
+        return notFound();
+    }
+
+    // Unapproved / mid-onboarding profiles are not publicly viewable —
+    // only the owning tutor or an admin may preview them.
+    const profileUserId = tutorProfile.user?.id ?? tutorProfile.user;
+    const isOwnerOrAdmin =
+        !!currentUser &&
+        (currentUser.accountType === 'admin' || String(profileUserId) === String(currentUser.id));
+    if (!tutorProfile.isApproved && !isOwnerOrAdmin) {
         return notFound();
     }
 
@@ -83,6 +91,7 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
         where: {
             and: [
                 { id: { not_equals: tutorProfile.id } },
+                { isApproved: { equals: true } },
                 {
                     subjects: {
                         in: tutorProfile.subjects?.map((s: any) => s?.id || s) || []
@@ -164,7 +173,9 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
     // Fetch Tutor Reviews
     const { docs: reviewDocs } = await payload.find({
         collection: 'reviews',
-        where: { tutor: { equals: tutorProfile.id } },
+        where: {
+            and: [{ tutor: { equals: tutorProfile.id } }, { isApproved: { equals: true } }],
+        },
         depth: 2,
         limit: 100,
         sort: '-createdAt'
@@ -207,7 +218,7 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                     <TutorReviews
                         reviews={reviews}
                         overallRating={rating}
-                        totalReviews={reviews.length}
+                        totalReviews={totalReviews}
                     />
                 </div>
 
@@ -220,9 +231,11 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                         pricePerHour={pricePerHour}
                         responseTimeText={responseTimeText}
                         offeredSubjects={tutorProfile.subjects?.map((s: any) => s.name) || []}
+                        availability={tutorProfile.weeklyAvailability || []}
+                        gradesTaught={tutorProfile.gradesTaught || []}
                         hasActiveBooking={hasActiveBooking}
                         currentUserRole={currentUser?.accountType}
-                        children={parentChildren}
+                        childrenOptions={parentChildren}
                     />
                 </div>
             </div>
