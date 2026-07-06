@@ -51,6 +51,7 @@ function RegisterContent() {
     const searchParams = useSearchParams()
     const emailParam = searchParams.get('email')
     const roleParam = searchParams.get('role')
+    const tokenParam = searchParams.get('token')
 
     const [step, setStep] = React.useState<1 | 2>(1)
     const [selectedTypeId, setSelectedTypeId] = React.useState<string | undefined>(undefined)
@@ -66,7 +67,12 @@ function RegisterContent() {
             setSelectedTypeId(roleParam)
             setStep(2)
         }
-    }, [emailParam, roleParam])
+        // Preserve the class invite so the user resumes acceptance after
+        // verifying their email and logging in (the register POST drops it).
+        if (tokenParam && typeof window !== 'undefined') {
+            localStorage.setItem('post_login_redirect', `/class-invite/${tokenParam}`)
+        }
+    }, [emailParam, roleParam, tokenParam])
 
     const mutation = useMutation({
         mutationFn: async (vars: any) => {

@@ -70,6 +70,7 @@ interface ResultRow {
   className: string | null
   score: number
   passed: boolean
+  pending?: boolean
   passingScore: number
   attempt: number
   submittedAt: string | null
@@ -427,24 +428,32 @@ export function ProgressDashboard({ role, students: initialStudents }: ProgressD
                             <TableCell className="text-sm">{row.studentName}</TableCell>
                           )}
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="w-9 text-sm font-medium">{row.score}%</span>
-                              <Progress
-                                value={row.score}
-                                className="h-1.5 w-[60px]"
-                                indicatorClassName={scoreColor(row.score)}
-                              />
-                            </div>
+                            {row.pending ? (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="w-9 text-sm font-medium">{row.score}%</span>
+                                <Progress
+                                  value={row.score}
+                                  className="h-1.5 w-[60px]"
+                                  indicatorClassName={scoreColor(row.score)}
+                                />
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={row.passed ? 'default' : 'destructive'}
-                              className={
-                                row.passed ? 'bg-emerald-500 text-white' : ''
-                              }
-                            >
-                              {row.passed ? 'Passed' : 'Failed'}
-                            </Badge>
+                            {row.pending ? (
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                                Pending review
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant={row.passed ? 'default' : 'destructive'}
+                                className={row.passed ? 'bg-emerald-500 text-white' : ''}
+                              >
+                                {row.passed ? 'Passed' : 'Failed'}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {row.submittedAt

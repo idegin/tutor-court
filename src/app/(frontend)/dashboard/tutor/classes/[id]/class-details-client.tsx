@@ -515,7 +515,9 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
             } else {
                 toast.success('Invitation email sent successfully!');
                 // Surface a shareable link as a fallback when email fails.
-                const link = data.inviteUrl || (data.invitation?.token ? buildInviteLink(data.invitation.token) : null);
+                // Prefer the browser origin (buildInviteLink) over the server-derived
+                // URL, which can diverge behind proxies/tunnels/custom ports.
+                const link = data.invitation?.token ? buildInviteLink(data.invitation.token) : data.inviteUrl || null;
                 setInviteLink(link);
                 setNewInviteEmail('');
             }

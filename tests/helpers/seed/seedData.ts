@@ -371,7 +371,7 @@ export async function seedData() {
       const classEnd = new Date()
       classEnd.setDate(classEnd.getDate() + 42)
       try {
-        await payload.create({
+        const testClass = await payload.create({
           collection: 'classes',
           data: {
             tutor: mainTutorUser.id,
@@ -393,8 +393,16 @@ export async function seedData() {
           } as any,
         })
         console.log('Seeded 1 active class for main tutor (Idegin) with enrolled students.')
+
+        // Assessment + results so the progress dashboard has real data to show.
+        await seedAssessments(payload, {
+          tutor: mainTutorUser,
+          subjectId: mathSubjectId,
+          classId: testClass.id,
+          students: [childStudentUser, knownStudentUser].filter(Boolean),
+        })
       } catch (e) {
-        console.log('Failed to seed test class:', (e as any)?.message)
+        console.log('Failed to seed test class/assessments:', (e as any)?.message)
       }
     }
   }
@@ -453,4 +461,107 @@ export async function seedData() {
   }
 
   console.log('Seeding complete!')
+}
+
+/**
+ * Seeds one published assessment (owned by the main tutor) with a few questions,
+ * then a completed tutor-assessment + graded results per student, so the
+ * progress dashboard renders real trend / score data.
+ */
+async function seedAssessments(
+  payload: any,
+  opts: { tutor: any; subjectId: any; classId: any; students: any[] },
+) {
+  const { tutor, subjectId, classId, students } = opts
+  if (!students.length) return
+
+  const assessment = await payload.create({
+    collection: 'assessments',
+    data: {
+      title: 'Algebra Basics Quiz',
+      description: 'A quick check on algebra fundamentals.',
+      subject: subjectId,
+      tutor: tutor.id,
+      type: 'quiz',
+      gradeLevel: 'grade_6',
+      passingScore: 70,
+      isPublished: true,
+    } as any,
+  })
+
+  const qDefs: Array<{ q: string; opts: Array<[string, boolean]> }> = [
+    { q: 'What is 5 + 7?', opts: [['10', false], ['12', true], ['13', false]] },
+    { q: 'Solve for x: x + 3 = 10', opts: [['7', true], ['13', false], ['3', false]] },
+    { q: 'What is 6 × 4?', opts: [['24', true], ['18', false], ['10', false]] },
+  ]
+  const questions: any[] = []
+  for (let i = 0; i < qDefs.length; i++) {
+    const created = await payload.create({
+      collection: 'assessment-questions',
+      data: {
+        assessment: assessment.id,
+        questionText: qDefs[i].q,
+        type: 'single_choice',
+        options: qDefs[i].opts.map(([optionText, isCorrect]) => ({ optionText, isCorrect })),
+        points: 2,
+        order: i,
+      } as any,
+    })
+    questions.push(created)
+  }
+  const totalPoints = questions.reduce((a, q) => a + (q.points || 2), 0)
+
+  let resultCount = 0
+  for (const s of students) {
+    const ta = await payload.create({
+      collection: 'tutor-assessments',
+      data: {
+        assessment: assessment.id,
+        tutor: tutor.id,
+        student: s.id,
+        class: classId,
+        selectedQuestions: questions.map((q) => q.id),
+        status: 'completed',
+        maxAttempts: 3,
+      } as any,
+    })
+
+    // Two attempts with improving scores so the trend line has a slope.
+    const attempts = [2, 3] // number of correct answers (out of 3)
+    for (let a = 0; a < attempts.length; a++) {
+      const correctCount = attempts[a]
+      const answers = questions.map((q, qi) => {
+        const correctIdx = (q.options || []).findIndex((o: any) => o.isCorrect)
+        const isCorrect = qi < correctCount
+        const chosen = isCorrect ? correctIdx : (correctIdx + 1) % (q.options?.length || 1)
+        return {
+          question: q.id,
+          selectedOptions: [{ optionIndex: chosen }],
+          isCorrect,
+          pointsEarned: isCorrect ? q.points || 2 : 0,
+        }
+      })
+      const earned = answers.reduce((x, ans) => x + ans.pointsEarned, 0)
+      const score = Math.round((earned / totalPoints) * 100)
+      const submittedAt = new Date()
+      submittedAt.setDate(submittedAt.getDate() - (attempts.length - a) * 3)
+      await payload.create({
+        collection: 'assessment-results',
+        data: {
+          tutorAssessment: ta.id,
+          student: s.id,
+          tutor: tutor.id,
+          answers,
+          totalPoints,
+          earnedPoints: earned,
+          score,
+          passed: score >= 70,
+          submittedAt: submittedAt.toISOString(),
+          timeTakenSeconds: 300 + a * 60,
+        } as any,
+      })
+      resultCount++
+    }
+  }
+  console.log(`Seeded assessment + ${resultCount} results for the progress dashboard.`)
 }

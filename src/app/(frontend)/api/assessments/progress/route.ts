@@ -145,6 +145,7 @@ export async function GET(request: Request) {
         className: cls?.title || null,
         score: Math.round(doc.score || 0),
         passed: Boolean(doc.passed),
+        pending: Boolean(doc.pendingManualGrading),
         passingScore:
           assessment && typeof assessment.passingScore === 'number' ? assessment.passingScore : 70,
         attempt: doc.attempt || 1,
@@ -153,26 +154,33 @@ export async function GET(request: Request) {
       }
     })
 
-    // Summary.
-    const totalAssessments = rows.length
-    const scoreSum = rows.reduce((acc, r) => acc + r.score, 0)
-    const averageScore = Math.round(scoreSum / totalAssessments)
-    const passedCount = rows.filter((r) => r.passed).length
-    const passRate = Math.round((passedCount / totalAssessments) * 100)
-    const bestScore = rows.reduce((max, r) => Math.max(max, r.score), 0)
-    // rows are already sorted oldest→newest by submittedAt.
-    const latestScore = rows[rows.length - 1].score
+    // Results still awaiting the tutor's manual grading carry a provisional
+    // (usually failing) score — exclude them from all aggregates so they don't
+    // drag down averages / pass rate / the trend. They still appear in the
+    // table, flagged as pending.
+    const graded = rows.filter((r) => !r.pending)
 
-    // Trend (oldest → newest).
-    const trend = rows.map((r) => ({
+    // Summary (graded results only).
+    const gradedCount = graded.length
+    const totalAssessments = gradedCount
+    const scoreSum = graded.reduce((acc, r) => acc + r.score, 0)
+    const averageScore = gradedCount > 0 ? Math.round(scoreSum / gradedCount) : 0
+    const passedCount = graded.filter((r) => r.passed).length
+    const passRate = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 100) : 0
+    const bestScore = graded.reduce((max, r) => Math.max(max, r.score), 0)
+    // graded is already sorted oldest→newest by submittedAt.
+    const latestScore = gradedCount > 0 ? graded[gradedCount - 1].score : 0
+
+    // Trend (oldest → newest, graded only).
+    const trend = graded.map((r) => ({
       date: r.submittedAt,
       score: r.score,
       title: r.title,
     }))
 
-    // Per-subject breakdown.
+    // Per-subject breakdown (graded only).
     const subjectAgg = new Map<string, { total: number; count: number }>()
-    for (const r of rows) {
+    for (const r of graded) {
       const cur = subjectAgg.get(r.subject) || { total: 0, count: 0 }
       cur.total += r.score
       cur.count += 1

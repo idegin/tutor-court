@@ -22,11 +22,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { classId, email, inviteeType } = body
+  const { classId: rawClassId, email, inviteeType } = body
 
-  if (!classId || !email || !inviteeType) {
+  if (!rawClassId || !email || !inviteeType) {
     return NextResponse.json({ error: 'Missing classId, email, or inviteeType.' }, { status: 400 })
   }
+
+  // Coerce a numeric-string id to a number — the Postgres relationship write
+  // rejects a stringified id when creating the class-invitation.
+  const classId =
+    typeof rawClassId === 'string' && /^\d+$/.test(rawClassId) ? Number(rawClassId) : rawClassId
 
   const trimmedEmail = email.trim().toLowerCase()
   if (!['parent', 'student'].includes(inviteeType)) {

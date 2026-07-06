@@ -158,30 +158,20 @@ export function ClassInviteClient({
     
     setIsAccepting(true)
     try {
-      // 1. Accept the invitation (adds parent to class, marks invite accepted)
+      // Accept + enroll in a single atomic request — the invitation is only
+      // marked accepted once the child is successfully enrolled, so a capacity
+      // failure leaves it retryable rather than consumed.
       const res = await fetch('/api/parent/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invitationId }),
+        body: JSON.stringify({ invitationId, studentId: selectedStudentId }),
       })
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Failed to accept invitation.')
       }
 
-      // 2. Enroll the student in the class using the unified enrollment endpoint
-      const enrollRes = await fetch('/api/parent/classes/enroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classId, studentId: selectedStudentId }),
-      })
-
-      if (!enrollRes.ok) {
-        const enrollData = await enrollRes.json().catch(() => ({}))
-        throw new Error(enrollData.error || 'Invitation accepted, but failed to enroll student. Please check class capacity or try again.')
-      }
-      
       toast.success('Invitation accepted! Child enrolled successfully.')
       router.push('/dashboard/parent')
       router.refresh()
@@ -376,6 +366,9 @@ export function ClassInviteClient({
                     </p>
                   </div>
                 </div>
+                <Button onClick={handleLogout} variant="destructive" className="w-full font-semibold cursor-pointer bg-red-600 hover:bg-red-700 text-white border-0">
+                  Log Out & Switch Accounts
+                </Button>
               </div>
             ) : inviteeType === 'student' ? (
               /* Scenario 4: Student User logged in correctly */

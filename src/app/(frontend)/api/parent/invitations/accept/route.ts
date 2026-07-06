@@ -38,6 +38,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invitation not found or not pending.' }, { status: 404 })
     }
 
+    if (invitation.inviteeType && invitation.inviteeType !== 'parent') {
+      return NextResponse.json({ error: 'This invitation is not for a parent account.' }, { status: 400 })
+    }
+
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+      await payload
+        .update({
+          collection: 'class-invitations',
+          id: invitationId,
+          data: { status: 'expired' } as any,
+          overrideAccess: true,
+        })
+        .catch(() => {})
+      return NextResponse.json({ error: 'This invitation has expired.' }, { status: 410 })
+    }
+
     if (invitation.inviteeEmail.toLowerCase() !== user.email.toLowerCase()) {
       return NextResponse.json({ error: 'Not authorized to accept this invitation.' }, { status: 403 })
     }
@@ -57,18 +73,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Class not found.' }, { status: 404 })
     }
 
-    // Add parent to class
-    const currentParents = (cls.parents || []).map((p: any) => typeof p === 'object' ? p.id : p)
-    if (!currentParents.includes(user.id)) {
-      currentParents.push(user.id)
+    // Optionally enroll a child in the same request so accept + enroll are
+    // atomic — the invitation is only marked accepted after enrollment succeeds
+    // (so a capacity failure leaves it retryable rather than consumed).
+    const studentId = body.studentId
+    const currentParents = (cls.parents || []).map((p: any) => (typeof p === 'object' ? p.id : p))
+    if (!currentParents.includes(user.id)) currentParents.push(user.id)
+
+    const classUpdate: any = { parents: currentParents }
+
+    if (studentId) {
+      const studentDoc = await payload.findByID({ collection: 'students', id: studentId, depth: 0 })
+      if (!studentDoc) {
+        return NextResponse.json({ error: 'Student profile not found.' }, { status: 404 })
+      }
+      const ownerId =
+        typeof studentDoc.parent === 'object' ? (studentDoc.parent as any).id : studentDoc.parent
+      if (ownerId !== user.id) {
+        return NextResponse.json({ error: 'You are not authorized to enroll this student.' }, { status: 403 })
+      }
+      const studentUserId =
+        typeof studentDoc.user === 'object' ? (studentDoc.user as any).id : studentDoc.user
+      if (!studentUserId) {
+        return NextResponse.json({ error: 'Student profile is missing a linked user account.' }, { status: 400 })
+      }
+      const currentStudents = (cls.students || []).map((s: any) => (typeof s === 'object' ? s.id : s))
+      if (!currentStudents.includes(studentUserId)) {
+        if (cls.classType === 'one-on-one' && currentStudents.length >= 1) {
+          return NextResponse.json({ error: 'One-on-One classes can only have 1 student.' }, { status: 400 })
+        }
+        if (cls.maxStudents && cls.maxStudents > 0 && currentStudents.length >= cls.maxStudents) {
+          return NextResponse.json(
+            { error: `Class capacity limit reached. Maximum is ${cls.maxStudents} student(s).` },
+            { status: 400 },
+          )
+        }
+        currentStudents.push(studentUserId)
+      }
+      classUpdate.students = currentStudents
     }
 
     await payload.update({
       collection: 'classes',
       id: classId,
-      data: {
-        parents: currentParents,
-      } as any,
+      data: classUpdate,
       overrideAccess: true,
     })
 

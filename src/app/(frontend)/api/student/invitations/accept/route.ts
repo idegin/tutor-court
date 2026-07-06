@@ -38,6 +38,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invitation not found or not pending.' }, { status: 404 })
     }
 
+    if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+      await payload
+        .update({
+          collection: 'class-invitations',
+          id: invitationId,
+          data: { status: 'expired' } as any,
+          overrideAccess: true,
+        })
+        .catch(() => {})
+      return NextResponse.json({ error: 'This invitation has expired.' }, { status: 410 })
+    }
+
     if (invitation.inviteeEmail.toLowerCase() !== user.email.toLowerCase()) {
       return NextResponse.json({ error: 'Not authorized to accept this invitation.' }, { status: 403 })
     }
