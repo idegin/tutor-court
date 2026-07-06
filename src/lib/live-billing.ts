@@ -51,6 +51,8 @@ export interface ChargeResult {
   newBalance: number
   /** Running total of credits charged for the whole session. */
   consumed: number
+  /** True when the class is escrow-funded (marketplace) → NOT billed via credits. */
+  skipped?: boolean
 }
 
 /**
@@ -68,6 +70,17 @@ export async function chargeSessionDelta(
 ): Promise<ChargeResult> {
   const prevConsumed = Number(session.coinsConsumed) || 0
   const currentBalance = Math.max(0, Number(wallet.creditBalance) || 0)
+
+  // Marketplace (booking-backed) classes are paid up-front via escrow, so they
+  // are NOT billed per-minute against the tutor's live-class credits.
+  const classId = typeof session.class === 'object' ? session.class?.id : session.class
+  if (classId) {
+    const cls = await payload.findByID({ collection: 'classes', id: classId, depth: 0 }).catch(() => null)
+    if (cls?.booking) {
+      return { charged: 0, newBalance: currentBalance, consumed: prevConsumed, skipped: true }
+    }
+  }
+
   const delta = Math.max(0, Math.floor(costSoFar) - prevConsumed)
 
   if (delta <= 0 || currentBalance <= 0) {

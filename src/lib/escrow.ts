@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { materializeClassFromBooking } from './booking-to-class'
 
 /**
  * Booking escrow.
@@ -208,6 +209,11 @@ export async function holdBookingEscrow({
     })
 
     await payload.db.commitTransaction(transactionID)
+
+    // Stage 5: once funded, materialize the schedulable class (post-commit, so a
+    // class-gen hiccup never rolls back the payment).
+    await materializeClassFromBooking(payload, bookingId).catch(() => {})
+
     return { ok: true, held: true }
   } catch (e: any) {
     await payload.db.rollbackTransaction(transactionID)

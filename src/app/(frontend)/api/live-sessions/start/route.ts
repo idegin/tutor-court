@@ -83,7 +83,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'You are not the tutor of this class.' }, { status: 403 })
     }
 
-    // Check tutor credit balance
+    // A marketplace (booking-backed) class is paid up-front via escrow, so the
+    // tutor does NOT need live-class credits to start it.
+    const isBookingBacked = Boolean((cls as any).booking)
+
+    // Check tutor credit balance (SaaS classes only).
     const wallets = await payload.find({
       collection: 'wallets',
       where: { user: { equals: user.id } },
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
     })
 
     const wallet = wallets.docs[0]
-    if (!wallet || (wallet.creditBalance || 0) < CREDIT_RATE.minimumClassCredits) {
+    if (!isBookingBacked && (!wallet || (wallet.creditBalance || 0) < CREDIT_RATE.minimumClassCredits)) {
       return NextResponse.json(
         {
           error: `You need at least ${CREDIT_RATE.minimumClassCredits} credits (1 hour) to start a live class.`,

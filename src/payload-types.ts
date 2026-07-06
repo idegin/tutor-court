@@ -548,6 +548,10 @@ export interface Class {
   parents?: (number | User)[] | null;
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
   whiteboard?: (number | null) | Whiteboard;
+  /**
+   * The marketplace booking this class was generated from (empty for tutor-created SaaS classes).
+   */
+  booking?: (number | null) | Booking;
   updatedAt: string;
   createdAt: string;
 }
@@ -615,6 +619,10 @@ export interface Booking {
    * Linked transaction that paid for this booking.
    */
   transaction?: (number | null) | Transaction;
+  /**
+   * The class materialized from this booking once it is paid (held).
+   */
+  class?: (number | null) | Class;
   /**
    * Start date of the engagement
    */
@@ -1479,6 +1487,7 @@ export interface BookingsSelect<T extends boolean = true> {
   status?: T;
   paymentStatus?: T;
   transaction?: T;
+  class?: T;
   date?: T;
   endDate?: T;
   hoursPerDay?: T;
@@ -1534,6 +1543,7 @@ export interface ClassesSelect<T extends boolean = true> {
   parents?: T;
   status?: T;
   whiteboard?: T;
+  booking?: T;
   updatedAt?: T;
   createdAt?: T;
 }

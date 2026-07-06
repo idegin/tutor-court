@@ -202,6 +202,17 @@ export const Classes: CollectionConfig = {
       relationTo: 'whiteboards',
       hasMany: false,
     },
+    {
+      name: 'booking',
+      type: 'relationship',
+      relationTo: 'bookings',
+      hasMany: false,
+      index: true,
+      admin: {
+        description:
+          'The marketplace booking this class was generated from (empty for tutor-created SaaS classes).',
+      },
+    },
   ],
   timestamps: true,
 }

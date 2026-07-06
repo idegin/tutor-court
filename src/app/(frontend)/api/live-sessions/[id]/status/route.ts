@@ -347,15 +347,19 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     // live session accrues charges.
     let newBalance = Math.max(0, (wallet.creditBalance as number) || 0)
     let consumed = Number(session.coinsConsumed) || 0
+    let escrowFunded = false
     if (session.status === 'live') {
       const charge = await chargeSessionDelta(payload, session, costSoFar, wallet)
       newBalance = charge.newBalance
       consumed = charge.consumed
+      escrowFunded = Boolean(charge.skipped)
     }
     const remainingCredits = Math.max(0, newBalance)
 
-    // Check if the tutor is out of credit. If so, automatically end the session!
-    if (remainingCredits <= 0 && session.status === 'live') {
+    // Check if the tutor is out of credit. If so, automatically end the session —
+    // BUT a marketplace (escrow-funded) class is never billed via credits, so it
+    // must not auto-end on a zero credit balance.
+    if (!escrowFunded && remainingCredits <= 0 && session.status === 'live') {
       const endedIso = new Date(endedTime).toISOString()
 
       // Atomically claim the live -> ended transition so two overlapping polls

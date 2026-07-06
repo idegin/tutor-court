@@ -101,6 +101,16 @@ export const Bookings: CollectionConfig = {
       },
     },
     {
+      name: 'class',
+      type: 'relationship',
+      relationTo: 'classes',
+      hasMany: false,
+      index: true,
+      admin: {
+        description: 'The class materialized from this booking once it is paid (held).',
+      },
+    },
+    {
       name: 'date',
       type: 'date',
       required: true,
