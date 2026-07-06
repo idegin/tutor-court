@@ -60,6 +60,28 @@ export async function POST(request: Request) {
       )
     }
 
+    // Lost-update guard: the lockedBalance write below is a read-modify-write, so
+    // two concurrent requests could each under-reserve. Independently bound the
+    // SUM of all still-pending withdrawal requests (plus this one) to the real
+    // balance — so a tutor can never have outstanding requests exceeding what the
+    // wallet actually holds, regardless of the reservation write race.
+    const pending = await payload.find({
+      collection: 'payout-requests',
+      where: { and: [{ tutor: { equals: user.id } }, { status: { equals: 'requested' } }] },
+      limit: 1000,
+      depth: 0,
+      overrideAccess: true,
+      req,
+    })
+    const pendingSum = pending.docs.reduce((s: number, d: any) => s + (Number(d.amount) || 0), 0)
+    if (pendingSum + amount > balance) {
+      if (transactionID) await payload.db.rollbackTransaction(transactionID)
+      return NextResponse.json(
+        { error: 'This exceeds your available balance once pending withdrawals are counted.' },
+        { status: 400 },
+      )
+    }
+
     // Reserve the funds so they can't be double-withdrawn while pending.
     await payload.update({
       collection: 'wallets',

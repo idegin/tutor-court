@@ -154,6 +154,8 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
     });
 
     const runAction = async (id: string, action: "accept" | "decline" | "complete") => {
+        // Re-entry guard: ignore a second click while a request is in flight.
+        if (loadingId) return;
         setLoadingId(id);
         try {
             const res = await fetch(`/api/private/bookings/${id}`, {
@@ -405,6 +407,7 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                                 <AlertDialogCancel>Not yet</AlertDialogCancel>
                                                                 <AlertDialogAction
                                                                     className="bg-blue-600 text-white hover:bg-blue-700"
+                                                                    disabled={loadingId === booking.id}
                                                                     onClick={() => runAction(booking.id, "complete")}
                                                                 >
                                                                     Complete & release payout

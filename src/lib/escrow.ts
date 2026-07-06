@@ -475,6 +475,15 @@ export async function payoutSessionEscrow({
     const isLastPlanned = relRes.docs.length + 1 >= totalSessions
     let share = isLastPlanned ? remaining : Math.min(Math.round(price / totalSessions), remaining)
     share = Math.min(share, remaining)
+    // Hard ceiling: never release more than what is ACTUALLY still locked on the
+    // booker's wallet. Even if a concurrent completion/session-payout raced past
+    // the `alreadyReleased` read above, this clamp guarantees we can't create
+    // money by unlocking funds that were already released.
+    const bLockedNow = Number(
+      (await payload.findByID({ collection: 'wallets', id: bookerWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null))
+        ?.lockedBalance ?? bookerWallet.lockedBalance,
+    ) || 0
+    share = Math.min(share, bLockedNow)
     const willComplete = alreadyReleased + share >= price
 
     if (share <= 0) {
@@ -608,7 +617,13 @@ export async function releaseRemainingEscrowToTutor({
       req,
     })
     const alreadyReleased = relRes.docs.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0)
-    const remaining = Math.max(0, price - alreadyReleased)
+    // Hard ceiling: never release more than what's actually still locked, so a
+    // concurrent per-session payout that raced past this read can't be
+    // double-counted into money creation.
+    const bFresh: any = await payload.findByID({ collection: 'wallets', id: bookerWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
+    const bBal = Number(bFresh?.balance ?? bookerWallet.balance) || 0
+    const bLocked = Number(bFresh?.lockedBalance ?? bookerWallet.lockedBalance) || 0
+    const remaining = Math.min(Math.max(0, price - alreadyReleased), bLocked)
 
     if (remaining > 0) {
       await payload.create({
@@ -629,9 +644,6 @@ export async function releaseRemainingEscrowToTutor({
         req,
         overrideAccess: true,
       })
-      const bFresh: any = await payload.findByID({ collection: 'wallets', id: bookerWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
-      const bBal = Number(bFresh?.balance ?? bookerWallet.balance) || 0
-      const bLocked = Number(bFresh?.lockedBalance ?? bookerWallet.lockedBalance) || 0
       await payload.update({ collection: 'wallets', id: bookerWallet.id, data: { balance: Math.max(0, bBal - remaining), lockedBalance: Math.max(0, bLocked - remaining) } as any, req, overrideAccess: true })
       const tFresh: any = await payload.findByID({ collection: 'wallets', id: tutorWallet.id, depth: 0, overrideAccess: true, req }).catch(() => null)
       const tBal = Number(tFresh?.balance ?? tutorWallet.balance) || 0

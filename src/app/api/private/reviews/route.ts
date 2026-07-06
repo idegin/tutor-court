@@ -65,20 +65,31 @@ export async function POST(request: Request) {
   const tutorProfileId = idOf(booking.tutor)
   const classId = idOf(booking.class)
 
-  const created = await payload.create({
-    collection: 'reviews',
-    data: {
-      review: reviewText,
-      rating,
-      user: numericId(user.id),
-      tutor: tutorProfileId ? numericId(tutorProfileId) : undefined,
-      booking: numericId(bookingId),
-      ...(classId ? { class: numericId(classId) } : {}),
-      // Verified (completed, paid) engagement → auto-approved.
-      isApproved: true,
-    } as any,
-    overrideAccess: true,
-  })
+  let created: any
+  try {
+    created = await payload.create({
+      collection: 'reviews',
+      data: {
+        review: reviewText,
+        rating,
+        user: numericId(user.id),
+        tutor: tutorProfileId ? numericId(tutorProfileId) : undefined,
+        booking: numericId(bookingId),
+        ...(classId ? { class: numericId(classId) } : {}),
+        // Verified (completed, paid) engagement → auto-approved.
+        isApproved: true,
+      } as any,
+      overrideAccess: true,
+    })
+  } catch (e: any) {
+    // The partial-unique index on reviews.booking closes the race the app-level
+    // dup check above can't (two concurrent POSTs) — surface it as a clean 409.
+    const msg = String(e?.message || '')
+    if (e?.code === '23505' || /unique|reviews_booking_unique/i.test(msg)) {
+      return NextResponse.json({ error: 'You have already reviewed this booking.' }, { status: 409 })
+    }
+    throw e
+  }
 
   return NextResponse.json({ success: true, review: created })
 }

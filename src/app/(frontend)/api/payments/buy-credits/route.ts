@@ -41,11 +41,14 @@ export async function POST(request: Request) {
 
     const wallet = wallets.docs[0]
     const balance = (wallet.balance as number) || 0
+    const locked = (wallet.lockedBalance as number) || 0
     const creditBalance = (wallet.creditBalance as number) || 0
 
-    if (balance < cost) {
+    // Spendable only — funds reserved for escrow / a pending withdrawal can't be
+    // spent on credits (otherwise a tutor could double-spend a reserved payout).
+    if (balance - locked < cost) {
       return NextResponse.json(
-        { error: 'Insufficient wallet balance. Please fund your wallet first.' },
+        { error: 'Insufficient available wallet balance. Please fund your wallet first.' },
         { status: 400 },
       )
     }
