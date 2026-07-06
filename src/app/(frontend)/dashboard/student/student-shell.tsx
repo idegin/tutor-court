@@ -9,6 +9,8 @@ import {
   HiClipboardDocumentList,
   HiOutlineCalendar,
   HiCalendar,
+  HiOutlineCalendarDays,
+  HiCalendarDays,
   HiOutlineBell,
   HiBell,
   HiOutlineChartBar,
@@ -35,6 +37,12 @@ const studentNavItems = [
     href: '/dashboard/student/assessments',
     icon: HiOutlineClipboardDocumentList,
     activeIcon: HiClipboardDocumentList,
+  },
+  {
+    name: 'Bookings',
+    href: '/dashboard/student/bookings',
+    icon: HiOutlineCalendarDays,
+    activeIcon: HiCalendarDays,
   },
   {
     name: 'Progress',

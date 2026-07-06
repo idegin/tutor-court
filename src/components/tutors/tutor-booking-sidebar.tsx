@@ -20,6 +20,8 @@ export interface TutorBookingSidebarProps {
     offeredSubjects?: string[];
     isVerified?: boolean;
     hasActiveBooking?: boolean;
+    currentUserRole?: string;
+    children?: { id: string; name: string }[];
 }
 
 export function TutorBookingSidebar({
@@ -32,12 +34,16 @@ export function TutorBookingSidebar({
     studentsCount = 0,
     offeredSubjects = ['Mathematics', 'Physics', 'Chemistry'],
     isVerified = true,
-    hasActiveBooking = false
+    hasActiveBooking = false,
+    currentUserRole,
+    children = []
 }: TutorBookingSidebarProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { user } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+
+    const bookingsHref = currentUserRole === 'parent' ? '/dashboard/parent/bookings' : '/dashboard/student/bookings';
 
     const handleBookClick = () => {
         if (!user) {
@@ -85,12 +91,28 @@ export function TutorBookingSidebar({
                             <span>{studentsCount} active student{studentsCount !== 1 ? 's' : ''}</span>
                         </div>
                     </div>
+
+                    {offeredSubjects.length > 0 && (
+                        <div className="mt-5">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Subjects offered</p>
+                            <div className="flex flex-wrap gap-2">
+                                {offeredSubjects.map((subject) => (
+                                    <span
+                                        key={subject}
+                                        className="px-2.5 py-1 rounded-full border-2 border-border bg-tutor-purple-50 text-xs font-bold text-tutor-purple-800"
+                                    >
+                                        {subject}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div>
                     <div className="flex flex-col gap-4">
                         {hasActiveBooking ? (
-                            <Link href="/dashboard/bookings" className="block">
+                            <Link href={bookingsHref} className="block">
                                 <Button
                                     className="w-full bg-foreground hover:bg-foreground/90 text-background font-black py-4 px-6 rounded-xl border-[3px] border-foreground transition-all text-lg"
                                 >
@@ -120,6 +142,7 @@ export function TutorBookingSidebar({
                 tutorName={tutorName}
                 pricePerHour={pricePerHour}
                 offeredSubjects={offeredSubjects}
+                children={children}
                 onSuccess={() => window.location.reload()}
             />
         </>

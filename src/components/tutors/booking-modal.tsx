@@ -5,6 +5,8 @@ import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import { Field, FieldContent, FieldError, FieldLabel } from '../ui/field';
+import { computeBookingPrice } from '@/lib/booking-pricing';
+import { formatNaira } from '@/lib/constants';
 
 export interface BookingModalProps {
     isOpen: boolean;
@@ -13,6 +15,7 @@ export interface BookingModalProps {
     tutorName: string;
     pricePerHour: number;
     offeredSubjects?: string[];
+    children?: { id: string; name: string }[];
     onSuccess?: () => void;
 }
 
@@ -25,7 +28,7 @@ interface BookingValues {
     daysOfWeek: string[];
 }
 
-type BookingErrors = Partial<Record<keyof BookingValues | 'form', string>>;
+type BookingErrors = Partial<Record<keyof BookingValues | 'form' | 'child', string>>;
 
 const DAYS_OF_WEEK = [
     { label: 'Mon', value: 'monday' },
@@ -37,9 +40,12 @@ const DAYS_OF_WEEK = [
     { label: 'Sun', value: 'sunday' },
 ];
 
-export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], onSuccess }: BookingModalProps) {
+export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour, offeredSubjects = [], children = [], onSuccess }: BookingModalProps) {
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const needsChildSelection = children.length > 1;
+    const [selectedChildId, setSelectedChildId] = useState<string>(children.length === 1 ? children[0].id : '');
 
     const [values, setValues] = useState<BookingValues>({
         subjects: [],
@@ -61,6 +67,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
 
     const validateStep1 = (): boolean => {
         const newErrors: BookingErrors = {};
+        if (needsChildSelection && !selectedChildId) newErrors.child = 'Please select which child this booking is for.';
         if (values.subjects.length === 0) newErrors.subjects = 'Please select at least one subject.';
 
         setErrors(newErrors);
@@ -88,29 +95,17 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
 
     const handlePrev = () => setStep(step - 1);
 
-    const estimatedTotal = useMemo(() => {
-        if (!values.startDate || !values.endDate) return 0;
-        const start = new Date(values.startDate);
-        const end = new Date(values.endDate);
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-
-        const daysDiff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-        const weeks = Math.max(1, Math.ceil(daysDiff / 7));
-        const estimatedHours = weeks * values.daysOfWeek.length * values.hoursPerDay;
-
-        return estimatedHours * pricePerHour;
-    }, [values, pricePerHour]);
-
-    const estimatedHours = useMemo(() => {
-        if (!values.startDate || !values.endDate) return 0;
-        const start = new Date(values.startDate);
-        const end = new Date(values.endDate);
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
-
-        const daysDiff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-        const weeks = Math.max(1, Math.ceil(daysDiff / 7));
-        return weeks * values.daysOfWeek.length * values.hoursPerDay;
-    }, [values]);
+    const price = useMemo(
+        () =>
+            computeBookingPrice({
+                startDate: values.startDate,
+                endDate: values.endDate,
+                daysOfWeek: values.daysOfWeek,
+                hoursPerDay: values.hoursPerDay,
+                hourlyRate: pricePerHour,
+            }),
+        [values, pricePerHour],
+    );
 
     const handleSubmit = async () => {
         setIsSubmitting(true);
@@ -122,6 +117,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tutorId,
+                    ...(selectedChildId ? { studentId: selectedChildId } : {}),
                     ...values
                 }),
             });
@@ -168,6 +164,41 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                     {step === 1 && (
                         <div className="flex flex-col gap-6 animate-in slide-in-from-right-4 fade-in duration-300">
                             <h3 className="text-xl font-black text-foreground">Engagement Details</h3>
+
+                            {needsChildSelection && (
+                                <Field data-invalid={Boolean(errors.child)} className="gap-2">
+                                    <FieldLabel className="font-bold text-foreground">
+                                        Which child? <span className="text-tutor-red-500">*</span>
+                                    </FieldLabel>
+                                    <FieldContent>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            {children.map((child) => {
+                                                const isSelected = selectedChildId === child.id;
+                                                return (
+                                                    <button
+                                                        key={child.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedChildId(child.id);
+                                                            if (errors.child) setErrors(prev => ({ ...prev, child: undefined }));
+                                                        }}
+                                                        className={cn(
+                                                            "px-3 py-1.5 rounded-full border-[2px] text-sm font-bold transition-all flex items-center gap-1.5",
+                                                            isSelected
+                                                                ? "border-foreground bg-tutor-purple-100 text-tutor-purple-800"
+                                                                : "border-border bg-background text-muted-foreground hover:border-foreground hover:text-foreground"
+                                                        )}
+                                                    >
+                                                        {isSelected && <HiCheck className="w-4 h-4 text-tutor-purple-800" />}
+                                                        {child.name}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <FieldError className="text-destructive font-semibold text-sm mt-1">{errors.child}</FieldError>
+                                    </FieldContent>
+                                </Field>
+                            )}
 
                             <Field data-invalid={Boolean(errors.subjects)} className="gap-2">
                                 <FieldLabel className="font-bold text-foreground">
@@ -313,19 +344,33 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
 
                             <div className="bg-muted p-6 rounded-xl border-[3px] border-foreground flex flex-col gap-4">
                                 <div className="flex justify-between items-center text-sm font-bold">
-                                    <span className="text-muted-foreground">Rate</span>
-                                    <span className="text-foreground">₦{pricePerHour.toLocaleString()}/hr</span>
+                                    <span className="text-muted-foreground">Sessions</span>
+                                    <span className="text-foreground">{price.sessions}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm font-bold">
-                                    <span className="text-muted-foreground">Estimated Hours</span>
-                                    <span className="text-foreground">{estimatedHours} hrs</span>
+                                    <span className="text-muted-foreground">Hours per day</span>
+                                    <span className="text-foreground">{price.hoursPerDay} hr</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm font-bold">
+                                    <span className="text-muted-foreground">Rate</span>
+                                    <span className="text-foreground">{formatNaira(price.hourlyRate)}/hr</span>
                                 </div>
                                 <div className="h-[2px] bg-foreground/20 w-full my-2"></div>
-                                <div className="flex justify-between items-center text-lg font-black">
-                                    <span className="text-foreground">Total Estimate</span>
-                                    <span className="text-foreground">₦{estimatedTotal.toLocaleString()}</span>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex justify-between items-center text-lg font-black">
+                                        <span className="text-foreground">Total</span>
+                                        <span className="text-foreground">{formatNaira(price.totalPrice)}</span>
+                                    </div>
+                                    <p className="text-xs font-bold text-muted-foreground text-right">
+                                        {price.sessions} sessions × {price.hoursPerDay}h × {formatNaira(price.hourlyRate)}/h
+                                    </p>
                                 </div>
                             </div>
+                            {!price.valid && (
+                                <p className="text-xs font-bold text-tutor-red-500 text-center">
+                                    No sessions fall within this date range and schedule. Adjust your dates or selected days.
+                                </p>
+                            )}
                             <p className="text-xs font-bold text-muted-foreground text-center">
                                 You won&apos;t be charged yet. The tutor needs to confirm the booking first.
                             </p>
@@ -359,8 +404,8 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
 
                             <Button
                                 onClick={step < 3 ? handleNext : handleSubmit}
-                                disabled={isSubmitting}
-                                className="flex-1 px-6 py-4 rounded-xl border-[3px] border-foreground bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black transition-colors text-lg"
+                                disabled={isSubmitting || (step === 3 && !price.valid)}
+                                className="flex-1 px-6 py-4 rounded-xl border-[3px] border-foreground bg-tutor-red-500 hover:bg-tutor-orange-400 text-white font-black transition-colors text-lg disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {isSubmitting ? 'Sending Request...' : (step < 3 ? 'Continue' : 'Submit Request')}
                             </Button>

@@ -1,0 +1,168 @@
+import { headers as getHeaders } from 'next/headers'
+import { NextResponse } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { getServerSideUser } from '@/lib/auth'
+import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
+import { sendEmail } from '@/lib/email-service'
+import { createNotification } from '@/lib/notification-service'
+
+type Action = 'accept' | 'decline' | 'cancel'
+
+const idOf = (rel: any): string | null =>
+  rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
+
+/**
+ * PATCH /api/private/bookings/[id]
+ * Booking lifecycle transitions:
+ *   - tutor:  accept (pending → confirmed) | decline (pending → cancelled)
+ *   - booker: cancel (pending|confirmed → cancelled)
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { user } = await getServerSideUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const body = await req.json().catch(() => ({}))
+    const action = body?.action as Action
+    if (!['accept', 'decline', 'cancel'].includes(action)) {
+      return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
+    }
+
+    const payload = await getPayload({ config })
+
+    const booking = await payload.findByID({
+      collection: 'bookings',
+      id,
+      depth: 2,
+      overrideAccess: true,
+    })
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found.' }, { status: 404 })
+    }
+
+    // Resolve the parties.
+    const studentUserId = idOf(booking.student)
+    const parentUserId = idOf(booking.parent)
+    const tutorProfile = booking.tutor as any
+    const tutorUserId = idOf(
+      tutorProfile && typeof tutorProfile === 'object' ? tutorProfile.user : null,
+    )
+
+    const isTutor = tutorUserId != null && String(tutorUserId) === String(user.id)
+    const isBooker =
+      String(studentUserId) === String(user.id) || String(parentUserId) === String(user.id)
+
+    // Authorize the action against the actor + current status.
+    const status = booking.status
+    let nextStatus: string | null = null
+
+    if (action === 'accept' || action === 'decline') {
+      if (!isTutor) {
+        return NextResponse.json({ error: 'Only the tutor can do that.' }, { status: 403 })
+      }
+      if (status !== 'pending') {
+        return NextResponse.json(
+          { error: 'This booking is no longer pending.' },
+          { status: 409 },
+        )
+      }
+      nextStatus = action === 'accept' ? 'confirmed' : 'cancelled'
+    } else if (action === 'cancel') {
+      if (!isBooker) {
+        return NextResponse.json({ error: 'Only the booker can cancel.' }, { status: 403 })
+      }
+      if (status !== 'pending' && status !== 'confirmed') {
+        return NextResponse.json(
+          { error: 'This booking can no longer be cancelled.' },
+          { status: 409 },
+        )
+      }
+      nextStatus = 'cancelled'
+    }
+
+    const updated = await payload.update({
+      collection: 'bookings',
+      id,
+      data: { status: nextStatus } as any,
+      overrideAccess: true,
+    })
+
+    // Notify the other party.
+    const headers = await getHeaders()
+    const serverUrl = getEmailServerUrl(headers)
+
+    // The recipient user: on accept/decline notify the booker; on cancel notify the tutor.
+    let recipientUserId: string | null = null
+    let recipientRoleLink = '/dashboard'
+    if (action === 'cancel') {
+      recipientUserId = tutorUserId
+      recipientRoleLink = '/dashboard/tutor/bookings'
+    } else {
+      // Prefer the parent (they placed the booking) else the student.
+      recipientUserId = parentUserId || studentUserId
+    }
+
+    // Build a friendly message.
+    const verb = action === 'accept' ? 'accepted' : action === 'decline' ? 'declined' : 'cancelled'
+
+    if (recipientUserId) {
+      let recipientEmail = ''
+      let recipientLink = recipientRoleLink
+      try {
+        const recipient = await payload.findByID({
+          collection: 'users',
+          id: recipientUserId,
+          overrideAccess: true,
+        })
+        recipientEmail = recipient?.email || ''
+        if (action !== 'cancel') {
+          recipientLink =
+            recipient?.accountType === 'parent'
+              ? '/dashboard/parent/bookings'
+              : '/dashboard/student/bookings'
+        }
+      } catch {
+        /* ignore */
+      }
+
+      await createNotification({
+        recipientId: String(recipientUserId),
+        type: 'general',
+        title: `Booking ${verb}`,
+        message:
+          action === 'cancel'
+            ? `A booking was cancelled by ${user.firstName} ${user.lastName}.`
+            : `Your booking request was ${verb} by the tutor.`,
+        link: recipientLink,
+        relatedCollection: 'bookings',
+        relatedId: String(id),
+      })
+
+      if (recipientEmail) {
+        const htmlContent = `
+          <p class="text">Hi there,</p>
+          <p class="text">Your booking has been <strong>${verb}</strong>.</p>
+          <div class="btn-container">
+            <a href="${serverUrl}${recipientLink}" class="btn">View Booking</a>
+          </div>
+        `
+        await sendEmail({
+          to: recipientEmail,
+          subject: `Booking ${verb} - TutorCourt`,
+          html: getBaseEmailLayout(`Booking ${verb}`, htmlContent, serverUrl),
+        }).catch((e) => console.error('[bookings/PATCH] email failed:', e?.message))
+      }
+    }
+
+    return NextResponse.json({ success: true, booking: updated })
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || 'Error updating booking' },
+      { status: 500 },
+    )
+  }
+}

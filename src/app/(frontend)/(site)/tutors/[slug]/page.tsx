@@ -33,13 +33,19 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
     }
 
     let hasActiveBooking = false;
+    let parentChildren: { id: string; name: string }[] = [];
     if (currentUser) {
         const activeBookings = await payload.find({
             collection: 'bookings',
             where: {
                 and: [
-                    { student: { equals: currentUser.id } },
                     { tutor: { equals: tutorProfile.id } },
+                    {
+                        or: [
+                            { student: { equals: currentUser.id } },
+                            { parent: { equals: currentUser.id } }
+                        ]
+                    },
                     {
                         or: [
                             { status: { equals: 'pending' } },
@@ -51,6 +57,25 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
             depth: 0,
         });
         hasActiveBooking = activeBookings.totalDocs > 0;
+
+        // A parent booking on behalf of a child must pick which child.
+        if (currentUser.accountType === 'parent') {
+            const { docs: childDocs } = await payload.find({
+                collection: 'users',
+                where: {
+                    and: [
+                        { parent: { equals: currentUser.id } },
+                        { accountType: { equals: 'student' } }
+                    ]
+                },
+                depth: 0,
+                limit: 100,
+            });
+            parentChildren = childDocs.map((c: any) => ({
+                id: c.id,
+                name: `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.email || 'Student',
+            }));
+        }
     }
 
     const { docs: similarDocs } = await payload.find({
@@ -196,6 +221,8 @@ export default async function TutorDetailsPage({ params }: { params: Promise<{ s
                         responseTimeText={responseTimeText}
                         offeredSubjects={tutorProfile.subjects?.map((s: any) => s.name) || []}
                         hasActiveBooking={hasActiveBooking}
+                        currentUserRole={currentUser?.accountType}
+                        children={parentChildren}
                     />
                 </div>
             </div>

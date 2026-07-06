@@ -36,17 +36,21 @@ export async function createNotification({
 }: CreateNotificationParams): Promise<void> {
   try {
     const payload = await getPayload({ config })
+    // Coerce numeric-string ids to numbers so the Postgres relationship
+    // validates (a stringified id fails the FK check).
+    const numericId = (v: string): string | number => (/^\d+$/.test(v) ? Number(v) : v)
     await payload.create({
       collection: 'notifications',
+      overrideAccess: true,
       data: {
-        recipient: recipientId,
+        recipient: numericId(recipientId),
         type,
         title,
         message,
         isRead: false,
         link: link || null,
         relatedEntity: relatedCollection && relatedId
-          ? { collection: relatedCollection, id: relatedId }
+          ? { collection: relatedCollection, id: numericId(relatedId) }
           : undefined,
       } as any,
     })

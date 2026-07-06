@@ -5,20 +5,37 @@ import {
   generateManagedEmail,
   generateManagedPassword,
 } from '../../../src/lib/managed-account.js'
+import { computeBookingPrice } from '../../../src/lib/booking-pricing.js'
 
 export async function seedData() {
   const payload = await getPayload({ config: configPromise })
 
   console.log('Clearing database...')
+  // Ordered children-first so foreign keys don't block deletion.
   const collections = [
+    'activity-logs',
+    'assessment-results',
+    'tutor-assessments',
+    'assessment-questions',
+    'assessments',
+    'attendance',
+    'whiteboard-slides',
+    'live-session-messages',
+    'live-session-participants',
+    'live-sessions',
+    'whiteboards',
+    'class-invitations',
+    'classes',
     'reviews',
     'bookings',
+    'notifications',
     'transactions',
     'wallets',
     'tutor-profiles',
     'students',
     'users',
     'subjects',
+    'subject-categories',
   ] as const
   for (const collection of collections) {
     try {
@@ -95,6 +112,9 @@ export async function seedData() {
   const createdStudents = []
   const createdTutors = []
   let parentUser: any = null
+  let mainTutorUser: any = null
+  let knownStudentUser: any = null
+  let childStudentUser: any = null
 
   for (let i = 0; i < 20; i++) {
     const isTutor = i >= 10
@@ -110,6 +130,12 @@ export async function seedData() {
       accountType = 'parent'
       firstName = 'Chukwuemeka'
       lastName = 'Ifeora'
+    } else if (i === 1) {
+      // Known standalone student for marketplace testing.
+      email = 'student@tutorcourt.com'
+      accountType = 'student'
+      firstName = 'Sam'
+      lastName = 'Student'
     } else if (i === 10) {
       email = 'ideginmedia@gmail.com'
       accountType = 'tutor'
@@ -127,13 +153,21 @@ export async function seedData() {
         phoneNumber: faker.phone.number(),
         accountType,
         _verified: true,
-        ...(accountType === 'parent' ? { hasCompletedOnboarding: true } : {}),
+        // Mark parents and the known standalone test student as onboarded so
+        // they land straight on their dashboard (not the onboarding flow).
+        ...(accountType === 'parent' || i === 1 ? { hasCompletedOnboarding: true } : {}),
       },
       disableVerificationEmail: true,
     })
 
     if (accountType === 'parent') {
       parentUser = user
+    }
+    if (i === 1) {
+      knownStudentUser = user
+    }
+    if (i === 10) {
+      mainTutorUser = user
     }
 
     if (isTutor) {
@@ -144,15 +178,20 @@ export async function seedData() {
         limit: 1,
       })
 
-      const tutorSubjects = faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
+      const isMainTutor = i === 10
+      // The main tutor (Idegin) gets deterministic subjects + rate so marketplace
+      // pricing is predictable during testing.
+      const tutorSubjects = isMainTutor
+        ? subjects.slice(0, 2) // Mathematics + Physics
+        : faker.helpers.arrayElements(subjects, { min: 1, max: 3 })
       const profileData = {
-        headline: faker.person.jobTitle(),
+        headline: isMainTutor ? 'Expert Maths & Physics Tutor' : faker.person.jobTitle(),
         bio: faker.lorem.paragraphs(5, '\n\n'),
-        yearsOfExperience: faker.number.int({ min: 1, max: 20 }),
+        yearsOfExperience: isMainTutor ? 8 : faker.number.int({ min: 1, max: 20 }),
         mode: faker.helpers.arrayElement(['online', 'hybrid']),
         type: faker.helpers.arrayElements(['one-on-one', 'group'], { min: 1, max: 2 }),
         subjects: tutorSubjects,
-        hourlyRate: faker.number.int({ min: 500, max: 50000 }),
+        hourlyRate: isMainTutor ? 5000 : faker.number.int({ min: 500, max: 50000 }),
         isApproved: true,
         onboardingCompleted: true,
       }
@@ -259,11 +298,71 @@ export async function seedData() {
         lastName: childLastName,
         generatedEmail,
         generatedPassword,
-        gradeLevel: '6',
+        gradeLevel: 'grade_6',
       } as any,
     })
 
+    childStudentUser = childUser
     createdStudents.push(childUser)
+  }
+
+  // Guaranteed PENDING bookings addressed to the main tutor (Idegin) so the
+  // accept/decline lifecycle can be tested immediately after seeding.
+  if (mainTutorUser) {
+    const mainProfileRes = await payload.find({
+      collection: 'tutor-profiles',
+      where: { user: { equals: mainTutorUser.id } },
+      limit: 1,
+    })
+    const mainProfile = mainProfileRes.docs[0]
+    const mathSubjectId = subjects[0]
+
+    if (mainProfile && mathSubjectId) {
+      const hourlyRate = (mainProfile as any).hourlyRate || 5000
+      // Weekly Mon/Wed/Fri engagement over the next ~2 weeks.
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() + 2)
+      const endDate = new Date()
+      endDate.setDate(endDate.getDate() + 16)
+      const daysOfWeek = ['monday', 'wednesday', 'friday']
+      const hoursPerDay = 2
+
+      const price = computeBookingPrice({
+        startDate,
+        endDate,
+        daysOfWeek,
+        hoursPerDay,
+        hourlyRate,
+      })
+
+      const pendingBookers: Array<{ student: any; parent: any | null; label: string }> = []
+      if (childStudentUser)
+        pendingBookers.push({ student: childStudentUser, parent: parentUser, label: 'parent→child' })
+      if (knownStudentUser)
+        pendingBookers.push({ student: knownStudentUser, parent: null, label: 'student' })
+
+      for (const b of pendingBookers) {
+        await payload.create({
+          collection: 'bookings',
+          data: {
+            tutor: mainProfile.id,
+            student: b.student.id,
+            ...(b.parent ? { parent: b.parent.id } : {}),
+            status: 'pending',
+            paymentStatus: 'unpaid',
+            currency: 'ngn',
+            date: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            hoursPerDay,
+            daysOfWeek,
+            subjects: [mathSubjectId],
+            price: price.totalPrice,
+            message: `Hi, I'd like ${hoursPerDay}h Maths sessions (${b.label}).`,
+          } as any,
+        })
+      }
+      console.log(`Seeded ${pendingBookers.length} pending booking(s) for main tutor (Idegin).`)
+    }
   }
 
   console.log('Seeding reviews and bookings...')
