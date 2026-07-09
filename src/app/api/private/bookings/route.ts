@@ -272,8 +272,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, booking, price })
   } catch (error: any) {
     if (error?.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid booking details.', details: error.issues }, { status: 400 })
+      // Never surface raw Zod issues to the UI. Build a short, human-readable
+      // message from the first problem, and keep the full issues for debugging.
+      return NextResponse.json(
+        { error: humanizeBookingIssues(error.issues), details: error.issues },
+        { status: 400 },
+      )
     }
-    return NextResponse.json({ error: error?.message || 'Error creating booking' }, { status: 500 })
+    // Payload/DB errors carry technical messages — log the real one, but return
+    // a friendly message so nothing raw ever lands in the booking popup.
+    console.error('[bookings] failed to create booking:', error?.message || error)
+    return NextResponse.json(
+      { error: 'Something went wrong while creating your booking. Please try again.' },
+      { status: 500 },
+    )
   }
+}
+
+// Turn a Zod validation failure into one plain-English sentence for the UI.
+function humanizeBookingIssues(issues: any[]): string {
+  const FIELD_LABELS: Record<string, string> = {
+    tutorId: 'tutor',
+    studentId: 'student',
+    startDate: 'start date',
+    endDate: 'end date',
+    hoursPerDay: 'hours per day',
+    daysOfWeek: 'days of the week',
+    subjects: 'subjects',
+    message: 'message',
+  }
+  const first = Array.isArray(issues) ? issues[0] : null
+  if (!first) return 'Please check your booking details and try again.'
+  const field = FIELD_LABELS[first.path?.[0] as string] || 'booking details'
+  return `Please check the ${field} and try again.`
 }

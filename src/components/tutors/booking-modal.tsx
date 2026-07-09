@@ -155,10 +155,16 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                 }),
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
 
             if (!res.ok) {
-                setErrors({ form: data.error || 'Failed to submit booking' });
+                // Only ever show a human-readable string — never a raw error
+                // object/array (which would render as unreadable JSON).
+                const message =
+                    typeof data?.error === 'string' && data.error.trim()
+                        ? data.error
+                        : 'Something went wrong while creating your booking. Please try again.';
+                setErrors({ form: message });
                 setIsSubmitting(false);
                 return;
             }
