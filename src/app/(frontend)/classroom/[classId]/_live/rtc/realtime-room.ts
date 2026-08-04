@@ -89,6 +89,7 @@ export class RealtimeRoom {
   private reconciling = false
   private reconcileQueued = false
   private pullFailures = new Map<string, number>() // key → failed attempts
+  private lastStream: MediaStream | null = null // last stream we published (for media rebuild)
 
   constructor(private readonly opts: RoomOptions) {
     this.local = {
@@ -137,8 +138,20 @@ export class RealtimeRoom {
     this.control = this.client.channels.get(CH.control(sessionId))
 
     // Everyone gets an SFU session (publishers to publish, viewers to pull).
-    this.sfu = new SfuClient(sessionId, this.opts.iceServers, (e) => this.onRemoteTrack(e))
+    // Rebuild media on a terminal PeerConnection failure so a transient network
+    // drop doesn't leave video/audio dead forever (Ably reconnects on its own).
+    this.sfu = new SfuClient(sessionId, this.opts.iceServers, (e) => this.onRemoteTrack(e), (s) =>
+      this.onMediaConnectionState(s),
+    )
     await this.sfu.connect()
+    // The effect may have unmounted us while connect() was in flight — bail and
+    // tear down instead of leaking the SFU session + Ably connection.
+    if (this.closed) {
+      this.sfu.close()
+      this.client.close()
+      this.client = null
+      return
+    }
 
     // Publish now if the local stream is already available; otherwise
     // publishStream() is called later (from the hook) once media is granted.
@@ -156,9 +169,71 @@ export class RealtimeRoom {
 
     // Presence: react to the roster, enter ourselves.
     this.base.presence.subscribe(() => this.reconcile())
+    if (this.closed) return
     await this.base.presence.enter(this.local)
     this.entered = true
     await this.reconcile()
+  }
+
+  private rebuilding = false
+  private rebuildAttempts = 0 // consecutive attempts since the last 'connected' (backoff)
+  private rebuildTotal = 0 // session-lifetime cap so a flapping link can't churn forever
+
+  /** Force an Ably token re-auth (e.g. whiteboard-writable was toggled → the
+   *  student's capability changed and their token must be re-minted now). */
+  reauth(): void {
+    // ably-js re-runs the authCallback and re-applies channel capabilities.
+    this.client?.auth.authorize().catch((err) => console.warn('[room] reauth failed', err))
+  }
+
+  private onMediaConnectionState(state: string): void {
+    if (this.closed) return
+    if (state === 'connected') this.rebuildAttempts = 0
+    if (state === 'failed') void this.rebuildMedia()
+  }
+
+  /**
+   * Rebuild the SFU media layer after a terminal PeerConnection failure: tear
+   * down the dead PC/session, create a fresh one, re-publish our local tracks,
+   * and let the next presence reconcile re-pull everyone. Ably (presence/chat)
+   * is unaffected and keeps running. Bounded + backed-off so a persistently
+   * broken network doesn't spin.
+   */
+  private async rebuildMedia(): Promise<void> {
+    if (this.closed || this.rebuilding) return
+    if (this.rebuildAttempts >= 4 || this.rebuildTotal >= 15) return
+    this.rebuilding = true
+    this.rebuildAttempts++
+    this.rebuildTotal++
+    try {
+      await new Promise((r) => setTimeout(r, 500 * this.rebuildAttempts))
+      if (this.closed) return
+      const hadStream = this.published
+      this.sfu?.close()
+      this.published = false
+      this.publishing = false
+      this.pulled.clear()
+      this.pullFailures.clear()
+      this.sfuToUser.clear()
+      this.sfu = new SfuClient(this.opts.liveSessionId, this.opts.iceServers, (e) => this.onRemoteTrack(e), (s) =>
+        this.onMediaConnectionState(s),
+      )
+      await this.sfu.connect()
+      if (this.closed) { this.sfu.close(); return }
+      this.local.sfuSessionId = this.sfu.id
+      this.local.audioTrack = null
+      this.local.videoTrack = null
+      // Re-publish our own tracks on the fresh session if we were on stage.
+      if (this.canPublishNow && hadStream && this.lastStream && this.lastStream.getTracks().length > 0) {
+        await this.doPublish(this.lastStream)
+      }
+      if (this.entered) await this.base?.presence.update(this.local).catch(() => {})
+      await this.reconcile()
+    } catch (err) {
+      console.warn('[room] media rebuild failed', err)
+    } finally {
+      this.rebuilding = false
+    }
   }
 
   /**
@@ -171,8 +246,11 @@ export class RealtimeRoom {
     if (this.closed || !this.canPublishNow) return
     if (!this.sfu?.id || stream.getTracks().length === 0) return
     // Already published (or a publish is in flight carrying the current tracks):
-    // a device switch just swaps the outgoing media, same trackNames.
+    // a device switch just swaps the outgoing media, same trackNames. Keep
+    // lastStream current so a media rebuild re-publishes the LIVE stream, not the
+    // ended tracks of the pre-switch one.
     if (this.published || this.publishing) {
+      this.lastStream = stream
       await this.sfu.replaceTracks(stream)
       return
     }
@@ -228,6 +306,7 @@ export class RealtimeRoom {
     try {
       const published = await this.sfu.publish(stream, String(this.opts.user.id))
       this.published = true
+      this.lastStream = stream
       this.local.sfuSessionId = this.sfu.id
       this.local.audioTrack = published.audio ?? null
       this.local.videoTrack = published.video ?? null

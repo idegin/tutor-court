@@ -53,6 +53,7 @@ export class SfuClient {
     private readonly liveSessionId: string | number,
     private readonly iceServers: RTCIceServer[],
     private readonly onRemoteTrack?: (e: RemoteTrackEvent) => void,
+    private readonly onConnectionState?: (state: RTCPeerConnectionState) => void,
   ) {}
 
   get id(): string | null {
@@ -87,6 +88,18 @@ export class SfuClient {
       bundlePolicy: 'max-bundle',
     })
     this.pc = pc
+
+    // Surface PeerConnection health. A transient blip → try an in-place ICE
+    // restart; a terminal 'failed' is reported so the room can rebuild the whole
+    // media session (Ably/presence keep running independently).
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState
+      if (state === 'disconnected') {
+        // Give ICE a chance to recover on its own before forcing anything.
+        pc.restartIce?.()
+      }
+      this.onConnectionState?.(state)
+    }
 
     pc.ontrack = (ev) => {
       const mid = ev.transceiver?.mid ?? null

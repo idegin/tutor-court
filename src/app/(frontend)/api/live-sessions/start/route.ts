@@ -9,6 +9,7 @@ import { CREDIT_RATE } from '@/lib/constants'
 import { toIntId } from '@/lib/id'
 import { isLiveClassroomReady, isSfuConfigured } from '@/lib/live/config'
 import { createSfuSession } from '@/lib/live/cf-realtime'
+import { settleBilling } from '@/lib/live/lifecycle'
 
 // A "live" session can be an orphan: there is no background worker, so if the
 // tutor's tab dies without ending the class, the row stays live forever. Any
@@ -129,6 +130,14 @@ export async function POST(request: Request) {
     // startedAt and drain the wallet the moment the class is reused).
     const endStaleSession = async (doc: any) => {
       const endedIso = new Date().toISOString()
+      // Settle the final billing delta BEFORE closing logs — otherwise the
+      // minutes accrued since this session's last charge are silently dropped
+      // (the row is about to be flipped to `ended`, so the sweep cron will skip
+      // it). Mirrors the cron's endLiveSession settle-then-close ordering. Only
+      // matters for a stale SaaS session; escrow classes no-op inside settle.
+      await settleBilling(payload, doc, Date.now()).catch((err) =>
+        console.error('[live-sessions/start] failed to settle stale session', doc.id, err),
+      )
       await payload
         .update({
           collection: 'live-sessions',

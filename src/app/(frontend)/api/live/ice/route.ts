@@ -31,8 +31,10 @@ export async function GET(request: Request) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status })
 
   // Short TTL: credentials can't be revoked, so keep them cheap to re-mint and
-  // refresh client-side rather than issuing long-lived relay access.
-  const { iceServers, degraded } = await generateIceServers(3600)
+  // refresh client-side rather than issuing long-lived relay access. 10 min
+  // bounds a kicked/ended-session member's residual relay access to roughly the
+  // data-plane re-auth cadence instead of a full hour.
+  const { iceServers, degraded } = await generateIceServers(600)
   if (degraded) {
     console.warn(`[live/ice] TURN unavailable for session ${access.sessionId} — serving STUN only`)
   }

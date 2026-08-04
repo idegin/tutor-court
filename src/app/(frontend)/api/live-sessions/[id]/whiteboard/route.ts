@@ -29,8 +29,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   }
 
   const { showWhiteboard, activeWhiteboard, whiteboardWritable } = body
-  // activeWhiteboard is a relationship id; coerce or null.
-  const activeWhiteboardId = activeWhiteboard != null ? toIntId(activeWhiteboard) : null
 
   try {
     const session = await payload
@@ -46,19 +44,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
-    const updated = await payload.update({
-      collection: 'live-sessions',
-      id,
-      data: {
-        showWhiteboard: !!showWhiteboard,
-        activeWhiteboard: activeWhiteboardId,
-        // Only change the draw-permission when the caller explicitly sends it,
-        // so ordinary share/hide toggles don't silently reset it.
-        ...(whiteboardWritable !== undefined
-          ? { whiteboardWritable: !!whiteboardWritable }
-          : {}),
-      } as any,
-    })
+    // Partial update: only touch fields the caller explicitly sent, so a
+    // writable-only toggle doesn't clobber show/active (and vice-versa).
+    const data: Record<string, unknown> = {}
+    if (showWhiteboard !== undefined) data.showWhiteboard = !!showWhiteboard
+    if (activeWhiteboard !== undefined) data.activeWhiteboard = activeWhiteboard != null ? toIntId(activeWhiteboard) : null
+    if (whiteboardWritable !== undefined) data.whiteboardWritable = !!whiteboardWritable
+
+    const updated = await payload.update({ collection: 'live-sessions', id, data: data as any })
 
     return NextResponse.json({ success: true, session: updated })
   } catch (error: any) {

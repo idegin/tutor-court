@@ -85,11 +85,20 @@ export async function POST(request: Request) {
       if (!studentIds.some((s) => String(s) === String(targetUserId))) {
         return NextResponse.json({ error: 'Only enrolled students can be promoted.' }, { status: 400 })
       }
-      const next = Array.from(new Set([...current, targetUserId]))
+      // The participant row's `role` is the authoritative media-publish gate
+      // (resolveSessionAccess reads it). Without a row we'd add to stagePublishers
+      // but never grant publish — a silent no-op. Require the student to be in the
+      // room first so promote actually takes effect.
+      if (!log) {
+        return NextResponse.json({ error: 'The student must join the class before being promoted.' }, { status: 409 })
+      }
+      // Coerce every element to an int id before writing back — Payload+Postgres
+      // rejects stringified numeric ids on a hasMany relationship update.
+      const next = Array.from(new Set([...current, targetUserId])).map((id) => toIntId(id)).filter(Boolean)
       await payload.update({ collection: 'live-sessions', id: sessionId, data: { stagePublishers: next } as any })
-      if (log) await payload.update({ collection: 'live-session-participants', id: log.id, data: { role: 'publisher' } as any })
+      await payload.update({ collection: 'live-session-participants', id: log.id, data: { role: 'publisher' } as any })
     } else {
-      const next = current.filter((id) => String(id) !== String(targetUserId))
+      const next = current.filter((id) => String(id) !== String(targetUserId)).map((id) => toIntId(id)).filter(Boolean)
       await payload.update({ collection: 'live-sessions', id: sessionId, data: { stagePublishers: next } as any })
       if (log) {
         await payload.update({ collection: 'live-session-participants', id: log.id, data: { role: 'viewer' } as any })

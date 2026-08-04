@@ -83,6 +83,29 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   const realtimeEnabled = caps.ready && !!realtime
   const localId = realtime?.user.id ?? local.id
   const lowFiredRef = React.useRef(false)
+  // The Ably presence roster + connection state, mirrored into a ref so the
+  // billing heartbeat (a long-lived interval) can read the CURRENT roster without
+  // re-subscribing every render.
+  const rosterRef = React.useRef<{ ids: string[]; connected: boolean }>({ ids: [], connected: false })
+  // Op ids we originated this session — used to drop Ably's LIVE echo of our own
+  // whiteboard ops (which our optimistic local draw already applied) WITHOUT
+  // dropping rewound history on rejoin (a fresh mount has an empty set, so our
+  // own replayed ops repaint the board instead of vanishing).
+  const wbLocalOpIds = React.useRef<Set<string>>(new Set())
+
+  // In real mode the mock local identity must become the REAL user, or the local
+  // user's own chat/reactions/roster entry are keyed by the mock id and mislabel
+  // (own messages render as someone else's, "You" never matches).
+  React.useEffect(() => {
+    if (!realtime) return
+    setLocal((p) => ({
+      ...p,
+      id: String(realtime.user.id),
+      name: realtime.user.name,
+      accountType: realtime.user.accountType,
+      role: realtime.user.role,
+    }))
+  }, [realtime])
 
   // The media hook owns the real mic/cam track state; mirror it onto the local
   // participant so the stage tile + roster reflect it.
@@ -168,10 +191,18 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     let cancelled = false
     const beat = async () => {
       try {
+        // Carry the presence roster so the server can check out students who
+        // dropped without a /leave beacon (stops ghost-log over-billing). Only
+        // when we actually have a connected roster — never mass-checkout on a
+        // transient empty read.
+        const roster = rosterRef.current
         const res = await fetch('/api/live/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: realtime.liveSessionId }),
+          body: JSON.stringify({
+            sessionId: realtime.liveSessionId,
+            activeUserIds: roster.connected && roster.ids.length > 0 ? roster.ids : undefined,
+          }),
         })
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
@@ -287,15 +318,33 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     },
     onWhiteboard: (payload) => {
       // Presentation + stroke sync from the tutor (and writable students).
-      if (payload?.kind === 'op' && payload.op) setWbOps((o) => [...o, payload.op])
-      else if (payload?.kind === 'show') setWhiteboardOn(Boolean(payload.on))
+      if (payload?.kind === 'op' && payload.op) {
+        // Drop the LIVE echo of an op we just drew (already applied optimistically),
+        // but let rewound history through (its id isn't in our local set on rejoin).
+        if (wbLocalOpIds.current.has(payload.op.id)) return
+        setWbOps((o) => [...o, payload.op].slice(-1000))
+      } else if (payload?.kind === 'show') setWhiteboardOn(Boolean(payload.on))
       else if (payload?.kind === 'active') setActiveBoard(payload.boardId ?? null)
-      else if (payload?.kind === 'writable') setSession((s) => ({ ...s, whiteboardWritable: Boolean(payload.on) }))
-      else if (payload?.kind === 'create' && payload.board) {
+      else if (payload?.kind === 'writable') {
+        setSession((s) => ({ ...s, whiteboardWritable: Boolean(payload.on) }))
+        // A non-host student's Ably token only grants whiteboard publish while
+        // writable is on — re-auth so the new capability takes effect now rather
+        // than after the ~5-min token TTL.
+        if (!isTutor) room.actions.reauth()
+      } else if (payload?.kind === 'create' && payload.board) {
         setBoards((b) => (b.some((x) => x.id === payload.board.id) ? b : [...b, payload.board]))
       }
     },
   })
+
+  // Mirror the live presence roster + connection state into a ref for the
+  // heartbeat interval (which can't depend on them without re-subscribing).
+  React.useEffect(() => {
+    rosterRef.current = {
+      ids: room.participants.map((p) => p.id),
+      connected: room.ready && room.connectionState === 'connected',
+    }
+  }, [room.participants, room.ready, room.connectionState])
 
   // Broadcast local mic/cam changes to presence in real mode.
   const roomUpdateMedia = room.actions.updateMedia
@@ -412,7 +461,22 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   const toggleWritable = () => {
     const next = !session.whiteboardWritable
     setSession((s) => ({ ...s, whiteboardWritable: next }))
-    if (realtimeEnabled) room.actions.sendWhiteboard({ kind: 'writable', on: next })
+    if (realtimeEnabled && realtime) {
+      // Persist FIRST so a student's token re-auth mints the new whiteboard
+      // capability from a DB that already reflects the toggle. Only broadcast (and
+      // trigger student re-auth) if the write actually landed — otherwise the UI
+      // would flip while the server-enforced capability stayed on the old value.
+      fetch(`/api/live-sessions/${realtime.liveSessionId}/whiteboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whiteboardWritable: next }),
+      })
+        .then((res) => {
+          if (res.ok) room.actions.sendWhiteboard({ kind: 'writable', on: next })
+          else setSession((s) => ({ ...s, whiteboardWritable: !next })) // revert
+        })
+        .catch(() => setSession((s) => ({ ...s, whiteboardWritable: !next })))
+    }
   }
 
   const toggleWhiteboard = () => {
@@ -540,7 +604,11 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
                 onCreate={createBoard}
                 onToggleWritable={toggleWritable}
                 onClose={toggleWhiteboard}
-                onDraw={(op) => { if (realtimeEnabled) room.actions.sendWhiteboard({ kind: 'op', op }) }}
+                onDraw={(op) => {
+                  if (!realtimeEnabled) return
+                  wbLocalOpIds.current.add(op.id)
+                  room.actions.sendWhiteboard({ kind: 'op', op })
+                }}
                 remoteOps={realtimeEnabled ? wbOps : undefined}
               />
             </Stage>

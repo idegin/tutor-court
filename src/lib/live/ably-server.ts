@@ -129,22 +129,25 @@ export function sessionChannel(sessionId: string | number): string {
  */
 export function participantCapability(
   sessionId: string | number,
-  opts: { isHost: boolean; canPublish?: boolean },
+  opts: { isHost: boolean; canPublish?: boolean; whiteboardWritable?: boolean },
 ): AblyCapability {
   const base = sessionChannel(sessionId)
-  const { isHost, canPublish = true } = opts
+  const { isHost, canPublish = true, whiteboardWritable = false } = opts
   const full = ['subscribe', 'publish', 'presence']
   const watch = ['subscribe', 'presence']
   const memberOps = canPublish ? full : watch
+  // Whiteboard publish is SERVER-enforced, not client-trust: the host always
+  // draws; a non-host non-observer draws only while the host's writable toggle
+  // is on. Toggling re-mints the student's token (client re-auths), so the grant
+  // tracks the current state within the short token TTL.
+  const whiteboardOps = isHost || (canPublish && whiteboardWritable) ? full : watch
 
   return {
     [base]: memberOps,
     [`${base}:chat`]: memberOps,
     [`${base}:reactions`]: memberOps,
     [`${base}:hands`]: memberOps,
-    // Non-observers can publish whiteboard ops (the host's writable toggle
-    // decides who actually draws, enforced client-side); observers watch.
-    [`${base}:whiteboard`]: canPublish ? full : watch,
+    [`${base}:whiteboard`]: whiteboardOps,
     // Control channel: only the host may publish (kick, mute-all, start/stop).
     [`${base}:control`]: isHost ? full : ['subscribe'],
   }

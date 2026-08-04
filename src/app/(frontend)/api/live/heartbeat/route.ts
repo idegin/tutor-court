@@ -9,6 +9,9 @@ import { settleBilling, endLiveSession } from '@/lib/live/lifecycle'
 
 export const runtime = 'nodejs'
 
+const idOfTutor = (session: any): string =>
+  String(typeof session?.tutor === 'object' ? session.tutor?.id : session?.tutor)
+
 // Real per-minute billing driver (Phase 6). The tutor's client posts this every
 // ~20s while the class is live. It charges the elapsed minutes, bumps
 // lastHeartbeatAt (so the sweep cron knows the session is alive), and auto-ends
@@ -42,6 +45,43 @@ export async function POST(request: Request) {
   }
 
   const now = Date.now()
+
+  // Presence reconcile: the tutor's client sends the Ably presence roster it can
+  // see. Any participant with an OPEN log who is NOT present (closed their tab /
+  // dropped network without firing the /leave beacon) is checked out here, so
+  // their ghost log stops accruing billable minutes every beat. Guarded: we only
+  // trust a non-empty roster (an empty/absent list means the client couldn't
+  // read presence — never mass-checkout on that).
+  const activeRaw = Array.isArray(body?.activeUserIds) ? body.activeUserIds : null
+  if (activeRaw && activeRaw.length > 0) {
+    const present = new Set(activeRaw.map((v: unknown) => String(v)))
+    present.add(String(idOfTutor(session))) // never check out the host
+    const openLogs = await payload
+      .find({
+        collection: 'live-session-participants',
+        where: { and: [{ liveSession: { equals: session.id } }, { leftAt: { exists: false } }] },
+        limit: 1000,
+        depth: 0,
+      })
+      .catch(() => null)
+    for (const log of (openLogs?.docs ?? []) as any[]) {
+      const uid = String(typeof log.user === 'object' ? log.user?.id : log.user)
+      if (present.has(uid)) continue
+      // Grace window: a student who joined seconds ago may not have propagated
+      // into the tutor's presence roster yet — don't check them out on that race.
+      const joinedMs = new Date(log.joinedAt).getTime()
+      if (now - joinedMs < 45_000) continue
+      const interval = Math.max(0, Math.floor((now - joinedMs) / 1000))
+      await payload
+        .update({
+          collection: 'live-session-participants',
+          id: log.id,
+          data: { leftAt: new Date(now).toISOString(), durationSeconds: (Number(log.durationSeconds) || 0) + interval } as any,
+        })
+        .catch(() => {})
+    }
+  }
+
   const result = await settleBilling(payload, session, now)
 
   await payload

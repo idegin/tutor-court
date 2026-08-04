@@ -17,6 +17,7 @@ export interface RealtimeRoomActions {
   sendWhiteboard: (op: any) => void
   promoteSelf: (stream: MediaStream | null) => void
   demoteSelf: () => void
+  reauth: () => void
 }
 
 export interface UseRealtimeRoomResult {
@@ -36,6 +37,7 @@ const NOOP_ACTIONS: RealtimeRoomActions = {
   sendWhiteboard: () => {},
   promoteSelf: () => {},
   demoteSelf: () => {},
+  reauth: () => {},
 }
 
 export function useRealtimeRoom(opts: {
@@ -136,6 +138,7 @@ export function useRealtimeRoom(opts: {
       sendWhiteboard: (op) => roomRef.current?.sendWhiteboard(op).catch(() => {}),
       promoteSelf: (stream) => roomRef.current?.promoteToStage(stream).catch(() => {}),
       demoteSelf: () => roomRef.current?.demoteSelf().catch(() => {}),
+      reauth: () => roomRef.current?.reauth(),
     }
   }, [enabled])
 

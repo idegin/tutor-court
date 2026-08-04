@@ -99,10 +99,26 @@ export async function POST(request: Request) {
         // Observers (parents) may pull but never publish. A publish is any
         // tracks/new that carries an OFFER (pulls carry none) or an explicit
         // location:'local' — gate on both so omitting `location` can't bypass it.
-        const publishesLocal =
-          body.sessionDescription?.type === 'offer' || body.tracks.some((t) => t.location === 'local')
+        const localTracks = body.tracks.filter(
+          (t) => t.location === 'local' || (body.sessionDescription?.type === 'offer' && t.location !== 'remote'),
+        )
+        const publishesLocal = body.sessionDescription?.type === 'offer' || localTracks.length > 0
         if (publishesLocal && !access.canPublish) {
           return NextResponse.json({ error: 'You are not allowed to publish media.' }, { status: 403 })
+        }
+        // Bind published track names to the authenticated identity. Ownership of
+        // the SFU session alone doesn't stop a publisher naming their track
+        // `${victimId}-video`; peers pull by trackName off presence, and the
+        // server's teardown (`forceCloseParticipantTracks`) keys on `${userId}-*`,
+        // so a mislabeled track would dodge kick/demote. Enforce the convention here.
+        const ownsAllNames = localTracks.every(
+          (t) => !t.trackName || t.trackName.startsWith(`${user.id}-`),
+        )
+        if (publishesLocal && !ownsAllNames) {
+          return NextResponse.json(
+            { error: 'Published track names must be scoped to your own identity.' },
+            { status: 403 },
+          )
         }
         const res = await newTracks(body.sfuSessionId, {
           sessionDescription: body.sessionDescription,

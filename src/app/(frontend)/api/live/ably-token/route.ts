@@ -46,6 +46,9 @@ export async function GET(request: Request) {
       // DATA-plane publish (chat/reactions/hands): every non-observer, regardless
       // of media stage status. Media publish is gated separately in /api/live/rtc.
       canPublish: access.role !== 'observer',
+      // Whiteboard publish for non-hosts follows the session's writable toggle
+      // (server-enforced). The host toggling it re-mints student tokens.
+      whiteboardWritable: Boolean(access.session?.whiteboardWritable),
     }),
   })
 
