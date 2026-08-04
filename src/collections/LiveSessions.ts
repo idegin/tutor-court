@@ -142,6 +142,39 @@ export const LiveSessions: CollectionConfig = {
       type: 'number',
       defaultValue: 0,
     },
+    // ── Live Classroom v2 (Cloudflare Realtime + Ably) ─────────────────────
+    {
+      name: 'lastHeartbeatAt',
+      type: 'date',
+      admin: {
+        description:
+          'Bumped on each tutor billing heartbeat. The sweep cron ends any live session whose heartbeat has gone stale (tutor tab died) so billing settles and the room closes.',
+      },
+    },
+    {
+      name: 'sfuSessionId',
+      type: 'text',
+      admin: {
+        description:
+          'Cloudflare Realtime (Calls) session handle for this room, created when the class goes live. Empty until the SFU is provisioned.',
+      },
+    },
+    {
+      name: 'stagePublishers',
+      type: 'relationship',
+      relationTo: 'users',
+      hasMany: true,
+      admin: {
+        description: 'Users currently publishing media (host + promoted students). Broadcast model.',
+      },
+    },
+    {
+      name: 'raisedHands',
+      type: 'relationship',
+      relationTo: 'users',
+      hasMany: true,
+      admin: { description: 'Users with a raised hand, oldest first (tutor promotes from here).' },
+    },
   ],
   timestamps: true,
 }

@@ -305,7 +305,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     >
                         <HiPlus className="mr-2 h-4 w-4" /> Create New Class
                     </Button>
-                    <SheetContent className="overflow-y-auto grid grid-cols-1 w-full sm:max-w-[45rem] [&[data-side=right]]:sm:max-w-[45rem]">
+                    <SheetContent className="overflow-y-auto grid grid-cols-1 w-full [&[data-side=right]]:w-full [&[data-side=right]]:max-w-none sm:max-w-[45rem] [&[data-side=right]]:sm:max-w-[45rem]">
                         <SheetHeader>
                             <SheetTitle>{editingClassId ? 'Edit Class' : 'Create New Class'}</SheetTitle>
                             <SheetDescription>

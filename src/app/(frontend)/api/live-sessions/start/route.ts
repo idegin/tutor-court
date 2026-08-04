@@ -2,47 +2,30 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
+
+export const runtime = 'nodejs'
+import crypto from 'crypto'
 import { CREDIT_RATE } from '@/lib/constants'
 import { toIntId } from '@/lib/id'
+import { isLiveClassroomReady, isSfuConfigured } from '@/lib/live/config'
+import { createSfuSession } from '@/lib/live/cf-realtime'
 
 // A "live" session can be an orphan: there is no background worker, so if the
 // tutor's tab dies without ending the class, the row stays live forever. Any
 // live session older than this is treated as abandoned rather than reusable.
 const MAX_LIVE_SESSION_AGE_MS = 6 * 60 * 60 * 1000
 
-/**
- * Check that a previously created VideoSDK room is still accepted by the
- * service under the CURRENT credentials. Only a definitive 4xx marks the room
- * invalid; transient failures must not block reusing an otherwise-fine room.
- */
-async function isRoomStillValid(roomId: string | null | undefined): Promise<boolean> {
-  if (!roomId) return false
-  const token = generateVideoSdkToken(300, 'server')
-  if (!token) return false
-  try {
-    const res = await fetch(`https://api.videosdk.live/v2/rooms/validate/${roomId}`, {
-      headers: { Authorization: token, 'Content-Type': 'application/json' },
-    })
-    if (res.ok) {
-      // A room can validate but be administratively disabled — that's dead too.
-      const data = await res.json().catch(() => ({}))
-      return data?.disabled !== true
-    }
-    if (res.status >= 400 && res.status < 500) return false
-    return true
-  } catch {
-    return true
-  }
-}
-
 export async function POST(request: Request) {
-  if (!isVideoSdkAvailable()) {
+  // The live backend (Cloudflare Realtime SFU + Ably) must be configured before
+  // a class can go live — otherwise media/chat can't connect and we'd bill the
+  // tutor for a dead room. Surfaces a clear "not yet available" state until the
+  // realtime keys are provisioned.
+  if (!isLiveClassroomReady()) {
     return NextResponse.json(
       {
         error: 'live_classes_unavailable',
         message:
-          "We're working on bringing live classes back online. Please try again in a little while.",
+          "We're bringing live classes online. Please try again shortly — you have not been charged.",
       },
       { status: 503 },
     )
@@ -218,40 +201,33 @@ export async function POST(request: Request) {
         await endStaleSession(dup)
       }
 
-      // Only reuse the canonical session when it is recent AND its VideoSDK
-      // room is still valid. Reusing an orphan hands every participant a dead
-      // room — media never connects while chat/whiteboard (our own backend)
-      // keep working, which is exactly the "nobody can see or hear anyone"
-      // report. Otherwise end it and start fresh below.
+      // Reuse the canonical session only when it is recent. An SFU session that
+      // has expired server-side is re-created lazily on join (the SFU handle is
+      // stored on the row); a stale/abandoned row is ended and started fresh.
       const startedAtMs = new Date(
         (canonical as any).startedAt || (canonical as any).createdAt,
       ).getTime()
       const isFresh =
         Number.isFinite(startedAtMs) && Date.now() - startedAtMs < MAX_LIVE_SESSION_AGE_MS
-      if (isFresh && (await isRoomStillValid((canonical as any).roomId))) {
+      if (isFresh) {
         return NextResponse.json({ session: canonical })
       }
       await endStaleSession(canonical)
     }
 
-    // Create a real VideoSDK room. We use a fresh server-scoped token for the
-    // REST call. If the room can't be created (e.g. VideoSDK is out of credit or
-    // unreachable), we must NOT mark a session live — otherwise the tutor would
-    // be billed for a class whose media never connects. Surface the failure.
-    let roomId: string
-    const token = generateVideoSdkToken(3600 * 2, 'server')
+    // Room identity is ours (a stable slug); media routing is a Cloudflare
+    // Realtime SFU session. If the SFU session can't be created we must NOT mark
+    // the class live — the tutor would be billed for a room whose media never
+    // connects. Surface the failure without charging.
+    const roomId = `room_${crypto.randomUUID()}`
+    let sfuSessionId: string | null = null
 
-    try {
-      const videoSdkRes = await fetch('https://api.videosdk.live/v2/rooms', {
-        method: 'POST',
-        headers: {
-          Authorization: token,
-          'Content-Type': 'application/json',
-        },
-      })
-      const videoSdkData = await videoSdkRes.json()
-      if (!videoSdkRes.ok || !videoSdkData.roomId) {
-        console.error('VideoSDK room creation failed:', videoSdkRes.status, videoSdkData)
+    if (isSfuConfigured()) {
+      try {
+        const sfu = await createSfuSession()
+        sfuSessionId = sfu.sessionId
+      } catch (err) {
+        console.error('[live-sessions/start] SFU session creation failed:', err)
         return NextResponse.json(
           {
             error: 'live_classes_unavailable',
@@ -261,17 +237,6 @@ export async function POST(request: Request) {
           { status: 502 },
         )
       }
-      roomId = videoSdkData.roomId
-    } catch (err) {
-      console.error('Error calling VideoSDK rooms API:', err)
-      return NextResponse.json(
-        {
-          error: 'live_classes_unavailable',
-          message:
-            "We couldn't connect to the live video service. Please try again shortly — you have not been charged.",
-        },
-        { status: 502 },
-      )
     }
 
     // Create the session. If a concurrent request won the race and created a
@@ -285,6 +250,7 @@ export async function POST(request: Request) {
           class: classId,
           tutor: user.id,
           roomId,
+          sfuSessionId,
           startedAt: new Date().toISOString(),
           status: 'live',
           attendees: [],

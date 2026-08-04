@@ -1574,7 +1574,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
 
             {/* Edit Class Sheet */}
             <Sheet open={isEditSheetOpen} onOpenChange={setIsEditSheetOpen}>
-                <SheetContent className="overflow-y-auto grid grid-cols-1 w-full sm:max-w-[45rem] [&[data-side=right]]:sm:max-w-[45rem] bg-card border-border">
+                <SheetContent className="overflow-y-auto grid grid-cols-1 w-full [&[data-side=right]]:w-full [&[data-side=right]]:max-w-none sm:max-w-[45rem] [&[data-side=right]]:sm:max-w-[45rem] bg-card border-border">
                     <SheetHeader>
                         <SheetTitle className="text-foreground">Edit Class</SheetTitle>
                         <SheetDescription className="text-muted-foreground">

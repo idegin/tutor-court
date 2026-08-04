@@ -2,6 +2,8 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
 import { toIntId } from '@/lib/id'

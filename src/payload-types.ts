@@ -574,6 +574,18 @@ export interface Whiteboard {
    */
   shareToken?: string | null;
   isPublic?: boolean | null;
+  /**
+   * Latest rendered whiteboard state (stroke list) for late joiners.
+   */
+  snapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -602,6 +614,18 @@ export interface LiveSession {
   whiteboardWritable?: boolean | null;
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
+  /**
+   * Cloudflare Realtime (Calls) session handle for this room, created when the class goes live. Empty until the SFU is provisioned.
+   */
+  sfuSessionId?: string | null;
+  /**
+   * Users currently publishing media (host + promoted students). Broadcast model.
+   */
+  stagePublishers?: (number | User)[] | null;
+  /**
+   * Users with a raised hand, oldest first (tutor promotes from here).
+   */
+  raisedHands?: (number | User)[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -887,6 +911,17 @@ export interface LiveSessionParticipant {
   joinedAt: string;
   leftAt?: string | null;
   durationSeconds?: number | null;
+  role?: ('host' | 'publisher' | 'viewer') | null;
+  handRaisedAt?: string | null;
+  /**
+   * Set when the host removes this participant; they may not rejoin.
+   */
+  removed?: boolean | null;
+  removedReason?: string | null;
+  /**
+   * This participant's Cloudflare Realtime session handle, bound on first RTC signalling so the server can verify they only act on their own media session.
+   */
+  sfuSessionId?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -903,6 +938,20 @@ export interface LiveSessionMessage {
   senderName: string;
   senderAccountType?: ('tutor' | 'student' | 'parent' | 'admin') | null;
   message: string;
+  /**
+   * Emoji reactions on this message.
+   */
+  reactions?:
+    | {
+        emoji: string;
+        user: number | User;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Optional message this one replies to.
+   */
+  replyTo?: (number | null) | LiveSessionMessage;
   updatedAt: string;
   createdAt: string;
 }
@@ -1654,6 +1703,7 @@ export interface WhiteboardsSelect<T extends boolean = true> {
   liveSession?: T;
   shareToken?: T;
   isPublic?: T;
+  snapshot?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1688,6 +1738,9 @@ export interface LiveSessionsSelect<T extends boolean = true> {
   whiteboardWritable?: T;
   coinsConsumed?: T;
   durationMinutes?: T;
+  sfuSessionId?: T;
+  stagePublishers?: T;
+  raisedHands?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1722,6 +1775,11 @@ export interface LiveSessionParticipantsSelect<T extends boolean = true> {
   joinedAt?: T;
   leftAt?: T;
   durationSeconds?: T;
+  role?: T;
+  handRaisedAt?: T;
+  removed?: T;
+  removedReason?: T;
+  sfuSessionId?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1735,6 +1793,14 @@ export interface LiveSessionMessagesSelect<T extends boolean = true> {
   senderName?: T;
   senderAccountType?: T;
   message?: T;
+  reactions?:
+    | T
+    | {
+        emoji?: T;
+        user?: T;
+        id?: T;
+      };
+  replyTo?: T;
   updatedAt?: T;
   createdAt?: T;
 }

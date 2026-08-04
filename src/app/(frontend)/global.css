@@ -210,3 +210,48 @@
         @apply font-sans;
     }
 }
+
+/* ── Live classroom v2 motion ─────────────────────────────────────────────
+   Scoped keyframes for the dark "broadcast studio" classroom. All are
+   transform/opacity only (compositor-friendly) and disabled under
+   prefers-reduced-motion below. */
+@keyframes lc-float {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%      { transform: translate3d(0, -22px, 0) scale(1.06); }
+}
+@keyframes lc-drift {
+    0%   { transform: translate3d(0, 0, 0); }
+    50%  { transform: translate3d(28px, -14px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes lc-pulse-ring {
+    0%   { transform: scale(0.82); opacity: 0.7; }
+    70%  { opacity: 0; }
+    100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes lc-reaction-rise {
+    0%   { transform: translate3d(0, 0, 0) scale(0.6); opacity: 0; }
+    12%  { opacity: 1; transform: translate3d(0, -8px, 0) scale(1.1); }
+    100% { transform: translate3d(var(--lc-drift, 12px), -160px, 0) scale(1); opacity: 0; }
+}
+@keyframes lc-speaking {
+    0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 0 0 5px color-mix(in oklch, var(--primary) 35%, transparent); }
+    50%      { box-shadow: 0 0 0 2px var(--primary), 0 0 0 9px color-mix(in oklch, var(--primary) 12%, transparent); }
+}
+@keyframes lc-shimmer {
+    100% { transform: translateX(100%); }
+}
+@keyframes lc-rise-in {
+    0%   { transform: translate3d(0, 14px, 0); opacity: 0; }
+    100% { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+.lc-float   { animation: lc-float 9s ease-in-out infinite; }
+.lc-drift   { animation: lc-drift 14s ease-in-out infinite; }
+.lc-speaking { animation: lc-speaking 1.6s ease-in-out infinite; }
+.lc-rise-in { animation: lc-rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+    .lc-float, .lc-drift, .lc-speaking, .lc-rise-in,
+    [class*="lc-"] { animation: none !important; }
+}

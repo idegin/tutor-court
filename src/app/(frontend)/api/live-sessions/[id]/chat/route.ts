@@ -2,6 +2,8 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { toIntId } from '@/lib/id'
 
 const MAX_MESSAGE_LENGTH = 2000
@@ -34,6 +36,21 @@ async function authorizeSession(payload: any, sessionId: number, user: any) {
   }
 
   if (!isAuthorized) return { ok: false as const, status: 403, error: 'Forbidden.' }
+
+  // A host-removed participant loses chat access (read + post), mirroring join.
+  if (user.id !== sessionTutorId && user.accountType !== 'admin') {
+    const plog = await payload.find({
+      collection: 'live-session-participants',
+      where: { and: [{ liveSession: { equals: sessionId } }, { user: { equals: user.id } }] },
+      sort: '-createdAt',
+      limit: 1,
+      depth: 0,
+    })
+    if ((plog.docs[0] as any)?.removed) {
+      return { ok: false as const, status: 403, error: 'You have been removed from this class.' }
+    }
+  }
+
   return { ok: true as const, session }
 }
 
@@ -104,6 +121,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
   const auth = await authorizeSession(payload, id, user)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  // Don't accept new chat on a class that's over (unbounded writes to a dead room).
+  if ((auth.session as any)?.status !== 'live') {
+    return NextResponse.json({ error: 'This class is not live.' }, { status: 409 })
+  }
 
   const body = await request.json().catch(() => ({}))
   const message = typeof body.message === 'string' ? body.message.trim() : ''

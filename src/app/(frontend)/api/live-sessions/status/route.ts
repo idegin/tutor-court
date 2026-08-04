@@ -2,6 +2,8 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { toIntId } from '@/lib/id'
 
 export async function GET(request: Request) {

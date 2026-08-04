@@ -2,7 +2,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { headers as getHeaders } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { WhiteboardCanvas } from '@/app/(frontend)/classroom/[classId]/whiteboard-canvas'
+import { StandaloneCanvas } from './standalone-canvas'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { HiOutlineArrowLeft } from 'react-icons/hi2'
@@ -37,16 +37,6 @@ export default async function StandaloneWhiteboardPage({
   if (!wb) {
     notFound()
   }
-
-  // Fetch slides
-  const slidesRes = await payload.find({
-    collection: 'whiteboard-slides',
-    where: { whiteboard: { equals: wb.id } },
-    sort: 'order',
-    limit: 100,
-    depth: 0,
-  })
-  const initialSlides = slidesRes.docs
 
   // Check access authorization: user must be tutor, parent, or student of the class
   const classDoc = wb.class as any
@@ -98,11 +88,7 @@ export default async function StandaloneWhiteboardPage({
 
       {/* Standalone Whiteboard Canvas */}
       <div className="flex-1 min-h-0 p-4">
-        <WhiteboardCanvas
-          whiteboardId={wb.id}
-          isTutor={canEdit}
-          initialSlides={initialSlides}
-        />
+        <StandaloneCanvas canEdit={canEdit} />
       </div>
     </div>
   )

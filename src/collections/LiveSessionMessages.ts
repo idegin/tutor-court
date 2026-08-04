@@ -66,6 +66,22 @@ export const LiveSessionMessages: CollectionConfig = {
       type: 'textarea',
       required: true,
     },
+    // ── Live Classroom v2: chat reactions + threading ──────────────────────
+    {
+      name: 'reactions',
+      type: 'array',
+      admin: { description: 'Emoji reactions on this message.' },
+      fields: [
+        { name: 'emoji', type: 'text', required: true },
+        { name: 'user', type: 'relationship', relationTo: 'users', required: true },
+      ],
+    },
+    {
+      name: 'replyTo',
+      type: 'relationship',
+      relationTo: 'live-session-messages',
+      admin: { description: 'Optional message this one replies to.' },
+    },
   ],
   timestamps: true,
 }

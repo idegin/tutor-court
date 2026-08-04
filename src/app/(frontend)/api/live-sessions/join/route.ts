@@ -2,20 +2,23 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { createNotification } from '@/lib/notification-service'
 import { createActivityLogs } from '@/lib/activity-log-service'
-import { isVideoSdkAvailable } from '@/lib/videosdk'
 import { toIntId } from '@/lib/id'
+import { isLiveClassroomReady } from '@/lib/live/config'
 
 const LATE_THRESHOLD_MINUTES = 5
 
 export async function POST(request: Request) {
-  if (!isVideoSdkAvailable()) {
+  // Don't admit anyone into a room whose media/data planes can't connect —
+  // otherwise attendance + the billable clock start against a dead room.
+  if (!isLiveClassroomReady()) {
     return NextResponse.json(
       {
         error: 'live_classes_unavailable',
-        message:
-          "We're working on bringing live classes back online. Please try again in a little while.",
+        message: "We're bringing live classes online. Please try again shortly.",
       },
       { status: 503 },
     )
@@ -111,7 +114,18 @@ export async function POST(request: Request) {
     // session (a beforeChange hook throws on a duplicate create). So create only
     // when none exists, reopen the existing one on rejoin, and no-op if already
     // active — otherwise a refresh/reconnect would 500.
+    // Broadcast model: the host (tutor) and admin publish; students/parents
+    // start as viewers and can be promoted to the stage by the host.
+    const joinRole = user.id === classTutorId ? 'host' : 'viewer'
+
     const latestLog = existingLog.docs[0] as any
+    // A participant the host removed may not rejoin.
+    if (latestLog?.removed) {
+      return NextResponse.json(
+        { error: 'You have been removed from this class by the tutor.' },
+        { status: 403 },
+      )
+    }
     if (!latestLog) {
       try {
         await payload.create({
@@ -121,6 +135,7 @@ export async function POST(request: Request) {
             class: classIdVal,
             user: user.id,
             accountType: user.accountType,
+            role: joinRole,
             joinedAt: new Date().toISOString(),
           } as any,
         })

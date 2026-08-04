@@ -2,8 +2,11 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { createActivityLogs } from '@/lib/activity-log-service'
 import { toIntId } from '@/lib/id'
+import { forceCloseParticipantTracks } from '@/lib/live/cf-realtime'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -55,6 +58,13 @@ export async function POST(request: Request) {
           durationSeconds: (Number(latestLog.durationSeconds) || 0) + intervalSeconds,
         } as any,
       })
+
+      // Authoritatively tear down this participant's SFU tracks (the client's
+      // pc.close()/beacon is best-effort). No-ops when SFU isn't configured or
+      // the participant never published.
+      if (latestLog.sfuSessionId) {
+        await forceCloseParticipantTracks(latestLog.sfuSessionId, String(user.id))
+      }
     }
 
     if (user.accountType === 'student') {

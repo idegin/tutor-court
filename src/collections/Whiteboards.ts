@@ -108,6 +108,13 @@ export const Whiteboards: CollectionConfig = {
       type: 'checkbox',
       defaultValue: false,
     },
+    // Live Classroom v2: latest stroke snapshot (JSON) so a late joiner renders
+    // the current board immediately, then subscribes to live ops via Ably.
+    {
+      name: 'snapshot',
+      type: 'json',
+      admin: { description: 'Latest rendered whiteboard state (stroke list) for late joiners.' },
+    },
   ],
   timestamps: true,
 }

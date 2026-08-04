@@ -2,17 +2,17 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+export const runtime = 'nodejs'
 import { CREDIT_RATE } from '@/lib/constants'
 import { createActivityLogs, ActivityLogEntry } from '@/lib/activity-log-service'
-import { generateVideoSdkToken, isVideoSdkAvailable } from '@/lib/videosdk'
 import { toIntId } from '@/lib/id'
-import { participantUserId } from '@/lib/live-participant-id'
 import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
 
 // Don't reconcile a participant log that was created moments ago: the /join
-// API call lands seconds BEFORE the browser's WebRTC join completes, so a
-// brand-new log briefly has no matching VideoSDK participant and would be
-// wrongly closed ("left at minute 0") by the very first poll.
+// API call lands seconds BEFORE media actually connects, so a brand-new log
+// briefly has no matching live participant and would be wrongly closed
+// ("left at minute 0") by the very first poll.
 const RECONCILE_GRACE_MS = 90 * 1000
 
 function deriveEngagementFlag(
@@ -27,61 +27,13 @@ function deriveEngagementFlag(
   return 'poor'
 }
 
-async function getActiveVideoSdkParticipants(roomId: string): Promise<string[] | null> {
-  if (!isVideoSdkAvailable()) return null
-
-  const token = generateVideoSdkToken(3600 * 2, 'server')
-  if (!token) return null
-
-  try {
-    const sessionsRes = await fetch(`https://api.videosdk.live/v2/sessions?roomId=${roomId}`, {
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!sessionsRes.ok) {
-      console.warn(`[VideoSDK] Fetch sessions for room ${roomId} failed: ${sessionsRes.statusText}`)
-      return null
-    }
-
-    const sessionsData = await sessionsRes.json()
-    const sessions = sessionsData.data || []
-
-    // Only an UN-ENDED VideoSDK session counts. Returning `[]` here would tell
-    // the caller "the room is verifiably empty" and every DB-active participant
-    // would be marked as left — but "no active session yet" is the NORMAL state
-    // in the first seconds after the room is created (before anyone completes
-    // the WebRTC join), and falling back to an ended session has the same
-    // mass-close effect. In both cases the truth is unknown → skip (null).
-    const activeSession = sessions.find((s: any) => !s.end)
-    if (!activeSession) return null
-
-    const sessionId = activeSession.id || activeSession.sessionId
-    if (!sessionId) return null
-
-    const participantsRes = await fetch(`https://api.videosdk.live/v2/sessions/${sessionId}/participants/active`, {
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!participantsRes.ok) {
-      console.warn(`[VideoSDK] Fetch active participants for session ${sessionId} failed: ${participantsRes.statusText}`)
-      return null
-    }
-
-    const participantsData = await participantsRes.json()
-    const activeParticipants = participantsData.data || []
-    // Participant ids are `${userId}--${nonce}` (see lib/live-participant-id);
-    // reduce them to app user ids for the DB comparison.
-    return activeParticipants.map((p: any) => participantUserId(p.participantId))
-  } catch (err) {
-    console.error('[VideoSDK] Error fetching active participants:', err)
-    return null
-  }
+// Server-authoritative presence for a live room. Under Live Classroom v2 this
+// comes from the Ably presence set (Phase 4), not a media-provider poll.
+// Returning `null` means "presence unknown" — every caller then SKIPS closing
+// participant logs and lets time-based billing proceed, which is the correct
+// conservative behavior until the Ably presence bridge lands.
+async function getActiveParticipantUserIds(_roomId: string): Promise<string[] | null> {
+  return null
 }
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -184,10 +136,14 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       })
     }
 
-    // Reconcile database active participants with VideoSDK active participants
+    // Reconcile database active participants against server-authoritative
+    // presence (null = unknown → skip closing logs; see the helper).
+    // NOTE: DEAD until Phase 4 wires Ably presence — getActiveParticipantUserIds
+    // currently always returns null, so this whole block is unexercised against
+    // the new backend. Re-validate the flap/grace assumptions when it lands.
     if (session.roomId) {
-      const activeVideoSdkUserIds = await getActiveVideoSdkParticipants(session.roomId)
-      if (activeVideoSdkUserIds !== null) {
+      const activePresenceUserIds = await getActiveParticipantUserIds(session.roomId)
+      if (activePresenceUserIds !== null) {
         const nowIso = new Date().toISOString()
         
         // All participant logs for this session — open ones may need closing,
@@ -208,9 +164,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             // Closed log but the user is verifiably active in the room →
             // reopen for a new interval. Require the close to be at least a
             // few seconds old so a just-left user with a briefly stale
-            // VideoSDK active list doesn't flap back open.
+            // presence set doesn't flap back open.
             const closedForMs = Date.now() - new Date(log.leftAt).getTime()
-            if (activeVideoSdkUserIds.includes(userIdStr) && closedForMs > 15_000) {
+            // A host-removed participant must never be reopened/re-billed.
+            if (!log.removed && activePresenceUserIds.includes(userIdStr) && closedForMs > 15_000) {
               await payload.update({
                 collection: 'live-session-participants',
                 id: log.id,
@@ -241,12 +198,12 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
             continue
           }
 
-          // Give a fresh join time to complete its WebRTC handshake before we
-          // trust VideoSDK's active list for it.
+          // Give a fresh join time to complete its media handshake before we
+          // trust the presence set for it.
           if (Date.now() - logJoinedTime < RECONCILE_GRACE_MS) continue
 
-          // If user is NOT active in VideoSDK, mark them as left in the DB
-          if (!activeVideoSdkUserIds.includes(userIdStr)) {
+          // If the user is NOT present, mark them as left in the DB.
+          if (!activePresenceUserIds.includes(userIdStr)) {
             const intervalSeconds = Math.max(0, Math.floor((Date.now() - logJoinedTime) / 1000))
 
             await payload.update({
@@ -497,7 +454,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       }
 
       // 4. Update session status
-      const updatedSession = await payload.update({
+      await payload.update({
         collection: 'live-sessions',
         id: session.id,
         data: {

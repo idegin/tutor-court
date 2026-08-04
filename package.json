@@ -35,7 +35,7 @@
     "@tailwindcss/postcss": "^4.2.2",
     "@tanstack/react-query": "^5.91.2",
     "@tanstack/react-query-devtools": "^5.91.3",
-    "@videosdk.live/react-sdk": "^0.13.1",
+    "ably": "^2.26.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

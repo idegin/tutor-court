@@ -13,6 +13,7 @@ import * as migration_20260706_000003_class_booking_unique from './20260706_0000
 import * as migration_20260706_185822_payout_requests from './20260706_185822_payout_requests';
 import * as migration_20260706_190000_reviews_booking_unique from './20260706_190000_reviews_booking_unique';
 import * as migration_20260706_200000_disputes from './20260706_200000_disputes';
+import * as migration_20260804_101918_live_classroom_v2_fields from './20260804_101918_live_classroom_v2_fields';
 
 export const migrations = [
   {
@@ -78,16 +79,21 @@ export const migrations = [
   {
     up: migration_20260706_185822_payout_requests.up,
     down: migration_20260706_185822_payout_requests.down,
-    name: '20260706_185822_payout_requests'
+    name: '20260706_185822_payout_requests',
   },
   {
     up: migration_20260706_190000_reviews_booking_unique.up,
     down: migration_20260706_190000_reviews_booking_unique.down,
-    name: '20260706_190000_reviews_booking_unique'
+    name: '20260706_190000_reviews_booking_unique',
   },
   {
     up: migration_20260706_200000_disputes.up,
     down: migration_20260706_200000_disputes.down,
-    name: '20260706_200000_disputes'
+    name: '20260706_200000_disputes',
+  },
+  {
+    up: migration_20260804_101918_live_classroom_v2_fields.up,
+    down: migration_20260804_101918_live_classroom_v2_fields.down,
+    name: '20260804_101918_live_classroom_v2_fields'
   },
 ];
