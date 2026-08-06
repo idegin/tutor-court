@@ -16,7 +16,7 @@ export const liveConfig = {
   sfu: {
     appId: env('CLOUDFLARE_REALTIME_APP_ID'),
     appSecret: env('CLOUDFLARE_REALTIME_APP_SECRET'),
-    baseUrl: env('CLOUDFLARE_REALTIME_BASE_URL') ?? 'https://rtc.live.cloudflare.com/v1',
+    baseUrl: 'https://rtc.live.cloudflare.com/v1',
   },
   ably: {
     apiKey: env('ABLY_API_KEY'),
@@ -24,7 +24,7 @@ export const liveConfig = {
   billing: {
     // Prefer a server-only value; fall back to the public one (client display).
     lowCreditThreshold:
-      Number(env('LIVE_LOW_CREDIT_THRESHOLD') ?? env('NEXT_PUBLIC_LIVE_LOW_CREDIT_THRESHOLD') ?? '40') || 40,
+      Number(env('LIVE_LOW_CREDIT_THRESHOLD') ?? '40') || 40,
   },
 } as const
 

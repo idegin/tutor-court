@@ -615,6 +615,10 @@ export interface LiveSession {
   coinsConsumed?: number | null;
   durationMinutes?: number | null;
   /**
+   * Bumped on each tutor billing heartbeat. The sweep cron ends any live session whose heartbeat has gone stale (tutor tab died) so billing settles and the room closes.
+   */
+  lastHeartbeatAt?: string | null;
+  /**
    * Cloudflare Realtime (Calls) session handle for this room, created when the class goes live. Empty until the SFU is provisioned.
    */
   sfuSessionId?: string | null;
@@ -1738,6 +1742,7 @@ export interface LiveSessionsSelect<T extends boolean = true> {
   whiteboardWritable?: T;
   coinsConsumed?: T;
   durationMinutes?: T;
+  lastHeartbeatAt?: T;
   sfuSessionId?: T;
   stagePublishers?: T;
   raisedHands?: T;
