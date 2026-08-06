@@ -7,7 +7,7 @@ const reviews = [
         quote: "Finding a tutor who actually understands how my son learns was a challenge until we found TutorCourt. His grades in Physics jumped from a C to an A within one term.",
         author: "Mrs. Funmi Balogun",
         role: "Parent of Year 11 Student",
-        avatarUrl: "https://xsgames.co/randomusers/assets/avatars/female/11.jpg"
+        avatarUrl: "https://images.unsplash.com/photo-1743871698163-a2e470d8eac7?auto=format&fit=crop&q=80&w=200"
     }
 ];
 
@@ -74,7 +74,7 @@ export function ReviewsSection() {
                         {/* Top Right Box (Smiling Boy) */}
                         <div className="absolute top-[2%] right-[5%] w-[45%] h-[40%] bg-primary rounded-[2rem] border-[3px] border-foreground overflow-hidden z-10 transform translate-x-4 -translate-y-4">
                             <img
-                                src="https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&q=80&w=800"
+                                src="https://images.unsplash.com/photo-1536337005238-94b997371b40?auto=format&fit=crop&q=80&w=800"
                                 alt="Student smiling"
                                 className="w-full h-full object-cover opacity-90"
                             />
@@ -83,7 +83,7 @@ export function ReviewsSection() {
                         {/* Middle Left Box (Group studying) */}
                         <div className="absolute top-[15%] left-[5%] w-[60%] h-[45%] bg-tutor-purple-200 dark:bg-tutor-purple-800 rounded-[2.5rem] border-[3px] border-foreground overflow-hidden z-20 shadow-none transform -rotate-3 hover:rotate-0 transition-transform duration-500 origin-bottom-right">
                             <img
-                                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=800"
+                                src="https://images.unsplash.com/photo-1758525860449-fa3602fceb31?auto=format&fit=crop&q=80&w=800"
                                 alt="Study group"
                                 className="w-full h-full object-cover opacity-95"
                             />
@@ -92,7 +92,7 @@ export function ReviewsSection() {
                         {/* Bottom Right Box (Teacher) */}
                         <div className="absolute bottom-[5%] right-[5%] w-[55%] h-[45%] bg-tutor-red-200 dark:bg-tutor-red-900 rounded-[2.5rem] border-[3px] border-foreground overflow-hidden z-30 transform rotate-2 hover:rotate-0 transition-transform duration-500 origin-top-left">
                             <img
-                                src="https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800"
+                                src="https://images.unsplash.com/photo-1632215861513-130b66fe97f4?auto=format&fit=crop&q=80&w=800"
                                 alt="Teacher teaching"
                                 className="w-full h-full object-cover opacity-90"
                             />
@@ -101,7 +101,7 @@ export function ReviewsSection() {
                         {/* Bottom Left Box (Laptop) */}
                         <div className="absolute bottom-[10%] left-[10%] w-[40%] h-[35%] bg-muted rounded-[2rem] border-[3px] border-foreground overflow-hidden z-10">
                             <img
-                                src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=800"
+                                src="https://images.unsplash.com/photo-1744809495173-217ca4faa8bc?auto=format&fit=crop&q=80&w=800"
                                 alt="Student desk"
                                 className="w-full h-full object-cover grayscale opacity-90"
                             />

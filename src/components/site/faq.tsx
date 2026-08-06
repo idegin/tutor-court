@@ -8,7 +8,7 @@ const faqs = [
     {
         id: "faq-1",
         question: "How do I know if a tutor is qualified?",
-        answer: "Every tutor on Academia undergoes a rigorous verification process, including background checks, academic credential verification, and a teaching skills assessment session."
+        answer: "Every tutor on TutorCourt undergoes a rigorous verification process, including background checks, academic credential verification, and a teaching skills assessment session."
     },
     {
         id: "faq-2",
@@ -37,7 +37,7 @@ export function FaqSection() {
                         Frequently Asked Questions
                     </h2>
                     <p className="text-lg text-muted-foreground font-semibold">
-                        Everything you need to know about the Academia platform.
+                        Everything you need to know about the TutorCourt platform.
                     </p>
                 </div>
 

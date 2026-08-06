@@ -32,7 +32,7 @@ export function SiteHeader() {
             <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-8">
                 <div className="flex items-center gap-10">
                     <Link href="/" className="flex items-center space-x-2">
-                        <img src="/logo.png" alt="Academia Logo" width={40} className='rounded-lg' />
+                        <img src="/logo.png" alt="TutorCourt Logo" width={40} className='rounded-lg' />
                         <span className='text-xl font-bold'>TutorCourt</span>
                     </Link>
                     <nav className="hidden md:flex gap-8 px-8">
@@ -65,7 +65,7 @@ export function SiteHeader() {
                         </Link>
                         <Link
                             href="/for-tutors"
-                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/for-parents')
+                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/for-tutors')
                                 ? 'border-b-2 border-foreground text-foreground'
                                 : 'text-muted-foreground hover:text-foreground'
                                 }`}
@@ -74,7 +74,7 @@ export function SiteHeader() {
                         </Link>
                         <Link
                             href="/subjects"
-                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/for-parents')
+                            className={`text-sm font-bold pb-1 transition-colors ${pathname?.startsWith('/subjects')
                                 ? 'border-b-2 border-foreground text-foreground'
                                 : 'text-muted-foreground hover:text-foreground'
                                 }`}

@@ -68,7 +68,7 @@ export function FeaturesSection() {
                     <div className="relative h-[500px] md:h-[600px] lg:h-[700px] w-full flex items-center justify-center lg:justify-end mt-12 lg:mt-0">
                         <div className="w-[90%] md:w-[85%] h-full rounded-[2.5rem] border-[3px] border-foreground overflow-hidden relative z-10 bg-muted">
                             <img
-                                src="https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&q=80&w=1200"
+                                src="https://images.unsplash.com/photo-1620829813573-7c9e1877706f?auto=format&fit=crop&q=80&w=1200"
                                 alt="Student studying with laptop"
                                 className="w-full h-full object-cover grayscale opacity-90"
                             />

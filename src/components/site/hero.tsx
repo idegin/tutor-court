@@ -113,7 +113,7 @@ export function SiteHero() {
             <div className="container relative z-10 px-4 md:px-8 mx-auto flex flex-col justify-center max-w-7xl">
                 <div className="max-w-3xl pt-10">
                     <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tight text-foreground leading-[1.05] mb-6">
-                        Fine qualified <br className="hidden md:block" />
+                        Find qualified <br className="hidden md:block" />
                         <span className="relative inline-block">
                             <span className="italic text-primary relative z-10">tutors</span>
                             <span className="absolute bottom-2 left-0 w-full h-[10px] bg-tutor-purple-200 z-0 rounded-sm"></span>
