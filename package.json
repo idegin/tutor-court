@@ -108,5 +108,11 @@
       "esbuild",
       "unrs-resolver"
     ]
-  }
+  },
+  "browserslist": [
+    "chrome >= 111",
+    "safari >= 16.4",
+    "firefox >= 111",
+    "edge >= 111"
+  ]
 }
