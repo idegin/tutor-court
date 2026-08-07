@@ -179,8 +179,8 @@ export class SfuClient {
       const pc = this.requirePc()
       const published: PublishedTracks = {}
       for (const t of this.localTrackObjects) {
-        if (t.trackName.endsWith('-audio')) published.audio = t.trackName
-        else if (t.trackName.endsWith('-video')) published.video = t.trackName
+        if (t.trackName?.endsWith('-audio')) published.audio = t.trackName
+        else if (t.trackName?.endsWith('-video')) published.video = t.trackName
       }
 
       const added: TrackObject[] = []
