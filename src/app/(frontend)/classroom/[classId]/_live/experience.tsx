@@ -644,6 +644,10 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const remoteStreams = realtimeEnabled ? room.streams : undefined
   const everyone = [local, ...effectiveRemote]
   const handCount = effectiveRemote.filter((p) => p.handRaisedAt).length
+  // Retries have been exhausted — the realtime backend can't be reached (network
+  // or, commonly, a misconfigured Ably key). Surface it clearly instead of a
+  // silent "you're the only one here" room.
+  const connectionFailed = realtimeEnabled && room.connectionState === 'failed'
 
   const panelContent =
     panel === 'people' ? (
@@ -687,6 +691,27 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       <div className="relative flex min-h-0 flex-1 gap-3 px-3 pb-2 sm:px-4">
         <main className="relative min-w-0 flex-1">
           <ReactionsLayer items={floating} />
+          {connectionFailed && (
+            <div className="absolute inset-0 z-40 grid place-items-center rounded-3xl bg-neutral-950/85 p-6 backdrop-blur-sm">
+              <div className="flex max-w-sm flex-col items-center text-center">
+                <span className="grid size-14 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-amber-300 [&_svg]:size-7">
+                  <HiOutlineExclamationTriangle />
+                </span>
+                <h3 className="mt-5 text-lg font-semibold">Can’t connect to the live class</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/60">
+                  We couldn’t reach the live service, so you can’t see or hear other participants yet.
+                  This is usually a network hiccup or a temporary service issue.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-6 inline-flex h-10 items-center rounded-xl bg-white px-4 text-sm font-semibold text-neutral-900 transition-colors hover:bg-white/90"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
           {whiteboardOn ? (
             <Stage participants={everyone} localStream={media.stream} remoteStreams={remoteStreams} filmstrip>
               <BoardsPanel
