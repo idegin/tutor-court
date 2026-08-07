@@ -169,8 +169,15 @@ export class RealtimeRoom {
 
     // Publish now if the local stream is already available; otherwise
     // publishStream() is called later (from the hook) once media is granted.
+    // NON-FATAL: a media-publish failure (e.g. a 403 or transient SFU error)
+    // must NOT abort join — presence + chat/reactions/hands are a separate plane
+    // and have to come up regardless, or a media hiccup blacks out the whole room.
     if (this.canPublishNow && localStream && localStream.getTracks().length > 0) {
-      await this.doPublish(localStream)
+      try {
+        await this.doPublish(localStream)
+      } catch (err) {
+        console.error('[room] initial media publish failed (continuing with data plane)', err)
+      }
     }
 
     // Sub-channel subscriptions.
