@@ -3,8 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { ClassroomExperience } from './_live/experience'
 import { ClassroomUnavailable } from './_live/unavailable'
-import type { ClassroomBootstrap, Identity, LiveSession } from './_live/types'
+import type { ClassroomBootstrap, Identity, LiveSession, Whiteboard } from './_live/types'
 import { isLiveClassroomReady } from '@/lib/live/config'
+import { seededHue } from './_live/avatar'
 import { toIntId } from '@/lib/id'
 
 // Live Classroom v2 — real data only.
@@ -136,6 +137,29 @@ export default async function ClassroomPage({ params, searchParams }: PageProps)
     creditBalance = Number((wallet?.docs?.[0] as any)?.creditBalance ?? 0)
   }
 
+  // Hydrate the class's persisted whiteboards (+ their stroke snapshots) so the
+  // room opens with existing boards, and a (re)joiner renders their content
+  // immediately before live Ably ops arrive.
+  let boards: Whiteboard[] = []
+  const wbRes = await payload
+    .find({
+      collection: 'whiteboards',
+      where: { class: { equals: numericClassId } },
+      sort: 'createdAt',
+      limit: 50,
+      depth: 0,
+    })
+    .catch(() => null)
+  if (wbRes?.docs) {
+    boards = wbRes.docs.map((wb: any) => ({
+      id: String(wb.id),
+      title: wb.title || 'Board',
+      hue: seededHue(String(wb.id)),
+      createdBy: String(idOf(wb.owner)),
+      snapshot: Array.isArray(wb.snapshot) ? wb.snapshot : [],
+    }))
+  }
+
   const bootstrap: ClassroomBootstrap = {
     ready: true,
     role: isTutor ? 'tutor' : 'student',
@@ -145,7 +169,7 @@ export default async function ClassroomPage({ params, searchParams }: PageProps)
     liveSessionId: liveSession ? liveSession.id : null,
     startedAt: liveSession?.startedAt ? String(liveSession.startedAt) : null,
     creditBalance,
-    boards: [],
+    boards,
   }
 
   return <ClassroomExperience bootstrap={bootstrap} />

@@ -42,6 +42,7 @@ export function BoardsPanel({
   onToggleWritable,
   onClose,
   onDraw,
+  onSnapshot,
   remoteOps,
 }: {
   boards: Whiteboard[]
@@ -54,6 +55,9 @@ export function BoardsPanel({
   onClose: () => void
   /** Emitted when the local user completes a stroke or clears (for realtime sync). */
   onDraw?: (op: WBOp) => void
+  /** Emitted (debounced by the caller) with a board's full stroke list so it can
+   *  be persisted as a snapshot. */
+  onSnapshot?: (boardId: string, strokes: Stroke[]) => void
   /** Ops from other participants to apply. Each is applied at most once (by id). */
   remoteOps?: WBOp[]
 }) {
@@ -64,6 +68,30 @@ export function BoardsPanel({
   const drawing = React.useRef<string | null>(null)
   const active = boards.find((b) => b.id === activeId) ?? boards[0]
   const list = active ? strokes[active.id] ?? [] : []
+
+  // Seed a board's strokes from its persisted snapshot the first time we see it
+  // (only when we have no local strokes for it yet, so live drawing is never
+  // clobbered by a late-arriving snapshot).
+  React.useEffect(() => {
+    setStrokes((prev) => {
+      let next = prev
+      for (const b of boards) {
+        if (next[b.id] === undefined && b.snapshot && b.snapshot.length > 0) {
+          if (next === prev) next = { ...prev }
+          next[b.id] = b.snapshot
+        }
+      }
+      return next
+    })
+  }, [boards])
+
+  // Emit the active board's snapshot when its strokes settle (never mid-stroke).
+  // The caller debounces the actual persistence.
+  React.useEffect(() => {
+    if (drawing.current || !active || !onSnapshot) return
+    onSnapshot(active.id, strokes[active.id] ?? [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [strokes, active?.id])
 
   // Apply remote ops exactly once (deduped by op id).
   const appliedRef = React.useRef<Set<string>>(new Set())

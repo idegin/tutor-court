@@ -23,6 +23,7 @@ import type {
   PanelKind,
   Phase,
   ReactionEmoji,
+  WBStroke,
 } from './types'
 import { buildInitialState } from './initial-state'
 import { useSfx } from './use-sfx'
@@ -550,9 +551,23 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     if (k === 'chat') setUnread(0)
   }
 
-  const createBoard = () => {
-    const id = `wb_${boards.length + 1}_${rid()}`
-    const nb = { id, title: `Board ${boards.length + 1}`, hue: (boards.length * 47) % 360, createdBy: String(localId) }
+  const createBoard = async () => {
+    const title = `Board ${boards.length + 1}`
+    // Persist first so the board has a real id shared across all clients + the
+    // DB. Fall back to a local id if persistence fails (still works this session).
+    let id = `wb_${boards.length + 1}_${rid()}`
+    try {
+      const res = await fetch('/api/whiteboards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, classId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.whiteboard?.id) id = String(data.whiteboard.id)
+    } catch {
+      /* keep the local fallback id */
+    }
+    const nb = { id, title, hue: (boards.length * 47) % 360, createdBy: String(localId) }
     setBoards((b) => [...b, nb])
     setActiveBoard(id)
     if (!whiteboardOn) setWhiteboardOn(true)
@@ -563,6 +578,24 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     }
     roomToast({ title: 'New whiteboard created', tone: 'success', icon: <HiOutlinePresentationChartBar /> })
   }
+
+  // Persist a board's strokes (debounced) so they survive rejoins + the session.
+  // Tutor-only (the authoritative drawer) and only for real DB boards.
+  const snapshotTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const saveSnapshot = React.useCallback(
+    (boardId: string, strokes: WBStroke[]) => {
+      if (!isTutor || !/^\d+$/.test(boardId)) return
+      clearTimeout(snapshotTimers.current[boardId])
+      snapshotTimers.current[boardId] = setTimeout(() => {
+        fetch(`/api/whiteboards/${boardId}/snapshot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ snapshot: strokes }),
+        }).catch(() => {})
+      }, 1500)
+    },
+    [isTutor],
+  )
 
   const selectBoard = (id: string) => {
     setActiveBoard(id)
@@ -745,6 +778,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
                   wbLocalOpIds.current.add(op.id)
                   room.actions.sendWhiteboard({ kind: 'op', op })
                 }}
+                onSnapshot={saveSnapshot}
                 remoteOps={realtimeEnabled ? wbOps : undefined}
               />
             </Stage>

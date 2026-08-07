@@ -45,12 +45,20 @@ export interface ChatMessage {
   system?: boolean
 }
 
+export interface WBStroke {
+  d: string
+  color: string
+}
+
 export interface Whiteboard {
   id: string
   title: string
-  /** Deterministic hue used to render the mock board's accent. */
+  /** Deterministic hue used to render the board's accent. */
   hue: number
   createdBy: string
+  /** Persisted stroke snapshot (from the DB) so a (re)joiner renders the board
+   *  immediately, before live Ably ops arrive. */
+  snapshot?: WBStroke[]
 }
 
 export interface LiveSession {
