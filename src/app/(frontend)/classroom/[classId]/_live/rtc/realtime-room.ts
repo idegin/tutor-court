@@ -114,16 +114,28 @@ export class RealtimeRoom {
       authCallback: async (_params, callback) => {
         try {
           const res = await fetch(`/api/live/ably-token?sessionId=${sessionId}`, { cache: 'no-store' })
-          if (!res.ok) throw new Error(`ably-token ${res.status}`)
+          if (!res.ok) {
+            // Surface the server's reason (e.g. realtime_not_configured, access
+            // denied) so a dead connection is diagnosable instead of silent.
+            const body = await res.text().catch(() => '')
+            throw new Error(`ably-token ${res.status} ${body}`)
+          }
           const tokenRequest = await res.json()
           callback(null, tokenRequest)
         } catch (err: any) {
+          console.error('[room] ably token fetch failed:', err?.message ?? err)
           callback(err?.message ?? 'auth failed', null)
         }
       },
     })
 
     this.client.connection.on((stateChange) => {
+      // Log the failure reason (Ably error code + message) so "Connection lost"
+      // is diagnosable — e.g. 40160 capability mismatch (key lacks the live:*
+      // channels/presence) or 40100 invalid credentials.
+      if (stateChange.current === 'failed' || stateChange.current === 'suspended') {
+        console.error('[room] ably connection', stateChange.current, stateChange.reason)
+      }
       this.opts.events.onConnectionState?.(stateChange.current)
     })
 

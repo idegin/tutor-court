@@ -98,6 +98,8 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const [unread, setUnread] = React.useState(0)
   const [elapsed, setElapsed] = React.useState(0)
   const [soundOn] = React.useState(true)
+  // Drives the lobby button's spinner so a slow start/join doesn't look dead.
+  const [joining, setJoining] = React.useState(false)
 
   const playSfx = useSfx(soundOn)
   const media = useLocalMedia()
@@ -239,10 +241,18 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     }
   }, [fetchStatus, doJoin, goLive, playSfx])
 
-  const join = React.useCallback(() => {
-    if (isTutor) return void startAsTutor()
-    return void joinAsStudent()
-  }, [isTutor, startAsTutor, joinAsStudent])
+  const join = React.useCallback(async () => {
+    if (joining) return
+    setJoining(true)
+    try {
+      if (isTutor) await startAsTutor()
+      else await joinAsStudent()
+    } finally {
+      // On success the phase changed and the lobby unmounts; on failure/waiting
+      // re-enable the button.
+      if (mountedRef.current) setJoining(false)
+    }
+  }, [joining, isTutor, startAsTutor, joinAsStudent])
 
   // Leaving: the tutor ends the session for everyone; a student just checks out
   // (finalising their billable duration). Best-effort — teardown also runs
@@ -592,6 +602,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
         isTutor={isTutor}
         media={media}
         onJoin={join}
+        busy={joining}
       />
     )
   }

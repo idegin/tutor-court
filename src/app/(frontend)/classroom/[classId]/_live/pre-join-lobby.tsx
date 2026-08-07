@@ -29,12 +29,14 @@ export function PreJoinLobby({
   isTutor,
   media,
   onJoin,
+  busy = false,
 }: {
   session: LiveSession
   localUser: Participant
   isTutor: boolean
   media: LocalMedia
   onJoin: () => void
+  busy?: boolean
 }) {
   const hue = seededHue(localUser.name)
   const { permission, error, stream, micOn, camOn, level, ensureAccess } = media
@@ -159,9 +161,23 @@ export function PreJoinLobby({
           <ReadyRow icon={micOn ? <HiMiniMicrophone /> : <LuMicOff />} label="Microphone" value={blocked ? 'Blocked' : micOn ? 'Ready' : 'Muted'} ok={micOn && !blocked} />
           <ReadyRow icon={camOn ? <HiMiniVideoCamera /> : <HiOutlineVideoCameraSlash />} label="Camera" value={blocked ? 'Blocked' : camOn ? 'Ready' : 'Off'} ok={camOn && !blocked} />
 
-          <Button size="lg" onClick={onJoin} className="mt-1 h-12 w-full rounded-2xl text-base font-semibold">
-            {isTutor ? 'Start class' : 'Join class'}
-            <HiArrowRight className="ml-1" />
+          <Button
+            size="lg"
+            onClick={onJoin}
+            disabled={busy}
+            className="mt-1 h-12 w-full rounded-2xl text-base font-semibold disabled:opacity-80"
+          >
+            {busy ? (
+              <>
+                <span className="mr-1 size-4 animate-spin rounded-full border-2 border-current/30 border-t-current" />
+                {isTutor ? 'Starting…' : 'Joining…'}
+              </>
+            ) : (
+              <>
+                {isTutor ? 'Start class' : 'Join class'}
+                <HiArrowRight className="ml-1" />
+              </>
+            )}
           </Button>
 
           {/* mobile settings link */}

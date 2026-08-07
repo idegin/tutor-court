@@ -68,46 +68,72 @@ export function useRealtimeRoom(opts: {
     if (!enabled) return
     let cancelled = false
     let room: RealtimeRoom | null = null
+    const MAX_ATTEMPTS = 5
 
-    ;(async () => {
-      try {
-        const iceRes = await fetch(`/api/live/ice?sessionId=${liveSessionId}`, { cache: 'no-store' })
-        const iceServers = iceRes.ok ? (await iceRes.json()).iceServers : []
-        if (cancelled) return
+    const attemptJoin = async () => {
+      // Retry the initial connection with backoff. Without this, a transient
+      // failure (slow ably-token, ICE hiccup, momentary network drop during
+      // join) leaves the room stuck on "Connection lost" forever — Ably's own
+      // reconnection only kicks in AFTER a first successful connect.
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS && !cancelled; attempt++) {
+        try {
+          const iceRes = await fetch(`/api/live/ice?sessionId=${liveSessionId}`, { cache: 'no-store' })
+          const iceServers = iceRes.ok ? (await iceRes.json()).iceServers : []
+          if (cancelled) return
 
-        room = new RealtimeRoom({
-          liveSessionId,
-          user: opts.user,
-          iceServers,
-          canPublish,
-          events: {
-            onConnectionState: (s) => setConnectionState(s),
-            onParticipants: (list) => setParticipants(list),
-            onStream: (userId, stream) =>
-              setStreams((prev) => new Map(prev).set(userId, stream)),
-            onStreamGone: (userId) =>
-              setStreams((prev) => {
-                const next = new Map(prev)
-                next.delete(userId)
-                return next
-              }),
-            onChat: (m) => cbs.current.onChat?.(m),
-            onReaction: (e, from) => cbs.current.onReaction?.(e, from),
-            onControl: (a, d, from) => cbs.current.onControl?.(a, d, from),
-            onWhiteboard: (o, from) => cbs.current.onWhiteboard?.(o, from),
-          },
-        })
-        roomRef.current = room
-        await room.join(localStream)
-        // Publish now if media was already granted (join covers the ready case);
-        // the effect below covers a stream that arrives after join.
-        if (!cancelled && localStream) room.publishStream(localStream).catch(() => {})
-        if (!cancelled) setReady(true)
-      } catch (err) {
-        console.error('[useRealtimeRoom] join failed', err)
-        if (!cancelled) setConnectionState('failed')
+          room = new RealtimeRoom({
+            liveSessionId,
+            user: opts.user,
+            iceServers,
+            canPublish,
+            events: {
+              onConnectionState: (s) => setConnectionState(s),
+              onParticipants: (list) => setParticipants(list),
+              onStream: (userId, stream) =>
+                setStreams((prev) => new Map(prev).set(userId, stream)),
+              onStreamGone: (userId) =>
+                setStreams((prev) => {
+                  const next = new Map(prev)
+                  next.delete(userId)
+                  return next
+                }),
+              onChat: (m) => cbs.current.onChat?.(m),
+              onReaction: (e, from) => cbs.current.onReaction?.(e, from),
+              onControl: (a, d, from) => cbs.current.onControl?.(a, d, from),
+              onWhiteboard: (o, from) => cbs.current.onWhiteboard?.(o, from),
+            },
+          })
+          roomRef.current = room
+          await room.join(localStream)
+          // Publish now if media was already granted (join covers the ready case);
+          // the effect below covers a stream that arrives after join.
+          if (!cancelled && localStream) room.publishStream(localStream).catch(() => {})
+          if (!cancelled) setReady(true)
+          return
+        } catch (err) {
+          console.error(`[useRealtimeRoom] join failed (attempt ${attempt}/${MAX_ATTEMPTS})`, err)
+          // Tear down the partial room before retrying so we don't leak an Ably
+          // connection / SFU session.
+          try {
+            await room?.leave()
+          } catch {
+            /* ignore */
+          }
+          room = null
+          roomRef.current = null
+          if (cancelled) return
+          if (attempt >= MAX_ATTEMPTS) {
+            setConnectionState('failed')
+            return
+          }
+          // Show "Reconnecting…", not "Connection lost", while we retry.
+          setConnectionState('connecting')
+          await new Promise((r) => setTimeout(r, Math.min(8000, 1000 * attempt)))
+        }
       }
-    })()
+    }
+
+    attemptJoin()
 
     return () => {
       cancelled = true

@@ -198,6 +198,8 @@ export function useLocalMedia(): LocalMedia {
     if (videoTrack) next.addTrack(videoTrack)
     streamRef.current = next
     setStream(next)
+    // NB: the audio track is carried over unchanged, so the level meter (bound to
+    // that same live track) keeps working — no need to restart it here.
   }, [])
 
   // Re-open the camera after it was released (toggled back on).
@@ -259,7 +261,10 @@ export function useLocalMedia(): LocalMedia {
       }
       if (kind === 'camera') {
         setCameraId(deviceId)
-        acquire({ cameraId: deviceId })
+        // Don't re-open the camera just to switch it while it's toggled OFF
+        // (that would light the device); the new id is applied on the next
+        // toggle-on via reacquireVideo.
+        if (camOnRef.current) acquire({ cameraId: deviceId })
       } else {
         setMicId(deviceId)
         acquire({ micId: deviceId })
