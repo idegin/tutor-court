@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { liveCapabilities, liveConfig, isAblyConfigured } from '@/lib/live/config'
 import { createAblyTokenRequest, participantCapability } from '@/lib/live/ably-server'
+import { generateIceServers } from '@/lib/live/turn'
 import { resolveSessionAccess } from '@/lib/live/access'
 
 export const runtime = 'nodejs'
@@ -78,6 +79,22 @@ export async function GET(request: Request) {
     } catch (err: any) {
       result.ably = { configured: true, tested: true, ok: false, error: err?.message ?? String(err) }
     }
+  }
+
+  // ICE / TURN reachability — media (SFU) needs a working TURN relay to traverse
+  // restrictive NATs. If this is degraded / has no turn: URLs, cross-network
+  // audio/video will fail even though Ably presence + chat work fine.
+  try {
+    const ice = await generateIceServers(60)
+    const urls = ice.iceServers.flatMap((s) => (Array.isArray(s.urls) ? s.urls : [s.urls]))
+    result.ice = {
+      turnConfigured: caps.turn,
+      degraded: ice.degraded,
+      hasTurn: urls.some((u) => u.startsWith('turn:') || u.startsWith('turns:')),
+      urls,
+    }
+  } catch (err: any) {
+    result.ice = { turnConfigured: caps.turn, error: err?.message ?? String(err) }
   }
 
   return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store' } })

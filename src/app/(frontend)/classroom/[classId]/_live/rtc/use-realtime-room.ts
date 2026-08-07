@@ -22,6 +22,8 @@ export interface RealtimeRoomActions {
 
 export interface UseRealtimeRoomResult {
   connectionState: string
+  /** SFU PeerConnection (media) state — for diagnostics. */
+  mediaState: string
   participants: RoomParticipant[]
   streams: Map<string, MediaStream>
   actions: RealtimeRoomActions
@@ -52,6 +54,7 @@ export function useRealtimeRoom(opts: {
   onWhiteboard?: (op: any, fromId: string) => void
 }): UseRealtimeRoomResult {
   const [connectionState, setConnectionState] = React.useState('initialized')
+  const [mediaState, setMediaState] = React.useState('new')
   const [participants, setParticipants] = React.useState<RoomParticipant[]>([])
   const [streams, setStreams] = React.useState<Map<string, MediaStream>>(new Map())
   const [ready, setReady] = React.useState(false)
@@ -88,6 +91,7 @@ export function useRealtimeRoom(opts: {
             canPublish,
             events: {
               onConnectionState: (s) => setConnectionState(s),
+              onMediaState: (s) => setMediaState(s),
               onParticipants: (list) => setParticipants(list),
               onStream: (userId, stream) =>
                 setStreams((prev) => new Map(prev).set(userId, stream)),
@@ -168,5 +172,5 @@ export function useRealtimeRoom(opts: {
     }
   }, [enabled])
 
-  return { connectionState, participants, streams, actions, ready }
+  return { connectionState, mediaState, participants, streams, actions, ready }
 }

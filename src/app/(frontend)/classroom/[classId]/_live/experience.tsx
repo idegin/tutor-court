@@ -737,8 +737,10 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
             <ConnectionDebug
               liveSessionId={liveSessionId}
               connectionState={room.connectionState}
+              mediaState={room.mediaState}
               ready={room.ready}
               participantCount={everyone.length}
+              streamCount={room.streams.size}
             />
           )}
           {connectionFailed && (

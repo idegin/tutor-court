@@ -21,6 +21,12 @@ interface Diagnostics {
     subscribe?: boolean
     usable?: boolean
   }
+  ice?: {
+    turnConfigured?: boolean
+    degraded?: boolean
+    hasTurn?: boolean
+    error?: string
+  }
 }
 
 function Row({ label, ok, value }: { label: string; ok?: boolean; value: React.ReactNode }) {
@@ -39,13 +45,17 @@ function Row({ label, ok, value }: { label: string; ok?: boolean; value: React.R
 export function ConnectionDebug({
   liveSessionId,
   connectionState,
+  mediaState,
   ready,
   participantCount,
+  streamCount,
 }: {
   liveSessionId: string | number | null
   connectionState: string
+  mediaState: string
   ready: boolean
   participantCount: number
+  streamCount: number
 }) {
   const [open, setOpen] = React.useState(true)
   const [diag, setDiag] = React.useState<Diagnostics | null>(null)
@@ -98,13 +108,22 @@ export function ConnectionDebug({
       </div>
 
       <Row label="Ably connection" ok={connectionState === 'connected'} value={connectionState} />
+      <Row label="Media (SFU) state" ok={mediaState === 'connected'} value={mediaState} />
+      <Row label="Remote streams pulled" ok={streamCount > 0} value={streamCount} />
       <Row label="Room ready" ok={ready} value={String(ready)} />
       <Row label="Participants (incl. you)" value={participantCount} />
       <Row label="Session id" value={String(liveSessionId ?? '—')} />
 
       <div className="mt-2 mb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Backend config</div>
       <Row label="SFU (Cloudflare)" ok={cfg?.sfu} value={String(cfg?.sfu ?? '…')} />
-      <Row label="TURN" ok={cfg?.turn} value={String(cfg?.turn ?? '…')} />
+      <Row label="TURN configured" ok={cfg?.turn} value={String(cfg?.turn ?? '…')} />
+      <Row label="TURN reachable" ok={diag?.ice?.hasTurn} value={diag?.ice ? String(diag.ice.hasTurn ?? false) : '…'} />
+      {diag?.ice?.degraded && (
+        <p className="mt-1 rounded bg-amber-400/15 px-2 py-1.5 text-[10px] leading-snug text-amber-200">
+          ICE is <b>degraded (STUN-only)</b> — TURN relay unavailable. Cross-network audio/video
+          will fail. Set CLOUDFLARE_TURN_KEY_ID + CLOUDFLARE_TURN_API_TOKEN on the deploy.
+        </p>
+      )}
       <Row label="Ably key present" ok={cfg?.ably} value={String(cfg?.ably ?? '…')} />
 
       <div className="mt-2 mb-1 text-[10px] font-semibold tracking-wide text-white/40 uppercase">Your access</div>

@@ -48,6 +48,8 @@ export interface RoomEvents {
   onControl?: (action: string, data: any, fromId: string) => void
   onWhiteboard?: (op: any, fromId: string) => void
   onConnectionState?: (state: string) => void
+  /** SFU PeerConnection state (media plane) — for diagnostics. */
+  onMediaState?: (state: string) => void
 }
 
 export interface RoomOptions {
@@ -208,6 +210,7 @@ export class RealtimeRoom {
   }
 
   private onMediaConnectionState(state: string): void {
+    this.opts.events.onMediaState?.(state)
     if (this.closed) return
     if (state === 'connected') this.rebuildAttempts = 0
     if (state === 'failed') void this.rebuildMedia()
