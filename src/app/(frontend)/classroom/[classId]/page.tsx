@@ -16,7 +16,7 @@ import { toIntId } from '@/lib/id'
 
 interface PageProps {
   params: Promise<{ classId: string }>
-  searchParams: Promise<{ sessionId?: string; as?: string }>
+  searchParams: Promise<{ sessionId?: string }>
 }
 
 const idOf = (v: any) => (v && typeof v === 'object' ? v.id : v)
@@ -141,6 +141,7 @@ export default async function ClassroomPage({ params, searchParams }: PageProps)
     identity,
     session: sessionMeta,
     liveSessionId: liveSession ? liveSession.id : null,
+    startedAt: liveSession?.startedAt ? String(liveSession.startedAt) : null,
     creditBalance,
     boards: [],
   }

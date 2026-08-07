@@ -41,6 +41,10 @@ export class SfuClient {
   private midMeta = new Map<string, { sfuSessionId: string; trackName: string }>()
   /** local track objects we published, so we can close them on teardown. */
   private localTrackObjects: TrackObject[] = []
+  /** kind → the send RTCRtpSender, so we can replace/null its track on toggle. */
+  private sendersByKind = new Map<'audio' | 'video', RTCRtpSender>()
+  /** the authenticated publisher id, retained so a later add-track keeps naming. */
+  private publisherId = ''
   private pullTimers = new Set<ReturnType<typeof setTimeout>>()
   /**
    * Serialize ALL SDP mutations. Concurrent publish()/pull() on one PC would
@@ -131,12 +135,14 @@ export class SfuClient {
   async publish(stream: MediaStream, publisherUserId: string): Promise<PublishedTracks> {
     return this.serialize(async () => {
       const pc = this.requirePc()
+      this.publisherId = publisherUserId
       const published: PublishedTracks = {}
       const localTracks: TrackObject[] = []
 
       for (const track of stream.getTracks()) {
         const transceiver = pc.addTransceiver(track, { direction: 'sendonly' })
         const trackName = `${publisherUserId}-${track.kind}`
+        this.sendersByKind.set(track.kind as 'audio' | 'video', transceiver.sender)
         localTracks.push({ location: 'local', mid: transceiver.mid, trackName })
         if (track.kind === 'audio') published.audio = trackName
         else published.video = trackName
@@ -158,18 +164,57 @@ export class SfuClient {
   }
 
   /**
-   * Swap the outgoing tracks (e.g. the user picked a different camera/mic, which
-   * produces a brand-new MediaStream). Uses RTCRtpSender.replaceTrack so the
-   * trackNames Cloudflare already assigned stay valid — no renegotiation, no
-   * presence update, peers keep pulling the same names.
+   * Reconcile the outgoing tracks to match `stream`, per kind:
+   *  - track present + sender exists  → replaceTrack (device switch / cam resume);
+   *    trackName stays valid, peers keep pulling, no renegotiation.
+   *  - track present + no sender yet   → addTransceiver + renegotiate (e.g. joined
+   *    with the camera off, then turned it on); returns the new trackName so the
+   *    caller can advertise it over presence.
+   *  - track ABSENT + sender exists    → replaceTrack(null) (camera released/off);
+   *    keeps the sender + trackName so a later resume just replaces the track again.
+   * Returns the full set of published trackNames (existing + any newly added).
    */
-  async replaceTracks(stream: MediaStream): Promise<void> {
+  async syncTracks(stream: MediaStream): Promise<PublishedTracks> {
     return this.serialize(async () => {
       const pc = this.requirePc()
-      for (const track of stream.getTracks()) {
-        const sender = pc.getSenders().find((s) => s.track?.kind === track.kind)
-        if (sender) await sender.replaceTrack(track)
+      const published: PublishedTracks = {}
+      for (const t of this.localTrackObjects) {
+        if (t.trackName.endsWith('-audio')) published.audio = t.trackName
+        else if (t.trackName.endsWith('-video')) published.video = t.trackName
       }
+
+      const added: TrackObject[] = []
+      for (const kind of ['audio', 'video'] as const) {
+        const track = stream.getTracks().find((t) => t.kind === kind) ?? null
+        const sender = this.sendersByKind.get(kind)
+        if (track) {
+          if (sender) {
+            await sender.replaceTrack(track)
+          } else {
+            const transceiver = pc.addTransceiver(track, { direction: 'sendonly' })
+            const trackName = `${this.publisherId}-${kind}`
+            this.sendersByKind.set(kind, transceiver.sender)
+            added.push({ location: 'local', mid: transceiver.mid, trackName })
+            published[kind] = trackName
+          }
+        } else if (sender) {
+          await sender.replaceTrack(null)
+        }
+      }
+
+      if (added.length > 0) {
+        await pc.setLocalDescription(await pc.createOffer())
+        const res = await this.rpc({
+          action: 'tracks',
+          sessionDescription: { type: 'offer', sdp: pc.localDescription!.sdp },
+          tracks: added,
+        })
+        if (res.sessionDescription) {
+          await pc.setRemoteDescription(new RTCSessionDescription(res.sessionDescription))
+        }
+        this.localTrackObjects.push(...added)
+      }
+      return published
     })
   }
 
@@ -238,6 +283,7 @@ export class SfuClient {
         }
       }
       this.localTrackObjects = []
+      this.sendersByKind.clear()
     })
   }
 

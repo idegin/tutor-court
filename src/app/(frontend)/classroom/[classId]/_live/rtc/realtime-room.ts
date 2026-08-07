@@ -128,7 +128,9 @@ export class RealtimeRoom {
     })
 
     this.base = this.client.channels.get(CH.base(sessionId))
-    this.chat = this.client.channels.get(CH.chat(sessionId))
+    // rewind replays recent chat so a late joiner arrives to context, not a
+    // blank thread.
+    this.chat = this.client.channels.get(CH.chat(sessionId), { params: { rewind: '50' } })
     this.reactions = this.client.channels.get(CH.reactions(sessionId))
     this.hands = this.client.channels.get(CH.hands(sessionId))
     // rewind replays recent whiteboard ops so a late joiner sees the current
@@ -246,12 +248,21 @@ export class RealtimeRoom {
     if (this.closed || !this.canPublishNow) return
     if (!this.sfu?.id || stream.getTracks().length === 0) return
     // Already published (or a publish is in flight carrying the current tracks):
-    // a device switch just swaps the outgoing media, same trackNames. Keep
-    // lastStream current so a media rebuild re-publishes the LIVE stream, not the
-    // ended tracks of the pre-switch one.
+    // reconcile the outgoing tracks to the current stream. A device switch swaps
+    // media (same trackNames); a camera toggle stops/re-adds the video track.
+    // Keep lastStream current so a media rebuild re-publishes the LIVE stream,
+    // not the ended tracks of the pre-toggle one. Re-advertise the track names
+    // (a newly-added video track has a name peers must learn to pull it).
     if (this.published || this.publishing) {
       this.lastStream = stream
-      await this.sfu.replaceTracks(stream)
+      const pub = await this.sfu.syncTracks(stream)
+      const prevAudio = this.local.audioTrack
+      const prevVideo = this.local.videoTrack
+      this.local.audioTrack = pub.audio ?? null
+      this.local.videoTrack = pub.video ?? null
+      if (this.entered && (prevAudio !== this.local.audioTrack || prevVideo !== this.local.videoTrack)) {
+        await this.base?.presence.update(this.local).catch(() => {})
+      }
       return
     }
     await this.doPublish(stream)

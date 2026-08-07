@@ -154,7 +154,17 @@ export function useLocalMedia(): LocalMedia {
         // stop any previous stream before swapping
         streamRef.current?.getTracks().forEach((t) => t.stop())
         next.getAudioTracks().forEach((t) => (t.enabled = micOnRef.current))
-        next.getVideoTracks().forEach((t) => (t.enabled = camOnRef.current))
+        if (camOnRef.current) {
+          next.getVideoTracks().forEach((t) => (t.enabled = true))
+        } else {
+          // Camera is toggled off — fully RELEASE the just-acquired video device
+          // (stop + drop the track) so the hardware indicator light doesn't stay
+          // lit while the camera is "off".
+          next.getVideoTracks().forEach((t) => {
+            t.stop()
+            next.removeTrack(t)
+          })
+        }
         streamRef.current = next
         setStream(next)
         setPermission('granted')
@@ -178,9 +188,48 @@ export function useLocalMedia(): LocalMedia {
     await acquire()
   }, [acquire])
 
+  // Swap the local stream for a new one carrying the current audio track plus an
+  // optional video track. The new object identity signals React (and the SFU
+  // publish effect) that the outgoing media changed.
+  const rebuildStream = React.useCallback((videoTrack: MediaStreamTrack | null) => {
+    const prev = streamRef.current
+    const next = new MediaStream()
+    prev?.getAudioTracks().forEach((t) => next.addTrack(t))
+    if (videoTrack) next.addTrack(videoTrack)
+    streamRef.current = next
+    setStream(next)
+  }, [])
+
+  // Re-open the camera after it was released (toggled back on).
+  const reacquireVideo = React.useCallback(async () => {
+    try {
+      const vs = await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: cameraId ? { exact: cameraId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+        },
+      })
+      const vt = vs.getVideoTracks()[0]
+      if (!vt) return
+      vt.enabled = true
+      rebuildStream(vt)
+      const id = vt.getSettings().deviceId
+      if (id) setCameraId(id)
+      setError(null)
+    } catch (e) {
+      camOnRef.current = false
+      setCamOn(false)
+      setError(humanizeError(e))
+    }
+  }, [cameraId, rebuildStream])
+
   const toggleMic = React.useCallback(() => {
     setMicOn((v) => {
       const next = !v
+      // Audio is muted via `enabled` (no device-release needed) so the level
+      // meter and instant unmute keep working.
       streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = next))
       if (!next) setLevel(0)
       return next
@@ -188,12 +237,19 @@ export function useLocalMedia(): LocalMedia {
   }, [])
 
   const toggleCam = React.useCallback(() => {
-    setCamOn((v) => {
-      const next = !v
-      streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = next))
-      return next
-    })
-  }, [])
+    const next = !camOnRef.current
+    camOnRef.current = next
+    setCamOn(next)
+    if (next) {
+      void reacquireVideo()
+    } else {
+      // Turning the camera OFF fully stops + releases the video device so the
+      // hardware indicator light turns off — not just `enabled = false`, which
+      // keeps the camera open.
+      streamRef.current?.getVideoTracks().forEach((t) => t.stop())
+      rebuildStream(null)
+    }
+  }, [reacquireVideo, rebuildStream])
 
   const selectDevice = React.useCallback(
     (kind: 'camera' | 'mic' | 'speaker', deviceId: string) => {

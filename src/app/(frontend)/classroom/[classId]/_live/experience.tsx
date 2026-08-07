@@ -37,7 +37,7 @@ import { Stage } from './stage'
 import { ControlBar } from './control-bar'
 import { ChatPanel } from './chat-panel'
 import { PeoplePanel } from './people-panel'
-import { BoardsPanel } from './boards-panel'
+import { BoardsPanel, type WBOp } from './boards-panel'
 import { CreditMeter } from './credit-meter'
 import { EndedScreen } from './ended-screen'
 import { ReactionsLayer, type FloatingReaction } from './reactions'
@@ -55,6 +55,7 @@ interface StatusResponse {
   status?: 'live' | 'inactive' | 'ended' | 'waiting'
   sessionId?: string | number
   roomId?: string
+  startedAt?: string
 }
 
 export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstrap }) {
@@ -81,11 +82,19 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     liveSessionIdRef.current = liveSessionId
   }, [liveSessionId])
 
+  // Tracks mount state so post-await state updates (e.g. after a poll+join) don't
+  // fire on an unmounted component.
+  const mountedRef = React.useRef(true)
+  React.useEffect(() => () => { mountedRef.current = false }, [])
+  // When the live session actually started — used to seed the elapsed clock so a
+  // late joiner sees the real running time, not 00:00.
+  const startedAtRef = React.useRef<string | null>(bootstrap.startedAt ?? null)
+
   const [panel, setPanel] = React.useState<PanelKind>(null)
   const [whiteboardOn, setWhiteboardOn] = React.useState(false)
   const [activeBoard, setActiveBoard] = React.useState<string | null>(initial.whiteboards[0]?.id ?? null)
   const [floating, setFloating] = React.useState<FloatingReaction[]>([])
-  const [wbOps, setWbOps] = React.useState<any[]>([])
+  const [wbOps, setWbOps] = React.useState<WBOp[]>([])
   const [unread, setUnread] = React.useState(0)
   const [elapsed, setElapsed] = React.useState(0)
   const [soundOn] = React.useState(true)
@@ -204,8 +213,10 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       }
     }
     setLiveSessionId(sid)
-    // Host participation log — also lets the SFU bind the tutor's published tracks.
-    await doJoin(sid!)
+    // Host participation log — also lets the SFU bind the tutor's published
+    // tracks. If it fails (e.g. removed / auth race) don't go live with no log,
+    // which would leave the tutor unable to publish; doJoin surfaced the reason.
+    if (!(await doJoin(sid!))) return
     playSfx('join')
     goLive()
   }, [classId, doJoin, goLive, playSfx])
@@ -215,8 +226,11 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const joinAsStudent = React.useCallback(async () => {
     const status = await fetchStatus()
     if (status?.status === 'live' && status.sessionId) {
+      if (status.startedAt) startedAtRef.current = status.startedAt
       setLiveSessionId(status.sessionId)
-      if (await doJoin(status.sessionId)) {
+      const ok = await doJoin(status.sessionId)
+      if (!mountedRef.current) return
+      if (ok) {
         playSfx('join')
         goLive()
       }
@@ -262,8 +276,10 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       if (!alive || !status) return
       if (status.status === 'live' && status.sessionId) {
         alive = false
+        if (status.startedAt) startedAtRef.current = status.startedAt
         setLiveSessionId(status.sessionId)
         const ok = await doJoin(status.sessionId)
+        if (!mountedRef.current) return
         if (!ok) {
           setPhase('ended')
           return
@@ -289,6 +305,13 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   // ── live timers: elapsed clock ────────────────────────────────────────────
   React.useEffect(() => {
     if (phase !== 'live') return
+    // Seed from the real session start so a late joiner sees the running time,
+    // not 00:00. (Done in an effect, not useState init, to avoid an SSR/CSR
+    // hydration mismatch from Date.now().)
+    const startedAt = startedAtRef.current
+    if (startedAt) {
+      setElapsed(Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)))
+    }
     const id = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(id)
   }, [phase])

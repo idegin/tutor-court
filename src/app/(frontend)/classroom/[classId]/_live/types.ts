@@ -108,6 +108,8 @@ export interface ClassroomBootstrap {
   session: LiveSession
   /** The active live-session id, or null when the tutor hasn't started yet. */
   liveSessionId: string | number | null
+  /** ISO start time of the live session, to seed the elapsed clock; null if not started. */
+  startedAt: string | null
   /** Tutor wallet balance for the credit meter; null for students/parents. */
   creditBalance: number | null
   boards: Whiteboard[]
