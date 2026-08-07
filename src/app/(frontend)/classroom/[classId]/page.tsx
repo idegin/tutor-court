@@ -121,12 +121,10 @@ export default async function ClassroomPage({ params, searchParams }: PageProps)
     name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
     accountType: isTutor ? 'tutor' : isStudent ? 'student' : 'parent',
     role: isTutor ? 'host' : 'viewer',
-    // Only the HOST publishes media by default. Students join as viewers and
-    // publish only once the tutor promotes them to the stage — this MUST match
-    // the server (access.ts: canPublish = host || onStage). If a student claims
-    // canPublish here, their SFU publish is 403'd and that rejection kills the
-    // whole realtime join (→ "can't connect"). Promotion flips it on server-side.
-    canPublish: isTutor,
+    // Tutor + enrolled students publish media (everyone sees everyone); parents
+    // observe only. MUST match the server (access.ts: canPublish = host ||
+    // student) or a student's SFU publish is 403'd and kills their realtime join.
+    canPublish: isTutor || isStudent,
   }
 
   // Tutor-only wallet balance for the live credit meter.

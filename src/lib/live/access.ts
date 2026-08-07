@@ -69,10 +69,8 @@ export async function resolveSessionAccess(
     return { ok: false, status: 403, error: 'You are not a member of this class.' }
   }
 
-  // One participant-row read serves both the removal check and stage status
-  // (the row's `role` is authoritative — no read-modify-write race like a shared
-  // stagePublishers array would have).
-  let onStage = false
+  // A host-removed participant is refused everywhere (token re-issue, RTC,
+  // moderate) — this is what makes a kick stick across a refresh/reauth.
   if (!isHost) {
     const plog = await payload
       .find({
@@ -84,17 +82,15 @@ export async function resolveSessionAccess(
       })
       .catch(() => null)
     const row = plog?.docs?.[0] as any
-    // A host-removed participant is refused everywhere (token re-issue, RTC,
-    // moderate) — this is what makes a kick stick across a refresh/reauth.
     if (row?.removed) {
       return { ok: false, status: 403, error: 'You have been removed from this class.' }
     }
-    onStage = row?.role === 'publisher'
   }
 
-  // Broadcast model: only the host and host-promoted students publish MEDIA.
-  // Everyone non-observer can still use chat/reactions/hands (Ably capability).
+  // Broadcast model: host + enrolled students publish MEDIA (everyone sees
+  // everyone, as expected for tutoring); parents observe only. Chat/reactions/
+  // hands are governed by the Ably capability (non-observers publish those too).
   const role: LiveRole = isHost ? 'host' : isStudent ? 'participant' : 'observer'
-  const canPublish = isHost || (isStudent && onStage)
+  const canPublish = isHost || isStudent
   return { ok: true, status: 200, sessionId, session, cls, role, isHost, canPublish }
 }
