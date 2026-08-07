@@ -41,6 +41,7 @@ import { BoardsPanel, type WBOp } from './boards-panel'
 import { CreditMeter } from './credit-meter'
 import { EndedScreen } from './ended-screen'
 import { ReactionsLayer, type FloatingReaction } from './reactions'
+import { ConnectionDebug } from './connection-debug'
 
 let RID = 0
 const rid = () => `r_${++RID}_${performance.now().toFixed(0)}`
@@ -100,6 +101,12 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const [soundOn] = React.useState(true)
   // Drives the lobby button's spinner so a slow start/join doesn't look dead.
   const [joining, setJoining] = React.useState(false)
+  // In-room diagnostics overlay, enabled with ?debug=1 (read client-side to
+  // avoid an SSR/CSR mismatch).
+  const [debug, setDebug] = React.useState(false)
+  React.useEffect(() => {
+    setDebug(new URLSearchParams(window.location.search).get('debug') === '1')
+  }, [])
 
   const playSfx = useSfx(soundOn)
   const media = useLocalMedia()
@@ -691,6 +698,14 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       <div className="relative flex min-h-0 flex-1 gap-3 px-3 pb-2 sm:px-4">
         <main className="relative min-w-0 flex-1">
           <ReactionsLayer items={floating} />
+          {debug && (
+            <ConnectionDebug
+              liveSessionId={liveSessionId}
+              connectionState={room.connectionState}
+              ready={room.ready}
+              participantCount={everyone.length}
+            />
+          )}
           {connectionFailed && (
             <div className="absolute inset-0 z-40 grid place-items-center rounded-3xl bg-neutral-950/85 p-6 backdrop-blur-sm">
               <div className="flex max-w-sm flex-col items-center text-center">
