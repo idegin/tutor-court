@@ -455,7 +455,9 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       ids: room.participants.map((p) => p.id),
       connected: room.ready && room.connectionState === 'connected',
     }
-    peakAttendeesRef.current = Math.max(peakAttendeesRef.current, room.participants.length + 1)
+    // room.participants (Ably presence) already includes the local user — don't
+    // add 1 or every session over-counts attendees by one.
+    peakAttendeesRef.current = Math.max(peakAttendeesRef.current, room.participants.length)
   }, [room.participants, room.ready, room.connectionState])
 
   // Broadcast local mic/cam changes to presence in real mode.
