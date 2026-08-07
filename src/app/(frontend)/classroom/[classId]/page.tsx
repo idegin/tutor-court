@@ -1,77 +1,149 @@
 import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { ClassroomExperience, type RealtimeProps } from './_live/experience'
+import { ClassroomExperience } from './_live/experience'
+import { ClassroomUnavailable } from './_live/unavailable'
+import type { ClassroomBootstrap, Identity, LiveSession } from './_live/types'
 import { isLiveClassroomReady } from '@/lib/live/config'
+import { toIntId } from '@/lib/id'
 
-// Live Classroom v2.
+// Live Classroom v2 — real data only.
 //
-// The UI is mock-first: without a resolved real live session (or without the
-// realtime keys) it runs on simulated data ("Demo mode"). When the tutor has
-// started a session AND the Cloudflare Realtime + Ably keys are configured, this
-// server component hands the client real identity + the live session id, and the
-// experience switches to real Ably presence + SFU media.
-//
-// Dev preview of the flow (no auth needed): /classroom/<id>?as=tutor|student
+// This server component resolves the class, the authenticated user, and the
+// active live session, then hands the client a fully-real ClassroomBootstrap.
+// When the backend keys aren't configured (or the user can't access the class)
+// we render a clear "unavailable" screen — never a simulated room.
 
 interface PageProps {
   params: Promise<{ classId: string }>
-  searchParams: Promise<{ as?: string }>
+  searchParams: Promise<{ sessionId?: string; as?: string }>
 }
 
 const idOf = (v: any) => (v && typeof v === 'object' ? v.id : v)
 
 export default async function ClassroomPage({ params, searchParams }: PageProps) {
   const { classId } = await params
-  const { as } = await searchParams
+  const { sessionId: sessionIdParam } = await searchParams
 
-  let realtime: RealtimeProps | undefined
-  let role: 'tutor' | 'student' = as === 'student' ? 'student' : 'tutor'
-
-  try {
-    // Only bother resolving a real session when the backend is actually configured.
-    if (isLiveClassroomReady()) {
-      const payload = await getPayload({ config })
-      const headers = await getHeaders()
-      const { user } = await payload.auth({ headers })
-      const numericClassId = /^\d+$/.test(classId) ? Number(classId) : classId
-
-      if (user) {
-        const cls = await payload
-          .findByID({ collection: 'classes', id: numericClassId, depth: 0 })
-          .catch(() => null)
-        const live = await payload
-          .find({
-            collection: 'live-sessions',
-            where: { and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }] },
-            sort: ['-startedAt', '-id'],
-            limit: 1,
-            depth: 0,
-          })
-          .catch(() => null)
-        const session = live?.docs?.[0]
-
-        if (cls && session) {
-          const isTutor = String(idOf(cls.tutor)) === String(user.id)
-          const isStudent = (cls.students ?? []).some((s: any) => String(idOf(s)) === String(user.id))
-          role = isTutor ? 'tutor' : 'student'
-          realtime = {
-            liveSessionId: session.id,
-            user: {
-              id: String(user.id),
-              name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
-              accountType: (user.accountType as any) === 'tutor' ? 'tutor' : isStudent ? 'student' : 'parent',
-              role: isTutor ? 'host' : 'viewer',
-            },
-            // Tutor + enrolled students publish; parents observe only.
-            canPublish: isTutor || isStudent,
-          }
-        }
-      }
-    }
-  } catch {
-    // Any resolution failure → fall back to mock preview.
+  // Backend not configured → honest unavailable state (no mock fallback).
+  if (!isLiveClassroomReady()) {
+    return <ClassroomUnavailable reason="not_configured" />
   }
 
-  return <ClassroomExperience as={role} realtime={realtime} />
+  const payload = await getPayload({ config })
+  const headers = await getHeaders()
+  const { user } = await payload.auth({ headers })
+
+  if (!user) {
+    return <ClassroomUnavailable reason="unauthenticated" classId={classId} />
+  }
+
+  const numericClassId = /^\d+$/.test(classId) ? Number(classId) : classId
+  const cls = await payload
+    .findByID({ collection: 'classes', id: numericClassId, depth: 1 })
+    .catch(() => null)
+
+  if (!cls) {
+    return <ClassroomUnavailable reason="not_found" />
+  }
+
+  // Membership check — only the tutor, an enrolled student, or a linked parent
+  // (or an admin) may enter.
+  const uid = String(user.id)
+  const tutorId = String(idOf(cls.tutor))
+  const studentIds = (cls.students ?? []).map((s: any) => String(idOf(s)))
+  const parentIds = ((cls as any).parents ?? []).map((p: any) => String(idOf(p)))
+  const isTutor = uid === tutorId
+  const isStudent = studentIds.includes(uid)
+  const isParent = parentIds.includes(uid)
+  const isAdmin = user.accountType === 'admin'
+
+  if (!isTutor && !isStudent && !isParent && !isAdmin) {
+    return <ClassroomUnavailable reason="forbidden" />
+  }
+
+  // Resolve the active live session: prefer the one named in ?sessionId= (when
+  // it's live and belongs to this class), otherwise the newest live session.
+  let liveSession: any = null
+  const sid = toIntId(sessionIdParam)
+  if (sid) {
+    const s = await payload
+      .findByID({ collection: 'live-sessions', id: sid, depth: 0 })
+      .catch(() => null)
+    if (s && s.status === 'live' && String(idOf(s.class)) === String(numericClassId)) {
+      liveSession = s
+    }
+  }
+  if (!liveSession) {
+    const live = await payload
+      .find({
+        collection: 'live-sessions',
+        where: { and: [{ class: { equals: numericClassId } }, { status: { equals: 'live' } }] },
+        sort: ['-startedAt', '-id'],
+        limit: 1,
+        depth: 0,
+      })
+      .catch(() => null)
+    liveSession = live?.docs?.[0] ?? null
+  }
+
+  // Room display metadata — sourced from the class so the lobby/waiting screens
+  // show real info even before a live session exists.
+  const tutorDoc = cls.tutor
+  const tutorName =
+    (tutorDoc && typeof tutorDoc === 'object'
+      ? `${(tutorDoc as any).firstName ?? ''} ${(tutorDoc as any).lastName ?? ''}`.trim() ||
+        (tutorDoc as any).email
+      : '') || 'Your tutor'
+  const subjectDoc = (cls as any).subject
+  const subjectName =
+    subjectDoc && typeof subjectDoc === 'object'
+      ? (subjectDoc as any).name ?? 'General'
+      : 'General'
+
+  const sessionMeta: LiveSession = {
+    id: liveSession ? String(liveSession.id) : '',
+    roomId: liveSession?.roomId ?? '',
+    classTitle: (cls as any).title || 'Live class',
+    subject: subjectName,
+    classType: (cls as any).classType === 'group' ? 'group' : 'one-on-one',
+    tutorName,
+    status: liveSession ? (liveSession.status as any) : 'waiting',
+    whiteboardVisible: Boolean(liveSession?.showWhiteboard),
+    whiteboardWritable: Boolean(liveSession?.whiteboardWritable),
+    activeWhiteboardId: liveSession?.activeWhiteboard
+      ? String(idOf(liveSession.activeWhiteboard))
+      : null,
+  }
+
+  const identity: Identity = {
+    id: uid,
+    name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
+    accountType: isTutor ? 'tutor' : isStudent ? 'student' : 'parent',
+    role: isTutor ? 'host' : 'viewer',
+    // Tutor + enrolled students publish; parents (and pure observers) watch only.
+    canPublish: isTutor || isStudent,
+  }
+
+  // Tutor-only wallet balance for the live credit meter.
+  let creditBalance: number | null = null
+  if (isTutor) {
+    const wallet = await payload
+      .find({ collection: 'wallets', where: { user: { equals: user.id } }, limit: 1, depth: 0 })
+      .catch(() => null)
+    creditBalance = Number((wallet?.docs?.[0] as any)?.creditBalance ?? 0)
+  }
+
+  const bootstrap: ClassroomBootstrap = {
+    ready: true,
+    role: isTutor ? 'tutor' : 'student',
+    classId: String(numericClassId),
+    identity,
+    session: sessionMeta,
+    liveSessionId: liveSession ? liveSession.id : null,
+    creditBalance,
+    boards: [],
+  }
+
+  return <ClassroomExperience bootstrap={bootstrap} />
 }

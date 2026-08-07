@@ -18,16 +18,16 @@ import {
 } from 'react-icons/hi2'
 import type {
   ChatMessage,
+  ClassroomBootstrap,
   Participant,
   PanelKind,
   Phase,
   ReactionEmoji,
 } from './types'
-import { buildMockState } from './mock-data'
+import { buildInitialState } from './initial-state'
 import { useSfx } from './use-sfx'
 import { useLocalMedia } from './use-local-media'
 import { useIsDesktop } from './use-media-query'
-import { useCapabilities } from './rtc/use-capabilities'
 import { useRealtimeRoom } from './rtc/use-realtime-room'
 import type { RoomParticipant } from './rtc/realtime-room'
 import { roomToast, messageToast } from './room-toast'
@@ -37,7 +37,7 @@ import { Stage } from './stage'
 import { ControlBar } from './control-bar'
 import { ChatPanel } from './chat-panel'
 import { PeoplePanel } from './people-panel'
-import { BoardsPanel, type WBOp } from './boards-panel'
+import { BoardsPanel } from './boards-panel'
 import { CreditMeter } from './credit-meter'
 import { EndedScreen } from './ended-screen'
 import { ReactionsLayer, type FloatingReaction } from './reactions'
@@ -45,16 +45,23 @@ import { ReactionsLayer, type FloatingReaction } from './reactions'
 let RID = 0
 const rid = () => `r_${++RID}_${performance.now().toFixed(0)}`
 
-export interface RealtimeProps {
+interface RealtimeProps {
   liveSessionId: string | number
   user: { id: string; name: string; accountType: 'tutor' | 'student' | 'parent'; role: 'host' | 'publisher' | 'viewer' }
   canPublish: boolean
 }
 
-export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student'; realtime?: RealtimeProps }) {
+interface StatusResponse {
+  status?: 'live' | 'inactive' | 'ended' | 'waiting'
+  sessionId?: string | number
+  roomId?: string
+}
+
+export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstrap }) {
   const router = useRouter()
-  const isTutor = as === 'tutor'
-  const initial = React.useMemo(() => buildMockState(as), [as])
+  const { role, identity, classId } = bootstrap
+  const isTutor = role === 'tutor'
+  const initial = React.useMemo(() => buildInitialState(bootstrap), [bootstrap])
 
   const [phase, setPhase] = React.useState<Phase>('lobby')
   const [local, setLocal] = React.useState<Participant>(initial.localUser)
@@ -64,11 +71,21 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   const [credit, setCredit] = React.useState(initial.credit)
   const [session, setSession] = React.useState(initial.session)
 
+  // The active live-session id: known upfront when the tutor already started;
+  // resolved via status polling for a student who arrives before the tutor.
+  const [liveSessionId, setLiveSessionId] = React.useState<string | number | null>(
+    bootstrap.liveSessionId,
+  )
+  const liveSessionIdRef = React.useRef(liveSessionId)
+  React.useEffect(() => {
+    liveSessionIdRef.current = liveSessionId
+  }, [liveSessionId])
+
   const [panel, setPanel] = React.useState<PanelKind>(null)
   const [whiteboardOn, setWhiteboardOn] = React.useState(false)
   const [activeBoard, setActiveBoard] = React.useState<string | null>(initial.whiteboards[0]?.id ?? null)
   const [floating, setFloating] = React.useState<FloatingReaction[]>([])
-  const [wbOps, setWbOps] = React.useState<WBOp[]>([])
+  const [wbOps, setWbOps] = React.useState<any[]>([])
   const [unread, setUnread] = React.useState(0)
   const [elapsed, setElapsed] = React.useState(0)
   const [soundOn] = React.useState(true)
@@ -76,36 +93,33 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   const playSfx = useSfx(soundOn)
   const media = useLocalMedia()
   const isDesktop = useIsDesktop()
-  const { caps } = useCapabilities()
-  // Real realtime is active only when the backend is configured AND the server
-  // handed us a real live session + identity. Otherwise the room runs on the
-  // simulated/mock realtime (Demo mode).
-  const realtimeEnabled = caps.ready && !!realtime
-  const localId = realtime?.user.id ?? local.id
+
+  // Real realtime is active once the tutor has started (we hold a live-session
+  // id) and we have a real identity. The backend readiness is already enforced
+  // server-side (page.tsx renders <ClassroomUnavailable/> otherwise).
+  const realtime = React.useMemo<RealtimeProps | undefined>(() => {
+    if (!identity || !liveSessionId) return undefined
+    return {
+      liveSessionId,
+      user: { id: identity.id, name: identity.name, accountType: identity.accountType, role: identity.role },
+      canPublish: identity.canPublish,
+    }
+  }, [identity, liveSessionId])
+
+  const realtimeEnabled = bootstrap.ready && !!realtime
+  const localId = identity?.id ?? local.id
   const lowFiredRef = React.useRef(false)
   // The Ably presence roster + connection state, mirrored into a ref so the
   // billing heartbeat (a long-lived interval) can read the CURRENT roster without
   // re-subscribing every render.
   const rosterRef = React.useRef<{ ids: string[]; connected: boolean }>({ ids: [], connected: false })
+  // Peak attendee count seen this session — used for the ended-screen summary.
+  const peakAttendeesRef = React.useRef(1)
   // Op ids we originated this session — used to drop Ably's LIVE echo of our own
   // whiteboard ops (which our optimistic local draw already applied) WITHOUT
   // dropping rewound history on rejoin (a fresh mount has an empty set, so our
   // own replayed ops repaint the board instead of vanishing).
   const wbLocalOpIds = React.useRef<Set<string>>(new Set())
-
-  // In real mode the mock local identity must become the REAL user, or the local
-  // user's own chat/reactions/roster entry are keyed by the mock id and mislabel
-  // (own messages render as someone else's, "You" never matches).
-  React.useEffect(() => {
-    if (!realtime) return
-    setLocal((p) => ({
-      ...p,
-      id: String(realtime.user.id),
-      name: realtime.user.name,
-      accountType: realtime.user.accountType,
-      role: realtime.user.role,
-    }))
-  }, [realtime])
 
   // The media hook owns the real mic/cam track state; mirror it onto the local
   // participant so the stage tile + roster reflect it.
@@ -119,73 +133,167 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     if (phase === 'ended') stopMedia()
   }, [phase, stopMedia])
 
-  // ── flow transitions ────────────────────────────────────────────────────
-  const join = () => {
-    playSfx('join')
-    if (isTutor) {
-      goLive()
-    } else {
-      // Students land in the lounge and auto-advance when the tutor "starts".
-      setPhase('waiting')
+  // ── lifecycle helpers ────────────────────────────────────────────────────
+  const fetchStatus = React.useCallback(async (): Promise<StatusResponse | null> => {
+    try {
+      const res = await fetch(`/api/live-sessions/status?classId=${classId}`, { cache: 'no-store' })
+      if (!res.ok) return null
+      return (await res.json()) as StatusResponse
+    } catch {
+      return null
     }
-  }
+  }, [classId])
+
+  // Register participation server-side (creates the billing/attendance log).
+  // Returns false when the join is rejected (e.g. removed by the tutor).
+  const doJoin = React.useCallback(
+    async (sid: string | number): Promise<boolean> => {
+      try {
+        const res = await fetch('/api/live-sessions/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ classId, sessionId: sid }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          roomToast({
+            title: data?.error || 'Unable to join the class',
+            tone: 'error',
+            icon: <HiOutlineExclamationTriangle />,
+          })
+          return false
+        }
+        return true
+      } catch {
+        roomToast({ title: 'Network error joining the class', tone: 'error', icon: <HiOutlineExclamationTriangle /> })
+        return false
+      }
+    },
+    [classId],
+  )
 
   const goLive = React.useCallback(() => {
     setSession((s) => ({ ...s, status: 'live' }))
     setPhase('live')
   }, [])
 
-  // Student waiting-room: simulate the tutor starting shortly after arrival.
-  React.useEffect(() => {
-    if (phase !== 'waiting' || isTutor) return
-    const t = setTimeout(() => {
-      playSfx('join')
-      roomToast({ title: 'Your tutor started the class', description: 'Joining now…', tone: 'success', icon: <HiOutlineCheckCircle /> })
-      goLive()
-    }, 5200)
-    return () => clearTimeout(t)
-  }, [phase, isTutor, goLive, playSfx])
+  // Tutor: ensure a live session exists (one may already have been created from
+  // the class page), register as host, then enter.
+  const startAsTutor = React.useCallback(async () => {
+    let sid = liveSessionIdRef.current
+    if (!sid) {
+      try {
+        const res = await fetch('/api/live-sessions/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ classId }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data?.session?.id) {
+          roomToast({
+            title: data?.error || 'Could not start the live class',
+            tone: 'error',
+            icon: <HiOutlineExclamationTriangle />,
+          })
+          return
+        }
+        sid = data.session.id
+      } catch {
+        roomToast({ title: 'Network error starting the class', tone: 'error', icon: <HiOutlineExclamationTriangle /> })
+        return
+      }
+    }
+    setLiveSessionId(sid)
+    // Host participation log — also lets the SFU bind the tutor's published tracks.
+    await doJoin(sid!)
+    playSfx('join')
+    goLive()
+  }, [classId, doJoin, goLive, playSfx])
 
-  const leave = () => {
+  // Student: enter if the tutor has already started; otherwise drop into the
+  // waiting lounge, which polls and auto-joins the moment the class goes live.
+  const joinAsStudent = React.useCallback(async () => {
+    const status = await fetchStatus()
+    if (status?.status === 'live' && status.sessionId) {
+      setLiveSessionId(status.sessionId)
+      if (await doJoin(status.sessionId)) {
+        playSfx('join')
+        goLive()
+      }
+    } else {
+      setPhase('waiting')
+    }
+  }, [fetchStatus, doJoin, goLive, playSfx])
+
+  const join = React.useCallback(() => {
+    if (isTutor) return void startAsTutor()
+    return void joinAsStudent()
+  }, [isTutor, startAsTutor, joinAsStudent])
+
+  // Leaving: the tutor ends the session for everyone; a student just checks out
+  // (finalising their billable duration). Best-effort — teardown also runs
+  // server-side via presence reconciliation + the live-sweep cron.
+  const endedRef = React.useRef(false)
+  const leave = React.useCallback(() => {
+    const sid = liveSessionIdRef.current
+    if (sid && !endedRef.current) {
+      endedRef.current = true
+      if (isTutor) {
+        fetch(`/api/live-sessions/${sid}/end`, { method: 'POST', keepalive: true }).catch(() => {})
+      } else {
+        fetch('/api/live-sessions/leave', {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid }),
+        }).catch(() => {})
+      }
+    }
     setPhase('ended')
     setPanel(null)
-  }
+  }, [isTutor])
 
-  // ── live timers: elapsed clock + credit draw-down ───────────────────────
+  // ── student waiting lounge: poll until the tutor starts, then auto-join ────
+  React.useEffect(() => {
+    if (isTutor || phase !== 'waiting') return
+    let alive = true
+    const poll = async () => {
+      const status = await fetchStatus()
+      if (!alive || !status) return
+      if (status.status === 'live' && status.sessionId) {
+        alive = false
+        setLiveSessionId(status.sessionId)
+        const ok = await doJoin(status.sessionId)
+        if (!ok) {
+          setPhase('ended')
+          return
+        }
+        playSfx('join')
+        roomToast({
+          title: 'Your tutor started the class',
+          description: 'Joining now…',
+          tone: 'success',
+          icon: <HiOutlineCheckCircle />,
+        })
+        goLive()
+      }
+    }
+    poll()
+    const id = setInterval(poll, 5000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [isTutor, phase, fetchStatus, doJoin, goLive, playSfx])
+
+  // ── live timers: elapsed clock ────────────────────────────────────────────
   React.useEffect(() => {
     if (phase !== 'live') return
     const id = setInterval(() => setElapsed((e) => e + 1), 1000)
     return () => clearInterval(id)
   }, [phase])
 
-  React.useEffect(() => {
-    // Credit draw-down is simulated in demo mode; real billing is Phase 6.
-    if (phase !== 'live' || !isTutor || realtimeEnabled) return
-    const id = setInterval(() => {
-      setCredit((c) => {
-        const spend = 2
-        const balance = Math.max(0, c.balance - spend)
-        if (balance <= c.lowThreshold && !lowFiredRef.current) {
-          lowFiredRef.current = true
-          roomToast({
-            title: 'Credits running low',
-            description: `About ${Math.floor(balance / c.burnPerMinute)} minutes of class left. Top up to keep going.`,
-            tone: 'warning',
-            icon: <HiBolt />,
-            duration: 8000,
-          })
-        }
-        if (balance === 0) {
-          roomToast({ title: 'Out of credits', description: 'Ending the class…', tone: 'error', icon: <HiOutlineExclamationTriangle /> })
-          setTimeout(leave, 1500)
-        }
-        return { ...c, balance, consumed: c.consumed + (c.balance - balance) }
-      })
-    }, 4000)
-    return () => clearInterval(id)
-  }, [phase, isTutor, realtimeEnabled])
-
-  // ── real billing heartbeat (Phase 6): tutor drives per-minute charging ──
+  // ── real billing heartbeat: tutor drives per-minute charging ──────────────
   React.useEffect(() => {
     if (!(realtimeEnabled && isTutor && phase === 'live' && realtime)) return
     let cancelled = false
@@ -208,6 +316,7 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
         if (cancelled) return
         if (data.ended) {
           roomToast({ title: 'Out of credits', description: 'The class is ending…', tone: 'error', icon: <HiOutlineExclamationTriangle /> })
+          endedRef.current = true // the server already ended it — don't re-POST /end
           setTimeout(leave, 1200)
           return
         }
@@ -228,50 +337,12 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeEnabled, isTutor, phase])
 
-  // ── simulated realtime: peer messages, reactions, speaking ──────────────
-  // Disabled in real mode — Ably drives these instead.
-  React.useEffect(() => {
-    if (phase !== 'live' || realtimeEnabled) return
-    const publishers = remote
-    const msgId = setInterval(() => {
-      const who = publishers[Math.floor(Math.random() * publishers.length)]
-      if (!who) return
-      const lines = ['Got it 👍', 'Can you explain that step again?', 'Ohh that makes sense now', 'Thank you!', 'Which page is this?']
-      const body = lines[Math.floor(Math.random() * lines.length)]
-      const m: ChatMessage = {
-        id: rid(), senderId: who.id, senderName: who.name, senderAccountType: who.accountType,
-        senderAvatar: who.avatar, body, sentAt: Date.now(), reactions: [],
-      }
-      setChat((c) => [...c, m])
-      playSfx('message')
-      if (panel !== 'chat') {
-        setUnread((u) => u + 1)
-        messageToast(m)
-      }
-    }, 15000)
-
-    const reactId = setInterval(() => {
-      const emojis: ReactionEmoji[] = ['👍', '❤️', '🎉', '🔥', '👏']
-      pushReaction(emojis[Math.floor(Math.random() * emojis.length)])
-    }, 8000)
-
-    const speakId = setInterval(() => {
-      setRemote((list) => {
-        const speakingIdx = Math.floor(Math.random() * list.length)
-        return list.map((p, i) => ({ ...p, speaking: i === speakingIdx && p.micOn }))
-      })
-    }, 3200)
-
-    return () => { clearInterval(msgId); clearInterval(reactId); clearInterval(speakId) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, panel, realtimeEnabled])
-
   // ── real realtime (Ably presence + SFU) ─────────────────────────────────
   const room = useRealtimeRoom({
     enabled: realtimeEnabled && phase === 'live',
-    liveSessionId: realtime?.liveSessionId ?? 'mock',
+    liveSessionId: realtime?.liveSessionId ?? 'pending',
     user: realtime?.user ?? { id: local.id, name: local.name, accountType: local.accountType, role: local.role },
-    canPublish: realtime?.canPublish ?? true,
+    canPublish: realtime?.canPublish ?? isTutor,
     localStream: media.stream,
     onChat: (m) => {
       const cm: ChatMessage = {
@@ -344,6 +415,7 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
       ids: room.participants.map((p) => p.id),
       connected: room.ready && room.connectionState === 'connected',
     }
+    peakAttendeesRef.current = Math.max(peakAttendeesRef.current, room.participants.length + 1)
   }, [room.participants, room.ready, room.connectionState])
 
   // Broadcast local mic/cam changes to presence in real mode.
@@ -396,11 +468,9 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     )
   }
 
-  // tutor moderation — over the control channel in real mode, mock state in demo.
-  const nameOf = (id: string) =>
-    (realtimeEnabled ? room.participants : remote).find((x) => x.id === id)?.name
-  // Authoritative moderation (server updates removed/stagePublishers + closes
-  // tracks + revokes tokens). The control message gives the target instant UX.
+  // tutor moderation — over the control channel, backed by an authoritative
+  // server write (removed/stagePublishers + close tracks + revoke tokens).
+  const nameOf = (id: string) => room.participants.find((x) => x.id === id)?.name
   const moderate = (action: 'remove' | 'promote' | 'demote', targetId: string): Promise<unknown> => {
     if (!realtime) return Promise.resolve()
     return fetch('/api/live/moderate', {
@@ -417,12 +487,11 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
       // roster update lands and gets 403'd.
       await moderate('promote', id)
       room.actions.sendControl('promote', { targetId: id })
-    } else setRemote((list) => list.map((x) => (x.id === id ? { ...x, role: 'publisher', handRaisedAt: null, micOn: true } : x)))
+    }
     roomToast({ title: `${name ?? 'Student'} is on stage`, tone: 'success', icon: <HiOutlineUserPlus /> })
   }
   const muteOne = (id: string) => {
     if (realtimeEnabled) room.actions.sendControl('mute', { targetId: id })
-    else setRemote((list) => list.map((p) => (p.id === id ? { ...p, micOn: false } : p)))
     roomToast({ title: 'Participant muted', tone: 'default', icon: <HiOutlineNoSymbol /> })
   }
   const removeOne = (id: string) => {
@@ -430,7 +499,7 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
     if (realtimeEnabled) {
       moderate('remove', id) // authoritative: removed flag + close tracks + revoke token
       room.actions.sendControl('remove', { targetId: id })
-    } else setRemote((list) => list.filter((x) => x.id !== id))
+    }
     roomToast({ title: `${name ?? 'Participant'} removed`, description: 'They can no longer join this class.', tone: 'error', icon: <HiOutlineNoSymbol /> })
   }
 
@@ -440,7 +509,7 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   }
 
   const createBoard = () => {
-    const id = `wb_${boards.length + 1}`
+    const id = `wb_${boards.length + 1}_${rid()}`
     const nb = { id, title: `Board ${boards.length + 1}`, hue: (boards.length * 47) % 360, createdBy: String(localId) }
     setBoards((b) => [...b, nb])
     setActiveBoard(id)
@@ -505,16 +574,15 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   }
 
   if (phase === 'waiting') {
-    const lounge = [local, ...remote.filter((p) => p.accountType === 'student').slice(0, 5)]
     return (
       <WaitingRoom
         session={session}
         localUser={local}
-        waiting={lounge}
+        waiting={[local]}
         isTutor={isTutor}
         media={media}
-        onLeave={leave}
-        onTutorStart={goLive}
+        onLeave={() => router.push('/dashboard')}
+        onTutorStart={startAsTutor}
       />
     )
   }
@@ -525,7 +593,7 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
         session={session}
         isTutor={isTutor}
         durationLabel={fmtClock(elapsed)}
-        attendees={remote.length + 1}
+        attendees={peakAttendeesRef.current}
         creditsSpent={credit.consumed}
         onLeave={() => router.push('/dashboard')}
       />
@@ -533,8 +601,8 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
   }
 
   // ── LIVE ──────────────────────────────────────────────────────────────
-  // In real mode the roster comes from Ably presence; in demo mode it's the
-  // simulated peers. The local participant always renders from our own state.
+  // The roster comes from Ably presence; the local participant always renders
+  // from our own state.
   const effectiveRemote =
     realtimeEnabled && room.ready
       ? room.participants.filter((p) => p.id !== String(localId)).map(roomToParticipant)
@@ -559,14 +627,6 @@ export function ClassroomExperience({ as, realtime }: { as: 'tutor' | 'student';
             <span className="size-1.5 animate-pulse rounded-full bg-red-400" /> LIVE
           </span>
           <span className="tabular-nums text-sm font-medium text-white/60">{fmtClock(elapsed)}</span>
-          {!caps.ready && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-300 uppercase"
-              title="Live media backend not configured — running on simulated data"
-            >
-              Demo
-            </span>
-          )}
           {realtimeEnabled && room.connectionState !== 'connected' && room.connectionState !== 'initialized' && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/70">
               <span className="size-1.5 animate-pulse rounded-full bg-amber-400" />

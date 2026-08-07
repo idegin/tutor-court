@@ -1,7 +1,7 @@
-// Shared types for the live-classroom v2 UI. This is the UI-first pass: all data
-// is mocked (see mock-data.ts) and the flow is driven client-side. When the
-// Cloudflare Realtime + Ably backend lands, these types stay; only the data
-// source behind them changes.
+// Shared types for the live-classroom v2 UI. The room runs on real data: the
+// server (page.tsx) resolves the class + live session and hands the client a
+// ClassroomBootstrap; the client fills chat/presence/whiteboard from Ably and
+// media from the Cloudflare Realtime SFU. There is no mock/demo data path.
 
 export type Role = 'host' | 'publisher' | 'viewer'
 export type AccountType = 'tutor' | 'student' | 'parent'
@@ -81,3 +81,34 @@ export interface CreditState {
 
 /** Which side panel (if any) is open in the live room. */
 export type PanelKind = 'chat' | 'people' | 'boards' | null
+
+/** The authenticated user's identity + publish rights for the live room. */
+export interface Identity {
+  id: string
+  name: string
+  accountType: AccountType
+  role: Role
+  /** Tutor + enrolled students publish media; parents observe only. */
+  canPublish: boolean
+}
+
+/**
+ * Everything the server resolves before the client renders the room. This is the
+ * single source of truth handed to <ClassroomExperience/> — it replaces the old
+ * mock state. `session` carries display metadata sourced from the CLASS (always
+ * present); `liveSessionId` is non-null only once the tutor has actually started.
+ */
+export interface ClassroomBootstrap {
+  /** The live-classroom backend (SFU + Ably) is configured. */
+  ready: boolean
+  role: 'tutor' | 'student'
+  classId: string
+  identity: Identity | null
+  /** Room display metadata (title/subject/tutor) from the class. */
+  session: LiveSession
+  /** The active live-session id, or null when the tutor hasn't started yet. */
+  liveSessionId: string | number | null
+  /** Tutor wallet balance for the credit meter; null for students/parents. */
+  creditBalance: number | null
+  boards: Whiteboard[]
+}
