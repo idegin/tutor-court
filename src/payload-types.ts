@@ -470,6 +470,26 @@ export interface TutorProfile {
    * Maximum age of students the tutor teaches (K-12 range).
    */
   maxAge?: number | null;
+  /**
+   * Paystack bank code for payouts.
+   */
+  payoutBankCode?: string | null;
+  /**
+   * Bank name for payouts.
+   */
+  payoutBankName?: string | null;
+  /**
+   * Bank account number for payouts.
+   */
+  payoutAccountNumber?: string | null;
+  /**
+   * Verified account name (from Paystack).
+   */
+  payoutAccountName?: string | null;
+  /**
+   * Paystack transfer recipient code.
+   */
+  payoutRecipientCode?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -780,6 +800,19 @@ export interface PayoutRequest {
   status: 'requested' | 'paid' | 'rejected';
   transaction?: (number | null) | Transaction;
   adminNote?: string | null;
+  /**
+   * Paystack transfer recipient code snapshot.
+   */
+  recipientCode?: string | null;
+  transferReference?: string | null;
+  /**
+   * Paystack transfer_code once the disbursement is initiated.
+   */
+  transferCode?: string | null;
+  /**
+   * Paystack transfer lifecycle.
+   */
+  transferStatus?: ('none' | 'processing' | 'success' | 'failed') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1504,6 +1537,11 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   type?: T;
   minAge?: T;
   maxAge?: T;
+  payoutBankCode?: T;
+  payoutBankName?: T;
+  payoutAccountNumber?: T;
+  payoutAccountName?: T;
+  payoutRecipientCode?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1594,6 +1632,10 @@ export interface PayoutRequestsSelect<T extends boolean = true> {
   status?: T;
   transaction?: T;
   adminNote?: T;
+  recipientCode?: T;
+  transferReference?: T;
+  transferCode?: T;
+  transferStatus?: T;
   updatedAt?: T;
   createdAt?: T;
 }

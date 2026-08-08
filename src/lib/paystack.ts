@@ -113,3 +113,16 @@ export async function initiateTransfer(params: {
     status: json?.data?.status,
   }
 }
+
+/**
+ * Verify a transfer by our reference. Used to reconcile transfers whose webhook
+ * never arrived. Returns null if Paystack has no record of it yet.
+ */
+export async function verifyTransfer(reference: string): Promise<{ status: string } | null> {
+  try {
+    const json = await psFetch(`/transfer/verify/${encodeURIComponent(reference)}`)
+    return { status: json?.data?.status }
+  } catch {
+    return null
+  }
+}

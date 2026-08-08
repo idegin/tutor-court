@@ -33,6 +33,12 @@ const JOBS: { id: string; path: string; cron: string; label: string }[] = [
     cron: '*/3 * * * *',
     label: 'live-session sweep (every 3 min)',
   },
+  {
+    id: 'tc-process-payouts',
+    path: '/api/cron/process-payouts',
+    cron: '*/5 * * * *',
+    label: 'tutor payout disbursement + reconciliation (every 5 min)',
+  },
 ]
 
 function requireEnv(name: string): string {

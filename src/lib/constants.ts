@@ -8,6 +8,9 @@ export const CREDIT_RATE = {
 
 export const MANAGED_ACCOUNT_DOMAIN = 'tutorcourt.local'
 
+// Public support inbox shown in the UI (disputes, help, contact).
+export const SUPPORT_EMAIL = 'support@tutorcourt.com'
+
 export const CURRENCIES = {
   ngn: { code: 'ngn', label: 'NGN', symbol: '₦' },
   usd: { code: 'usd', label: 'USD', symbol: '$' },

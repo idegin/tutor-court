@@ -308,7 +308,6 @@ export async function holdBookingEscrow({
       return await creditToWallet({
         payload,
         walletId: wallet.id,
-        currentBalance: Number(wallet.balance) || 0,
         amount: collected,
         reference,
         userId: bookerUserId,
@@ -343,7 +342,6 @@ export async function holdBookingEscrow({
         return await creditToWallet({
           payload,
           walletId: wallet.id,
-          currentBalance: Number(wallet.balance) || 0,
           amount: collected,
           reference,
           userId: bookerUserId,
@@ -460,7 +458,6 @@ export async function holdBookingEscrow({
 async function creditToWallet({
   payload,
   walletId,
-  currentBalance,
   amount,
   reference,
   userId,
@@ -470,7 +467,6 @@ async function creditToWallet({
 }: {
   payload: Payload
   walletId: string | number
-  currentBalance: number
   amount: number
   reference: string
   userId: string | number

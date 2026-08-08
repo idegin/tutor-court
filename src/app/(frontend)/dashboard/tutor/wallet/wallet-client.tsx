@@ -273,21 +273,24 @@ export function TutorWalletClient({
       toast.error(`You can withdraw up to ${formatNaira(spendable)}.`)
       return
     }
+    if (!payout?.configured) {
+      toast.error('Add your bank payout details first.')
+      setIsWithdrawOpen(false)
+      openPayoutSettings()
+      return
+    }
     setIsWithdrawLoading(true)
     try {
       const res = await fetch('/api/private/withdrawals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, bankName, accountNumber, accountName }),
+        body: JSON.stringify({ amount }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Withdrawal request failed.')
       toast.success('Withdrawal requested — pending admin approval.')
       setIsWithdrawOpen(false)
       setWithdrawAmount('')
-      setBankName('')
-      setAccountNumber('')
-      setAccountName('')
       router.refresh()
     } catch (err: any) {
       toast.error(err.message || 'Could not request withdrawal.')
@@ -316,6 +319,13 @@ export function TutorWalletClient({
             className="rounded-full px-5 bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
           >
             Buy Credits
+          </Button>
+          <Button
+            variant="outline"
+            onClick={openPayoutSettings}
+            className="rounded-full px-5"
+          >
+            Payout Settings
           </Button>
           <Button
             variant="outline"
@@ -563,28 +573,125 @@ export function TutorWalletClient({
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="bankName">Bank name</Label>
-                <Input id="bankName" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. GTBank" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber">Account number</Label>
-                <Input id="accountNumber" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="0123456789" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="accountName">Account name</Label>
-                <Input id="accountName" value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Account holder name" required />
-              </div>
+              {payout?.configured ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
+                  <p className="text-gray-500 text-xs uppercase tracking-wide">Paying out to</p>
+                  <p className="font-medium text-gray-900">{payout.accountName}</p>
+                  <p className="text-gray-600">
+                    {payout.bankName} · {payout.accountNumber}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWithdrawOpen(false)
+                      openPayoutSettings()
+                    }}
+                    className="mt-1 text-xs font-medium text-tutor-purple-600 hover:underline"
+                  >
+                    Change bank account
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                  Add your bank payout details to withdraw.
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsWithdrawOpen(false)
+                      openPayoutSettings()
+                    }}
+                    className="ml-1 font-medium underline"
+                  >
+                    Set up now
+                  </button>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsWithdrawOpen(false)} disabled={isWithdrawLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isWithdrawLoading} className="bg-gray-900 text-white hover:bg-gray-800">
+              <Button type="submit" disabled={isWithdrawLoading || !payout?.configured} className="bg-gray-900 text-white hover:bg-gray-800">
                 {isWithdrawLoading ? 'Requesting...' : 'Request Withdrawal'}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payout Settings Modal */}
+      <Dialog open={isPayoutOpen} onOpenChange={setIsPayoutOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Payout settings</DialogTitle>
+            <DialogDescription>
+              Add the Nigerian bank account where your withdrawals are paid. We verify the account
+              name with your bank before saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="payoutBank">Bank</Label>
+              <select
+                id="payoutBank"
+                value={selectedBankCode}
+                onChange={(e) => {
+                  setSelectedBankCode(e.target.value)
+                  setResolvedName('')
+                }}
+                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tutor-purple-500"
+              >
+                <option value="">Select your bank…</option>
+                {banks.map((b) => (
+                  <option key={b.code} value={b.code}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payoutAccountNumber">Account number</Label>
+              <Input
+                id="payoutAccountNumber"
+                value={payoutAccountNumber}
+                onChange={(e) => {
+                  setPayoutAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))
+                  setResolvedName('')
+                }}
+                placeholder="0123456789"
+                inputMode="numeric"
+              />
+            </div>
+            {resolvedName ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                <p className="text-emerald-700 text-xs uppercase tracking-wide">Account name</p>
+                <p className="font-semibold text-emerald-800">{resolvedName}</p>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={onVerifyAccount}
+                disabled={isResolving || !selectedBankCode || payoutAccountNumber.length !== 10}
+              >
+                {isResolving ? 'Verifying…' : 'Verify account'}
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsPayoutOpen(false)} disabled={isSavingPayout}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={onSavePayout}
+              disabled={isSavingPayout || !resolvedName}
+              className="bg-gray-900 text-white hover:bg-gray-800"
+            >
+              {isSavingPayout ? 'Saving…' : 'Save payout details'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

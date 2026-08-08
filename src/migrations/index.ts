@@ -16,6 +16,7 @@ import * as migration_20260706_200000_disputes from './20260706_200000_disputes'
 import * as migration_20260804_101918_live_classroom_v2_fields from './20260804_101918_live_classroom_v2_fields';
 import * as migration_20260808_000000_booking_awaiting_release from './20260808_000000_booking_awaiting_release';
 import * as migration_20260808_120000_tutor_payout_paystack from './20260808_120000_tutor_payout_paystack';
+import * as migration_20260808_130000_wallet_nonnegative_checks from './20260808_130000_wallet_nonnegative_checks';
 
 export const migrations = [
   {
@@ -107,5 +108,10 @@ export const migrations = [
     up: migration_20260808_120000_tutor_payout_paystack.up,
     down: migration_20260808_120000_tutor_payout_paystack.down,
     name: '20260808_120000_tutor_payout_paystack',
+  },
+  {
+    up: migration_20260808_130000_wallet_nonnegative_checks.up,
+    down: migration_20260808_130000_wallet_nonnegative_checks.down,
+    name: '20260808_130000_wallet_nonnegative_checks',
   },
 ];

@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
 import { createNotification } from '@/lib/notification-service'
 import { emailUserById } from '@/lib/transactional-email'
+import { SUPPORT_EMAIL } from '@/lib/constants'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
@@ -144,7 +145,8 @@ export async function POST(request: Request) {
       tutorUserId,
       'A dispute was opened on your engagement - TutorCourt',
       'A dispute was opened',
-      `<p class="text">A booker opened a dispute on one of your engagements. Our team will review it, and the payout is <strong>paused</strong> until it's resolved. We'll let you know the outcome.</p>`,
+      `<p class="text">A booker opened a dispute on one of your engagements. Our team will review it, and the payout is <strong>paused</strong> until it's resolved. We'll let you know the outcome.</p>
+       <p class="text">Have details to share? Reply or email <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>`,
       { link: '/dashboard/tutor/bookings', linkLabel: 'View engagement' },
     )
   }

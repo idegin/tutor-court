@@ -25,6 +25,7 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 
     ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "recipient_code" varchar;
     ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "transfer_reference" varchar;
+    ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "transfer_code" varchar;
     ALTER TABLE "payout_requests" ADD COLUMN IF NOT EXISTS "transfer_status" "public"."enum_payout_requests_transfer_status";
     CREATE INDEX IF NOT EXISTS "payout_requests_transfer_reference_idx" ON "payout_requests" USING btree ("transfer_reference");
   `)
@@ -34,6 +35,7 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`
     DROP INDEX IF EXISTS "payout_requests_transfer_reference_idx";
     ALTER TABLE "payout_requests" DROP COLUMN IF EXISTS "transfer_status";
+    ALTER TABLE "payout_requests" DROP COLUMN IF EXISTS "transfer_code";
     ALTER TABLE "payout_requests" DROP COLUMN IF EXISTS "transfer_reference";
     ALTER TABLE "payout_requests" DROP COLUMN IF EXISTS "recipient_code";
     DROP TYPE IF EXISTS "public"."enum_payout_requests_transfer_status";

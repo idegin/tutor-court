@@ -1,6 +1,5 @@
 import type { CollectionConfig } from 'payload'
 import { debitWalletAtomic, unlockEscrowAtomic } from '@/lib/escrow'
-import { initiateTransfer } from '@/lib/paystack'
 import { emailUserById } from '@/lib/transactional-email'
 
 /**
@@ -50,6 +49,7 @@ export const PayoutRequests: CollectionConfig = {
     // Paystack Transfer tracking (set on approval / finalized by the transfer webhook).
     { name: 'recipientCode', type: 'text', admin: { readOnly: true, description: 'Paystack transfer recipient code snapshot.' } },
     { name: 'transferReference', type: 'text', index: true, admin: { readOnly: true } },
+    { name: 'transferCode', type: 'text', admin: { readOnly: true, description: 'Paystack transfer_code once the disbursement is initiated.' } },
     {
       name: 'transferStatus',
       type: 'select',
@@ -131,23 +131,19 @@ export const PayoutRequests: CollectionConfig = {
             req,
           })
 
-          // Disburse via Paystack Transfer when a recipient is on file. The
-          // transfer webhook finalizes success/failure (and reverses the wallet
-          // on failure). If initiation throws, this whole approval rolls back so
-          // we never mark 'paid' without a disbursement in flight.
+          // Disburse via Paystack when a recipient is on file. We do NOT call
+          // Paystack here (never make an external payment call inside a DB
+          // transaction — a lost response could roll back the debit after the
+          // money left). Instead we persist the intent (deterministic reference)
+          // and let the `process-payouts` cron initiate the idempotent transfer
+          // and the webhook/cron finalize it. This keeps debit + intent atomic.
           if (doc.recipientCode) {
-            const transfer = await initiateTransfer({
-              amountNaira: amount,
-              recipientCode: doc.recipientCode,
-              reference: `withdrawal-${doc.id}`,
-              reason: 'Tutor withdrawal',
-            })
             // Status-only update → does not re-trigger the money path (the hook
             // early-returns when status is unchanged).
             await payload.update({
               collection: 'payout-requests',
               id: doc.id,
-              data: { transferReference: transfer.reference, transferStatus: 'processing' } as any,
+              data: { transferReference: `withdrawal-${doc.id}`, transferStatus: 'processing' } as any,
               overrideAccess: true,
               req,
             })

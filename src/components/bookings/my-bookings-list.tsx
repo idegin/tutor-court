@@ -51,7 +51,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { formatNaira } from "@/lib/constants";
+import { formatNaira, SUPPORT_EMAIL } from "@/lib/constants";
 import { countSessions } from "@/lib/booking-pricing";
 
 const DAY_SHORT: Record<string, string> = {
@@ -838,6 +838,14 @@ export function MyBookingsList({
                         {disputeError && (
                             <p className="text-xs text-red-600 dark:text-red-400">{disputeError}</p>
                         )}
+
+                        <p className="text-xs text-muted-foreground">
+                            Prefer to talk to us directly? Email{" "}
+                            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-tutor-purple-600 hover:underline">
+                                {SUPPORT_EMAIL}
+                            </a>
+                            .
+                        </p>
                     </div>
 
                     <DialogFooter>

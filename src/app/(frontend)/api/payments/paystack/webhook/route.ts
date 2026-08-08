@@ -3,126 +3,43 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
 import { holdBookingEscrow, creditWalletAtomic } from '@/lib/escrow'
-import { emailUserById } from '@/lib/transactional-email'
-import { createNotification } from '@/lib/notification-service'
+import { markWithdrawalPaid, reverseWithdrawal, withdrawalIdFromReference } from '@/lib/payout'
 
 /**
- * Finalize a tutor-withdrawal Paystack Transfer. Success just confirms +
- * notifies (the wallet was already debited on admin approval). Failure/reversal
- * RE-CREDITS the wallet (idempotent via a reversal transaction) and flips the
- * request back so the tutor can retry.
+ * Finalize a tutor-withdrawal Paystack Transfer. Matches the payout-request by
+ * the deterministic reference (`withdrawal-{id}`) so it works even if the
+ * transferReference field wasn't persisted. Delegates to the shared, idempotent
+ * finalizers so webhook + reconciliation cron converge safely.
  */
 async function handleTransferEvent(payload: any, event: any) {
   const data = event.data || {}
   const reference: string = data.reference || ''
   if (!reference) return
 
-  const reqRes = await payload.find({
-    collection: 'payout-requests',
-    where: { transferReference: { equals: reference } },
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-  })
-  const request = reqRes.docs[0] as any
-  if (!request) return
-
-  const tutorId = typeof request.tutor === 'object' ? request.tutor.id : request.tutor
-  const amount = Number(request.amount) || 0
-
-  if (event.event === 'transfer.success') {
-    if (request.transferStatus === 'success') return // idempotent
-    await payload.update({
+  // Prefer the id parsed from the reference; fall back to the stored field.
+  const parsedId = withdrawalIdFromReference(reference)
+  let request: any = null
+  if (parsedId) {
+    request = await payload.findByID({ collection: 'payout-requests', id: parsedId, depth: 0, overrideAccess: true }).catch(() => null)
+  }
+  if (!request) {
+    const reqRes = await payload.find({
       collection: 'payout-requests',
-      id: request.id,
-      data: { transferStatus: 'success' } as any,
+      where: { transferReference: { equals: reference } },
+      limit: 1,
+      depth: 0,
       overrideAccess: true,
     })
-    await createNotification({
-      recipientId: String(tutorId),
-      type: 'payment_received',
-      title: 'Withdrawal paid',
-      message: `Your withdrawal of ₦${amount.toLocaleString()} was paid to your bank account.`,
-      link: '/dashboard/tutor/wallet',
-    }).catch(() => {})
-    await emailUserById(
-      payload,
-      tutorId,
-      'Your withdrawal was paid - TutorCourt',
-      'Withdrawal paid',
-      `<p class="text">Your withdrawal of <strong>₦${amount.toLocaleString()}</strong> has been paid to your bank account.</p>`,
-      { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet' },
-    )
-    return
+    request = reqRes.docs[0] || null
   }
+  if (!request) return
 
-  // transfer.failed | transfer.reversed → return the funds to the wallet.
-  if (request.transferStatus === 'failed') return // already reversed (idempotent)
-  const walletRes = await payload.find({
-    collection: 'wallets',
-    where: { user: { equals: tutorId } },
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-  })
-  const wallet = walletRes.docs[0] as any
-  if (!wallet) return
-
-  const reversalRef = `withdrawal-reversal-${request.id}`
-  const existing = await payload.find({
-    collection: 'transactions',
-    where: { reference: { equals: reversalRef } },
-    limit: 1,
-    depth: 0,
-    overrideAccess: true,
-  })
-  const transactionID = (await payload.db.beginTransaction()) || undefined
-  const req = transactionID ? ({ transactionID } as any) : undefined
-  try {
-    if (existing.totalDocs === 0) {
-      await payload.create({
-        collection: 'transactions',
-        data: {
-          reference: reversalRef,
-          gateway: 'paystack',
-          type: 'refund',
-          sender: tutorId,
-          receiver: tutorId,
-          amount,
-          currency: request.currency || 'ngn',
-          status: 'reversed',
-          description: 'Withdrawal failed — funds returned to wallet',
-        } as any,
-        req,
-      })
-      await creditWalletAtomic(payload, req, wallet.id, amount)
-    }
-    await payload.update({
-      collection: 'payout-requests',
-      id: request.id,
-      data: { transferStatus: 'failed', status: 'rejected', adminNote: 'Paystack transfer failed — auto-reversed.' } as any,
-      req,
-    })
-    if (transactionID) await payload.db.commitTransaction(transactionID)
-  } catch (e: any) {
-    if (transactionID) await payload.db.rollbackTransaction(transactionID)
-    if (e?.code !== '23505' && !/reference|unique/i.test(String(e?.message || ''))) throw e
+  if (event.event === 'transfer.success') {
+    await markWithdrawalPaid(payload, request)
+  } else {
+    // transfer.failed | transfer.reversed → return the funds to the wallet.
+    await reverseWithdrawal(payload, request)
   }
-  await createNotification({
-    recipientId: String(tutorId),
-    type: 'general',
-    title: 'Withdrawal failed',
-    message: `Your withdrawal of ₦${amount.toLocaleString()} could not be completed. The funds are back in your wallet.`,
-    link: '/dashboard/tutor/wallet',
-  }).catch(() => {})
-  await emailUserById(
-    payload,
-    tutorId,
-    'Your withdrawal could not be completed - TutorCourt',
-    'Withdrawal failed',
-    `<p class="text">Your withdrawal of <strong>₦${amount.toLocaleString()}</strong> could not be completed, so the funds have been returned to your wallet balance. You can update your bank details and try again.</p>`,
-    { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet' },
-  )
 }
 
 export async function POST(request: Request) {

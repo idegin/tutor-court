@@ -22,6 +22,16 @@ Items **#1 (wire the crons)** and **#2 (split tutor-completion from parent-relea
 
 Still open from the list below: §4.4 (remaining money-event emails), §4.5 (USD gateway), §4.6/§4.6b (automated payouts + bank-detail collection), §4.7–§4.11, §5, and the pre-existing wallet-update concurrency race (see §7 "next").
 
+## Update 2 — 2026-08-08 (implemented)
+
+Follow-up hardening + payout automation (NGN):
+
+- **Wallet-update race fixed (§7 "next" #1):** every wallet mutation in `src/lib/escrow.ts` is now an atomic relative-SQL statement bound to the enclosing Payload transaction (`moveEscrowToTutorAtomic`, `unlockEscrowAtomic`, `reserveLockedAtomic`, `debitWalletAtomic`, `creditWalletAtomic`, `spendBalanceForCreditsAtomic`) with `LEAST/GREATEST` clamps — no more read-then-write lost-update / money-creation window. Applied across escrow payouts, refunds, holds, withdrawals, buy-credits, and Paystack funding. Backstopped by DB `CHECK (… >= 0)` constraints on wallets. Also fixed the refund ledger overstatement (records the actual remaining, not full price).
+- **Money-event emails (§4.4):** added for payment held (tutor), refund (booker), dispute opened/resolved (both), auto-release (both), and withdrawal paid/failed (tutor) via a shared `emailUserById` helper. The "booking funded" notify+email is now centralized in `holdBookingEscrow` so **all** funding sources (wallet + Paystack) notify.
+- **Paystack Transfers + tutor bank details (§4.6/§4.6b):** tutors save a verified bank account (Paystack Resolve Account → Transfer Recipient) in a Payout Settings dialog; withdrawals disburse to the saved recipient. Disbursement is **decoupled** from the approval DB transaction — approval persists intent, a `process-payouts` cron sends the idempotent transfer and reconciles via the transfer webhook, and failures auto-reverse the wallet. USD gateway (§4.5) intentionally deferred — NGN only.
+
+Still open: automated-payout live testing, admin ops UI (§5), USD gateway (§4.5), platform fee/split (§4.11), and the migrations/QStash smoke-test before deploy.
+
 ## 0. TL;DR
 
 The escrow **engine** is genuinely solid — atomic, idempotent, dispute-aware, with per-session drip payout and a completion sweep. But the **engagement contract you described** ("parent pays → we hold → tutor finishes → **parent is prompted to release** → if parent goes silent, tutor can escalate") is **not** the flow that's implemented. Today:
