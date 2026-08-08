@@ -172,11 +172,15 @@ export async function POST(req: Request) {
     for (const raw of parsed.subjects) {
       const trimmed = raw.trim()
       if (!trimmed) continue
+      // Only match by id when the value is numeric — a non-numeric string in an
+      // `id equals` clause makes the whole Postgres query fail (integer column),
+      // which would silently break name/slug resolution.
+      const isNumericId = /^\d+$/.test(trimmed)
       const match = await payload.find({
         collection: 'subjects',
         where: {
           or: [
-            { id: { equals: trimmed } },
+            ...(isNumericId ? [{ id: { equals: Number(trimmed) } }] : []),
             { slug: { equals: trimmed.toLowerCase() } },
             { name: { equals: trimmed } },
           ],
