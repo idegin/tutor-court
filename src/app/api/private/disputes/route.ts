@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
 import { createNotification } from '@/lib/notification-service'
+import { emailUserById } from '@/lib/transactional-email'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     throw e
   }
 
-  // Notify the tutor and any admins-relevant channel (tutor here).
+  // Notify the tutor (in-app + email) — payout is paused while under review.
   if (tutorUserId) {
     await createNotification({
       recipientId: tutorUserId,
@@ -138,6 +139,14 @@ export async function POST(request: Request) {
       relatedCollection: 'bookings',
       relatedId: String(bookingId),
     })
+    await emailUserById(
+      payload,
+      tutorUserId,
+      'A dispute was opened on your engagement - TutorCourt',
+      'A dispute was opened',
+      `<p class="text">A booker opened a dispute on one of your engagements. Our team will review it, and the payout is <strong>paused</strong> until it's resolved. We'll let you know the outcome.</p>`,
+      { link: '/dashboard/tutor/bookings', linkLabel: 'View engagement' },
+    )
   }
 
   return NextResponse.json({ success: true, dispute: created })

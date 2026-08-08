@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { releaseBookingEscrow, releaseRemainingEscrowToTutor } from '../lib/escrow'
 import { createNotification } from '../lib/notification-service'
+import { emailUserById } from '../lib/transactional-email'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
@@ -111,22 +112,38 @@ export const Disputes: CollectionConfig = {
             relatedCollection: 'bookings',
             relatedId: bookingId,
           })
+          await emailUserById(
+            payload,
+            bookerId,
+            'Your dispute was resolved - TutorCourt',
+            'Dispute resolved',
+            `<p class="text">${outcome}</p>`,
+          )
         }
         if (tutorUserId) {
+          const tutorMsg =
+            doc.status === 'resolved_refund'
+              ? 'A dispute on one of your engagements was resolved with a refund to the booker.'
+              : doc.status === 'resolved_release'
+                ? 'A dispute on one of your engagements was resolved — the escrow was released to you.'
+                : 'A dispute on one of your engagements was reviewed and closed.'
           await createNotification({
             recipientId: tutorUserId,
             type: 'general',
             title: 'Dispute resolved',
-            message:
-              doc.status === 'resolved_refund'
-                ? 'A dispute on one of your engagements was resolved with a refund to the booker.'
-                : doc.status === 'resolved_release'
-                  ? 'A dispute on one of your engagements was resolved — the escrow was released to you.'
-                  : 'A dispute on one of your engagements was reviewed and closed.',
+            message: tutorMsg,
             link: '/dashboard/tutor/bookings',
             relatedCollection: 'bookings',
             relatedId: bookingId,
           })
+          await emailUserById(
+            payload,
+            tutorUserId,
+            'A dispute was resolved - TutorCourt',
+            'Dispute resolved',
+            `<p class="text">${tutorMsg}</p>`,
+            { link: '/dashboard/tutor/bookings', linkLabel: 'View engagement' },
+          )
         }
       },
     ],

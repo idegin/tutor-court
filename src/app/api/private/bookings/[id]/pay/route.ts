@@ -3,7 +3,6 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
 import { holdBookingEscrow } from '@/lib/escrow'
-import { createNotification } from '@/lib/notification-service'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
@@ -49,23 +48,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     )
   }
 
-  // Notify the tutor that the booking is now funded (only on a fresh hold).
-  if (result.held) {
-    const tutorProfile = booking.tutor
-    const tutorUserId =
-      tutorProfile && typeof tutorProfile === 'object' ? idOf(tutorProfile.user) : null
-    if (tutorUserId) {
-      await createNotification({
-        recipientId: tutorUserId,
-        type: 'payment_received',
-        title: 'Booking funded',
-        message: `${user.firstName} ${user.lastName} paid for their booking — funds are held in escrow.`,
-        link: '/dashboard/tutor/bookings',
-        relatedCollection: 'bookings',
-        relatedId: String(id),
-      })
-    }
-  }
-
+  // The tutor "booking funded" notification + email is sent inside
+  // holdBookingEscrow so every funding source (wallet + Paystack) notifies once.
   return NextResponse.json({ success: true, alreadyHeld: Boolean(result.alreadyHeld) })
 }

@@ -1,4 +1,7 @@
 import type { CollectionConfig } from 'payload'
+import { debitWalletAtomic, unlockEscrowAtomic } from '@/lib/escrow'
+import { initiateTransfer } from '@/lib/paystack'
+import { emailUserById } from '@/lib/transactional-email'
 
 /**
  * A tutor's request to withdraw spendable wallet funds to a bank account.
@@ -44,6 +47,20 @@ export const PayoutRequests: CollectionConfig = {
     },
     { name: 'transaction', type: 'relationship', relationTo: 'transactions', hasMany: false },
     { name: 'adminNote', type: 'textarea' },
+    // Paystack Transfer tracking (set on approval / finalized by the transfer webhook).
+    { name: 'recipientCode', type: 'text', admin: { readOnly: true, description: 'Paystack transfer recipient code snapshot.' } },
+    { name: 'transferReference', type: 'text', index: true, admin: { readOnly: true } },
+    {
+      name: 'transferStatus',
+      type: 'select',
+      admin: { readOnly: true, description: 'Paystack transfer lifecycle.' },
+      options: [
+        { label: 'None', value: 'none' },
+        { label: 'Processing', value: 'processing' },
+        { label: 'Success', value: 'success' },
+        { label: 'Failed', value: 'failed' },
+      ],
+    },
   ],
   hooks: {
     afterChange: [
@@ -86,32 +103,22 @@ export const PayoutRequests: CollectionConfig = {
           if (isApproval) throw new Error('Cannot approve payout: tutor wallet not found.')
           return
         }
-        const balance = Number(wallet.balance) || 0
-        const locked = Number(wallet.lockedBalance) || 0
-
         if (isApproval) {
-          // Money-safety backstop: never pay out more than the wallet actually
-          // holds. Even if concurrent withdrawal requests under-reserved
-          // lockedBalance (a lost update), this stops real value from leaving
-          // beyond the tutor's real balance — the approval fails and rolls back.
-          if (balance < amount) {
+          // Money-safety: debit atomically against the LIVE balance so a
+          // concurrent escrow credit to this tutor can't be lost to a stale
+          // read-then-write, and never pay out more than the wallet holds. A
+          // false result (insufficient balance) throws → rolls back 'paid'.
+          const ok = await debitWalletAtomic(payload, req, wallet.id, amount)
+          if (!ok) {
             throw new Error('Cannot approve payout: insufficient wallet balance.')
           }
-          // Funds leave the wallet entirely; book a completed payout transaction.
-          // Errors are NOT swallowed — a failed debit or transaction must roll
-          // back the 'paid' status change.
-          await payload.update({
-            collection: 'wallets',
-            id: wallet.id,
-            data: { balance: Math.max(0, balance - amount), lockedBalance: Math.max(0, locked - amount) } as any,
-            overrideAccess: true,
-            req,
-          })
+          // Errors are NOT swallowed — a failed transaction must roll back the
+          // 'paid' status change (the debit is in the same tx).
           await payload.create({
             collection: 'transactions',
             data: {
               reference: `withdrawal-${doc.id}`,
-              gateway: 'manual',
+              gateway: doc.recipientCode ? 'paystack' : 'manual',
               type: 'payout',
               sender: tutorId,
               receiver: tutorId,
@@ -123,15 +130,41 @@ export const PayoutRequests: CollectionConfig = {
             overrideAccess: true,
             req,
           })
+
+          // Disburse via Paystack Transfer when a recipient is on file. The
+          // transfer webhook finalizes success/failure (and reverses the wallet
+          // on failure). If initiation throws, this whole approval rolls back so
+          // we never mark 'paid' without a disbursement in flight.
+          if (doc.recipientCode) {
+            const transfer = await initiateTransfer({
+              amountNaira: amount,
+              recipientCode: doc.recipientCode,
+              reference: `withdrawal-${doc.id}`,
+              reason: 'Tutor withdrawal',
+            })
+            // Status-only update → does not re-trigger the money path (the hook
+            // early-returns when status is unchanged).
+            await payload.update({
+              collection: 'payout-requests',
+              id: doc.id,
+              data: { transferReference: transfer.reference, transferStatus: 'processing' } as any,
+              overrideAccess: true,
+              req,
+            })
+          } else {
+            // Manual/offline payout — no gateway transfer; notify the tutor now.
+            await emailUserById(
+              payload,
+              tutorId,
+              'Your withdrawal was processed - TutorCourt',
+              'Withdrawal processed',
+              `<p class="text">Your withdrawal of ₦${amount.toLocaleString()} has been processed to your bank account.</p>`,
+              { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet' },
+            )
+          }
         } else if (isRejection) {
-          // Release the reservation back to spendable.
-          await payload.update({
-            collection: 'wallets',
-            id: wallet.id,
-            data: { lockedBalance: Math.max(0, locked - amount) } as any,
-            overrideAccess: true,
-            req,
-          })
+          // Release the reservation back to spendable (atomic).
+          await unlockEscrowAtomic(payload, req, wallet.id, amount)
         }
       },
     ],

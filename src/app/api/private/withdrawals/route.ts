@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
+import { reserveLockedAtomic } from '@/lib/escrow'
 
 /**
  * POST /api/private/withdrawals — a tutor requests a withdrawal of spendable
@@ -19,18 +20,33 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}))
   const amount = Number(body?.amount)
-  const bankName = typeof body?.bankName === 'string' ? body.bankName.trim() : ''
-  const accountNumber = typeof body?.accountNumber === 'string' ? body.accountNumber.trim() : ''
-  const accountName = typeof body?.accountName === 'string' ? body.accountName.trim() : ''
 
   if (!(amount > 0)) {
     return NextResponse.json({ error: 'Enter a valid amount.' }, { status: 400 })
   }
-  if (!bankName || !accountNumber || !accountName) {
-    return NextResponse.json({ error: 'Bank name, account number and account name are required.' }, { status: 400 })
-  }
 
   const payload = await getPayload({ config })
+
+  // Payout must go to the tutor's verified, saved Paystack recipient — no
+  // free-typed bank details at withdrawal time.
+  const profileRes = await payload.find({
+    collection: 'tutor-profiles',
+    where: { user: { equals: user.id } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const profile = profileRes.docs[0] as any
+  if (!profile?.payoutRecipientCode) {
+    return NextResponse.json(
+      { error: 'Add your bank payout details before withdrawing.', code: 'no_payout_recipient' },
+      { status: 400 },
+    )
+  }
+  const bankName = profile.payoutBankName || ''
+  const accountNumber = profile.payoutAccountNumber || ''
+  const accountName = profile.payoutAccountName || ''
+  const recipientCode = profile.payoutRecipientCode
 
   const walletRes = await payload.find({
     collection: 'wallets',
@@ -82,14 +98,17 @@ export async function POST(request: Request) {
       )
     }
 
-    // Reserve the funds so they can't be double-withdrawn while pending.
-    await payload.update({
-      collection: 'wallets',
-      id: wallet.id,
-      data: { lockedBalance: locked + amount } as any,
-      req,
-      overrideAccess: true,
-    })
+    // Reserve the funds so they can't be double-withdrawn while pending. Atomic
+    // relative update guarded by live spendable — a concurrent reservation can't
+    // be lost to this read-then-write.
+    const reserved = await reserveLockedAtomic(payload, req, wallet.id, amount)
+    if (!reserved) {
+      if (transactionID) await payload.db.rollbackTransaction(transactionID)
+      return NextResponse.json(
+        { error: 'Amount exceeds your available balance.', spendable },
+        { status: 400 },
+      )
+    }
 
     const record = await payload.create({
       collection: 'payout-requests',
@@ -100,6 +119,8 @@ export async function POST(request: Request) {
         bankName,
         accountNumber,
         accountName,
+        recipientCode,
+        transferStatus: 'none',
         status: 'requested',
       } as any,
       req,

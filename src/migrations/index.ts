@@ -14,6 +14,8 @@ import * as migration_20260706_185822_payout_requests from './20260706_185822_pa
 import * as migration_20260706_190000_reviews_booking_unique from './20260706_190000_reviews_booking_unique';
 import * as migration_20260706_200000_disputes from './20260706_200000_disputes';
 import * as migration_20260804_101918_live_classroom_v2_fields from './20260804_101918_live_classroom_v2_fields';
+import * as migration_20260808_000000_booking_awaiting_release from './20260808_000000_booking_awaiting_release';
+import * as migration_20260808_120000_tutor_payout_paystack from './20260808_120000_tutor_payout_paystack';
 
 export const migrations = [
   {
@@ -95,5 +97,15 @@ export const migrations = [
     up: migration_20260804_101918_live_classroom_v2_fields.up,
     down: migration_20260804_101918_live_classroom_v2_fields.down,
     name: '20260804_101918_live_classroom_v2_fields'
+  },
+  {
+    up: migration_20260808_000000_booking_awaiting_release.up,
+    down: migration_20260808_000000_booking_awaiting_release.down,
+    name: '20260808_000000_booking_awaiting_release',
+  },
+  {
+    up: migration_20260808_120000_tutor_payout_paystack.up,
+    down: migration_20260808_120000_tutor_payout_paystack.down,
+    name: '20260808_120000_tutor_payout_paystack',
   },
 ];

@@ -70,12 +70,23 @@ export const Bookings: CollectionConfig = {
         { label: 'Pending', value: 'pending' },
         { label: 'Confirmed', value: 'confirmed' },
         { label: 'In Progress', value: 'in_progress' },
+        { label: 'Awaiting Release', value: 'awaiting_release' },
         { label: 'Completed', value: 'completed' },
         { label: 'Cancelled', value: 'cancelled' },
         { label: 'Refunded', value: 'refunded' },
       ],
       required: true,
       index: true,
+    },
+    {
+      name: 'awaitingReleaseAt',
+      type: 'date',
+      index: true,
+      admin: {
+        readOnly: true,
+        description:
+          'When the tutor marked work delivered (status → awaiting_release). Drives the auto-release grace window.',
+      },
     },
     {
       name: 'paymentStatus',

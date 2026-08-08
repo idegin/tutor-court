@@ -68,6 +68,7 @@ const STATUS_STYLES: Record<string, string> = {
     pending: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400",
     confirmed: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400",
     in_progress: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400",
+    awaiting_release: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400",
     completed: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
     cancelled: "bg-muted text-muted-foreground border-border",
     refunded: "bg-muted text-muted-foreground border-border",
@@ -77,6 +78,7 @@ const STATUS_LABEL: Record<string, string> = {
     pending: "Pending",
     confirmed: "Confirmed",
     in_progress: "In Progress",
+    awaiting_release: "Ready to release",
     completed: "Completed",
     cancelled: "Cancelled",
     refunded: "Refunded",
@@ -263,6 +265,28 @@ export function MyBookingsList({
                 return;
             }
             toast.success("Booking cancelled");
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err?.message || "Something went wrong");
+        } finally {
+            setLoadingId(null);
+        }
+    };
+
+    const releaseBooking = async (id: string) => {
+        setLoadingId(id);
+        try {
+            const res = await fetch(`/api/private/bookings/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "release" }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                toast.error(data.error || "Something went wrong");
+                return;
+            }
+            toast.success("Payment released to your tutor. Thank you!");
             router.refresh();
         } catch (err: any) {
             toast.error(err?.message || "Something went wrong");
@@ -529,8 +553,42 @@ export function MyBookingsList({
                                         </AlertDialogContent>
                                     </AlertDialog>
                                 )}
+                                {b.status === "awaiting_release" &&
+                                    b.paymentStatus === "held" &&
+                                    !disputedIds.has(String(b.id)) && (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                                    disabled={loadingId === b.id}
+                                                >
+                                                    Confirm &amp; release
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Release the payment to {name}?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Your tutor marked this engagement as delivered. Releasing pays out the {formatNaira(b.price || 0)} held in escrow and completes the booking. Only do this if you&apos;re happy with the sessions — otherwise report a problem instead.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Not yet</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                                        onClick={() => releaseBooking(b.id)}
+                                                    >
+                                                        Release payment
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    )}
                                 {b.paymentStatus === "held" &&
-                                    (b.status === "confirmed" || b.status === "in_progress") && (
+                                    (b.status === "confirmed" ||
+                                        b.status === "in_progress" ||
+                                        b.status === "awaiting_release") && (
                                         disputedIds.has(String(b.id)) ? (
                                             <Button
                                                 size="sm"

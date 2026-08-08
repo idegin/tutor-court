@@ -3,20 +3,29 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { releaseRemainingEscrowToTutor, hasOpenDispute } from '@/lib/escrow'
 import { createNotification } from '@/lib/notification-service'
+import { emailUserById } from '@/lib/transactional-email'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
 
 /**
- * Cron: auto-complete past-`endDate` engagements whose escrow is still held, so
- * money isn't trapped when a tutor never clicks "mark complete". Conservative by
- * design — it only settles engagements that actually ran (≥1 ended live session)
- * and have no open dispute; a paid-but-never-taught booking is LEFT for a booker
- * dispute / admin, never auto-paid to the tutor.
+ * Cron: auto-release held escrow so money isn't trapped. Two buckets:
+ *
+ *   A) status `awaiting_release` — the tutor marked work delivered and the booker
+ *      neither released nor disputed within the grace window. We trust the
+ *      tutor's assertion (the booker had their chance) and release.
+ *   B) status `confirmed`/`in_progress` past `endDate` — neither party acted.
+ *      Conservative: only settle engagements that actually ran (≥1 ended live
+ *      session); a paid-but-never-taught booking is LEFT for a booker dispute /
+ *      admin, never auto-paid to the tutor.
+ *
+ * Both buckets skip engagements with an open dispute.
  *
  * Protect with CRON_SECRET (Bearer token). Schedule daily via an external cron
- * (Vercel Cron / GitHub Actions / cron-job.org).
+ * (Vercel Cron / QStash — see scripts/setup-qstash-schedules.ts).
  */
+const AUTO_RELEASE_GRACE_MS = 3 * 24 * 60 * 60 * 1000 // booker has 3 days to act after "delivered"
+
 async function handle(request: Request) {
   const secret = process.env.CRON_SECRET
   if (!secret) {
@@ -30,14 +39,31 @@ async function handle(request: Request) {
 
   const payload = await getPayload({ config })
   const nowIso = new Date().toISOString()
+  const graceIso = new Date(Date.now() - AUTO_RELEASE_GRACE_MS).toISOString()
 
   const due = await payload.find({
     collection: 'bookings',
     where: {
       and: [
         { paymentStatus: { equals: 'held' } },
-        { or: [{ status: { equals: 'confirmed' } }, { status: { equals: 'in_progress' } }] },
-        { endDate: { less_than: nowIso } },
+        {
+          or: [
+            // Bucket A — delivered, booker didn't act within the grace window.
+            {
+              and: [
+                { status: { equals: 'awaiting_release' } },
+                { awaitingReleaseAt: { less_than: graceIso } },
+              ],
+            },
+            // Bucket B — neither party acted and the engagement window passed.
+            {
+              and: [
+                { or: [{ status: { equals: 'confirmed' } }, { status: { equals: 'in_progress' } }] },
+                { endDate: { less_than: nowIso } },
+              ],
+            },
+          ],
+        },
       ],
     },
     depth: 2,
@@ -55,8 +81,11 @@ async function handle(request: Request) {
         continue
       }
 
-      // Only settle engagements that actually ran — a booking whose class had no
-      // ended session is a possible no-show; leave it for dispute/admin.
+      // No-show guard (BOTH buckets): auto-release only when the engagement
+      // actually ran (≥1 ended live session). A tutor who no-shows but clicks
+      // "Mark delivered" (→ awaiting_release) must NOT be auto-paid; that case
+      // is left for the booker to release manually or dispute. This closes the
+      // hole where marking delivered would bypass the no-show protection.
       const classId = idOf(booking.class)
       let endedSessions = 0
       if (classId) {
@@ -88,15 +117,24 @@ async function handle(request: Request) {
       const tutorUserId =
         booking.tutor && typeof booking.tutor === 'object' ? idOf(booking.tutor.user) : null
       if (bookerId) {
+        const bookerLink = parentId ? '/dashboard/parent/bookings' : '/dashboard/student/bookings'
         await createNotification({
           recipientId: bookerId,
           type: 'general',
           title: 'Engagement completed',
           message: 'Your tutoring engagement has ended. Leave a review to help other learners.',
-          link: parentId ? '/dashboard/parent/bookings' : '/dashboard/student/bookings',
+          link: bookerLink,
           relatedCollection: 'bookings',
           relatedId: String(bookingId),
         })
+        await emailUserById(
+          payload,
+          bookerId,
+          'Your tutoring engagement has ended - TutorCourt',
+          'Engagement completed',
+          `<p class="text">Your tutoring engagement has ended and the payment held in escrow was released to your tutor. Thanks for using TutorCourt — leave a review to help other learners.</p>`,
+          { link: bookerLink, linkLabel: 'View booking' },
+        )
       }
       if (tutorUserId) {
         await createNotification({
@@ -108,6 +146,14 @@ async function handle(request: Request) {
           relatedCollection: 'bookings',
           relatedId: String(bookingId),
         })
+        await emailUserById(
+          payload,
+          tutorUserId,
+          'Escrow released to your wallet - TutorCourt',
+          'Payment released to your wallet',
+          `<p class="text">A completed engagement has settled and the remaining escrow was <strong>released to your wallet</strong>. It's available to withdraw or spend.</p>`,
+          { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet' },
+        )
       }
     } catch (e: any) {
       result.failed++

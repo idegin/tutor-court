@@ -309,6 +309,36 @@ export const TutorProfiles: CollectionConfig = {
         description: 'Maximum age of students the tutor teaches (K-12 range).',
       },
     },
+    // ── Payout settings (Paystack Transfers, NGN) ───────────────────────────
+    // Set via /api/private/payout/recipient after resolving + verifying the
+    // account with Paystack. Read-only in admin; the recipient code is what
+    // withdrawals disburse to.
+    {
+      name: 'payoutBankCode',
+      type: 'text',
+      admin: { readOnly: true, description: 'Paystack bank code for payouts.' },
+    },
+    {
+      name: 'payoutBankName',
+      type: 'text',
+      admin: { readOnly: true, description: 'Bank name for payouts.' },
+    },
+    {
+      name: 'payoutAccountNumber',
+      type: 'text',
+      admin: { readOnly: true, description: 'Bank account number for payouts.' },
+    },
+    {
+      name: 'payoutAccountName',
+      type: 'text',
+      admin: { readOnly: true, description: 'Verified account name (from Paystack).' },
+    },
+    {
+      name: 'payoutRecipientCode',
+      type: 'text',
+      index: true,
+      admin: { readOnly: true, description: 'Paystack transfer recipient code.' },
+    },
   ],
   timestamps: true,
 }

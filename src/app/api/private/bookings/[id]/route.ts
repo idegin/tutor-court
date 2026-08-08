@@ -8,10 +8,39 @@ import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
 import { releaseBookingEscrow, releaseRemainingEscrowToTutor, hasOpenDispute } from '@/lib/escrow'
 
-type Action = 'accept' | 'decline' | 'cancel' | 'complete'
+type Action = 'accept' | 'decline' | 'cancel' | 'complete' | 'release'
 
 const idOf = (rel: any): string | null =>
   rel == null ? null : String(typeof rel === 'object' ? rel.id : rel)
+
+/**
+ * Fire-and-forget transactional email to a user. Never throws — a failed email
+ * must not roll back the money/state change that already happened.
+ */
+async function emailUser(
+  payload: any,
+  userId: string | null,
+  subject: string,
+  heading: string,
+  innerHtml: string,
+  link: string,
+  serverUrl: string,
+): Promise<void> {
+  if (!userId) return
+  try {
+    const u = await payload.findByID({ collection: 'users', id: userId, overrideAccess: true })
+    if (!u?.email) return
+    const html = `
+      ${innerHtml}
+      <div class="btn-container">
+        <a href="${serverUrl}${link}" class="btn">View Booking</a>
+      </div>
+    `
+    await sendEmail({ to: u.email, subject, html: getBaseEmailLayout(heading, html, serverUrl) })
+  } catch (e: any) {
+    console.error('[bookings/PATCH] email failed:', e?.message)
+  }
+}
 
 /**
  * PATCH /api/private/bookings/[id]
@@ -29,7 +58,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params
     const body = await req.json().catch(() => ({}))
     const action = body?.action as Action
-    if (!['accept', 'decline', 'cancel', 'complete'].includes(action)) {
+    if (!['accept', 'decline', 'cancel', 'complete', 'release'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action.' }, { status: 400 })
     }
 
@@ -59,16 +88,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // Authorize the action against the actor + current status.
     const status = booking.status
+    const bookerUserId = parentUserId || studentUserId
+    const bookerLink = parentUserId ? '/dashboard/parent/bookings' : '/dashboard/student/bookings'
 
-    // Stage 7 — the tutor marks the engagement complete: release the remaining
-    // escrow to the tutor and settle the booking. Handled separately (its own
-    // escrow helper sets status/paymentStatus + completes the class).
+    const headers = await getHeaders()
+    const serverUrl = getEmailServerUrl(headers)
+
+    // The tutor marks work delivered. This does NOT pay out — it flips the
+    // booking to `awaiting_release` and asks the booker to confirm & release
+    // (or auto-releases later via the cron grace window). This keeps the payer,
+    // not the payee, in control of releasing escrow.
     if (action === 'complete') {
       if (!isTutor) {
-        return NextResponse.json({ error: 'Only the tutor can complete an engagement.' }, { status: 403 })
+        return NextResponse.json({ error: 'Only the tutor can mark an engagement delivered.' }, { status: 403 })
       }
       if (status !== 'confirmed' && status !== 'in_progress') {
-        return NextResponse.json({ error: 'This booking cannot be completed.' }, { status: 409 })
+        return NextResponse.json({ error: 'This booking cannot be marked delivered.' }, { status: 409 })
       }
       if (booking.paymentStatus !== 'held') {
         return NextResponse.json({ error: 'This booking has not been paid.' }, { status: 409 })
@@ -76,26 +111,84 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // Frozen while a dispute is open — an admin must resolve it first.
       if (await hasOpenDispute(payload, id)) {
         return NextResponse.json(
-          { error: 'This engagement has an open dispute and cannot be completed until it is resolved.' },
+          { error: 'This engagement has an open dispute and cannot be marked delivered until it is resolved.' },
+          { status: 409 },
+        )
+      }
+      await payload.update({
+        collection: 'bookings',
+        id,
+        data: { status: 'awaiting_release', awaitingReleaseAt: new Date().toISOString() } as any,
+        overrideAccess: true,
+      })
+      if (bookerUserId) {
+        await createNotification({
+          recipientId: String(bookerUserId),
+          type: 'general',
+          title: 'Confirm & release your tutor’s payment',
+          message: `Your tutor marked the engagement as delivered. Please confirm and release the funds held in escrow — or report a problem if something’s wrong.`,
+          link: bookerLink,
+          relatedCollection: 'bookings',
+          relatedId: String(id),
+        })
+        await emailUser(
+          payload,
+          bookerUserId,
+          'Confirm & release your tutor’s payment - TutorCourt',
+          'Your engagement is marked delivered',
+          `<p class="text">Hi there,</p>
+           <p class="text">Your tutor marked your engagement as <strong>delivered</strong>. Please review and <strong>release the payment</strong> held in escrow, or report a problem if something wasn’t right.</p>
+           <p class="text">If you take no action, the funds will be released automatically after a few days.</p>`,
+          bookerLink,
+          serverUrl,
+        )
+      }
+      const updatedBooking = await payload.findByID({ collection: 'bookings', id, depth: 0, overrideAccess: true })
+      return NextResponse.json({ success: true, booking: updatedBooking })
+    }
+
+    // The booker confirms the work and releases the remaining escrow to the
+    // tutor. Allowed any time the engagement is funded (they can release early),
+    // and blocked while a dispute is open.
+    if (action === 'release') {
+      if (!isBooker) {
+        return NextResponse.json({ error: 'Only the booker can release the payment.' }, { status: 403 })
+      }
+      if (status !== 'confirmed' && status !== 'in_progress' && status !== 'awaiting_release') {
+        return NextResponse.json({ error: 'This booking cannot be released.' }, { status: 409 })
+      }
+      if (booking.paymentStatus !== 'held') {
+        return NextResponse.json({ error: 'There are no held funds to release.' }, { status: 409 })
+      }
+      if (await hasOpenDispute(payload, id)) {
+        return NextResponse.json(
+          { error: 'This engagement has an open dispute and cannot be released until it is resolved.' },
           { status: 409 },
         )
       }
       const settle = await releaseRemainingEscrowToTutor({ payload, bookingId: id })
       if (!settle.ok) {
-        return NextResponse.json({ error: settle.error || 'Could not complete the engagement.' }, { status: settle.status || 500 })
+        return NextResponse.json({ error: settle.error || 'Could not release the payment.' }, { status: settle.status || 500 })
       }
-      // Notify the booker: engagement done + prompt a review.
-      const bookerId = parentUserId || studentUserId
-      if (bookerId) {
+      if (tutorUserId) {
         await createNotification({
-          recipientId: String(bookerId),
-          type: 'general',
-          title: 'Engagement completed',
-          message: `Your tutoring engagement is complete. Leave a review to help other learners.`,
-          link: parentUserId ? '/dashboard/parent/bookings' : '/dashboard/student/bookings',
+          recipientId: String(tutorUserId),
+          type: 'payment_received',
+          title: 'Payment released',
+          message: `${user.firstName} ${user.lastName} released the escrow for a completed engagement. The funds are now in your wallet.`,
+          link: '/dashboard/tutor/wallet',
           relatedCollection: 'bookings',
           relatedId: String(id),
         })
+        await emailUser(
+          payload,
+          tutorUserId,
+          'Your escrow payment was released - TutorCourt',
+          'Payment released to your wallet',
+          `<p class="text">Good news — the booker confirmed your engagement and <strong>released the payment</strong> held in escrow. It’s now available in your wallet.</p>`,
+          '/dashboard/tutor/wallet',
+          serverUrl,
+        )
       }
       const updatedBooking = await payload.findByID({ collection: 'bookings', id, depth: 0, overrideAccess: true })
       return NextResponse.json({ success: true, booking: updatedBooking })
@@ -137,6 +230,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           { status: release.status || 500 },
         )
       }
+      // Refund receipt to the booker (the held funds are back in their wallet).
+      if (bookerUserId) {
+        await createNotification({
+          recipientId: String(bookerUserId),
+          type: 'payment_received',
+          title: 'Booking cancelled — funds refunded',
+          message: 'Your booking was cancelled and the held funds were returned to your wallet balance.',
+          link: bookerLink,
+          relatedCollection: 'bookings',
+          relatedId: String(id),
+        })
+        await emailUser(
+          payload,
+          bookerUserId,
+          'Your booking was cancelled — funds refunded - TutorCourt',
+          'Refund to your wallet',
+          `<p class="text">Your booking has been cancelled and the funds held in escrow have been <strong>returned to your wallet balance</strong>. You can use them for another booking or withdraw them.</p>`,
+          bookerLink,
+          serverUrl,
+        )
+      }
     }
 
     // Cancelling a booking must also cancel its materialized class, otherwise a
@@ -160,10 +274,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       overrideAccess: true,
     })
 
-    // Notify the other party.
-    const headers = await getHeaders()
-    const serverUrl = getEmailServerUrl(headers)
-
+    // Notify the other party. (serverUrl was resolved above.)
     // The recipient user: on accept/decline notify the booker; on cancel notify the tutor.
     let recipientUserId: string | null = null
     let recipientRoleLink = '/dashboard'

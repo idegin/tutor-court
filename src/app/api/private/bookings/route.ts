@@ -122,7 +122,12 @@ export async function POST(req: Request) {
           { tutor: { equals: tutorProfile.id } },
           { student: { equals: studentId } },
           {
-            or: [{ status: { equals: 'pending' } }, { status: { equals: 'confirmed' } }],
+            or: [
+              { status: { equals: 'pending' } },
+              { status: { equals: 'confirmed' } },
+              { status: { equals: 'in_progress' } },
+              { status: { equals: 'awaiting_release' } },
+            ],
           },
         ],
       },

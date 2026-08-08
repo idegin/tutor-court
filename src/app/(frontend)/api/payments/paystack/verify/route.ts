@@ -2,7 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { holdBookingEscrow } from '@/lib/escrow'
+import { holdBookingEscrow, creditWalletAtomic } from '@/lib/escrow'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -117,17 +117,12 @@ export async function GET(request: Request) {
           } as any,
           req: txReq,
         })
-        const fresh: any = await payload
-          .findByID({ collection: 'wallets', id: wallet.id, depth: 0, overrideAccess: true, req: txReq })
-          .catch(() => null)
-        const currentBalance = Number(fresh?.balance ?? wallet.balance) || 0
-        updatedWallet = await payload.update({
-          collection: 'wallets',
-          id: wallet.id,
-          data: { balance: currentBalance + amountNaira } as any,
-          req: txReq,
-        })
+        // Relative credit — atomic, so a concurrent credit can't be clobbered.
+        await creditWalletAtomic(payload, txReq, wallet.id, amountNaira)
         if (transactionID) await payload.db.commitTransaction(transactionID)
+        updatedWallet = (await payload
+          .findByID({ collection: 'wallets', id: wallet.id, depth: 0, overrideAccess: true })
+          .catch(() => wallet)) as any
       } catch (e: any) {
         if (transactionID) await payload.db.rollbackTransaction(transactionID)
         // Duplicate reference (a concurrent verify already funded) — safe to ignore.

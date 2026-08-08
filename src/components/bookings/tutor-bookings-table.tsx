@@ -72,6 +72,7 @@ const STATUS_OPTIONS = [
     { value: "pending", label: "Pending" },
     { value: "confirmed", label: "Confirmed" },
     { value: "in_progress", label: "In Progress" },
+    { value: "awaiting_release", label: "Awaiting Release" },
     { value: "completed", label: "Completed" },
     { value: "cancelled", label: "Cancelled" },
     { value: "refunded", label: "Refunded" },
@@ -81,6 +82,7 @@ const STATUS_STYLES: Record<string, string> = {
     pending: "bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/20 dark:text-amber-400",
     confirmed: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 dark:text-emerald-400",
     in_progress: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20 dark:text-emerald-400",
+    awaiting_release: "bg-indigo-500/10 text-indigo-600 border border-indigo-500/20 hover:bg-indigo-500/20 dark:text-indigo-400",
     completed: "bg-blue-500/10 text-blue-600 border border-blue-500/20 hover:bg-blue-500/20 dark:text-blue-400",
     cancelled: "bg-muted text-muted-foreground hover:bg-muted/80",
     refunded: "bg-muted text-muted-foreground hover:bg-muted/80",
@@ -90,6 +92,7 @@ const STATUS_LABEL: Record<string, string> = {
     pending: "Pending",
     confirmed: "Confirmed",
     in_progress: "In Progress",
+    awaiting_release: "Awaiting Release",
     completed: "Completed",
     cancelled: "Cancelled",
     refunded: "Refunded",
@@ -173,7 +176,7 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                     ? "Booking accepted"
                     : action === "decline"
                         ? "Booking declined"
-                        : "Engagement completed — payout released",
+                        : "Marked delivered — the booker will be asked to release your payment",
             );
             router.refresh();
         } catch (err: any) {
@@ -323,7 +326,8 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                     {STATUS_LABEL[booking.status] || booking.status}
                                                 </Badge>
                                                 {(booking.status === "confirmed" ||
-                                                    booking.status === "in_progress") && (
+                                                    booking.status === "in_progress" ||
+                                                    booking.status === "awaiting_release") && (
                                                     <span
                                                         className={
                                                             "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
@@ -393,14 +397,14 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                                 className="h-8 bg-blue-600 hover:bg-blue-700 text-white shadow-none"
                                                                 disabled={loadingId === booking.id}
                                                             >
-                                                                <Check className="h-4 w-4" /> Mark complete
+                                                                <Check className="h-4 w-4" /> Mark work delivered
                                                             </Button>
                                                         </AlertDialogTrigger>
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader>
-                                                                <AlertDialogTitle>Mark this engagement complete?</AlertDialogTitle>
+                                                                <AlertDialogTitle>Mark this engagement as delivered?</AlertDialogTitle>
                                                                 <AlertDialogDescription>
-                                                                    This releases the remaining escrow to you and marks the engagement with {booking.bookerName} as complete. This action cannot be undone.
+                                                                    This tells {booking.bookerName} the work is done and asks them to release your payment. The escrow is released when they confirm — or automatically after a few days if they don&apos;t respond.
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
@@ -410,12 +414,14 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                                     disabled={loadingId === booking.id}
                                                                     onClick={() => runAction(booking.id, "complete")}
                                                                 >
-                                                                    Complete & release payout
+                                                                    Mark delivered
                                                                 </AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
                                                     </AlertDialog>
                                                 </div>
+                                            ) : booking.raw.status === "awaiting_release" ? (
+                                                <span className="text-xs text-indigo-600 dark:text-indigo-400">Awaiting booker release</span>
                                             ) : (
                                                 <span className="text-xs text-muted-foreground">No actions</span>
                                             )}

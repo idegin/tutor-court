@@ -52,10 +52,96 @@ export function TutorWalletClient({
 
   const [isWithdrawOpen, setIsWithdrawOpen] = React.useState(false)
   const [withdrawAmount, setWithdrawAmount] = React.useState('')
-  const [bankName, setBankName] = React.useState('')
-  const [accountNumber, setAccountNumber] = React.useState('')
-  const [accountName, setAccountName] = React.useState('')
   const [isWithdrawLoading, setIsWithdrawLoading] = React.useState(false)
+
+  // Payout settings (Paystack transfer recipient)
+  const [payout, setPayout] = React.useState<any | null>(null)
+  const [isPayoutOpen, setIsPayoutOpen] = React.useState(false)
+  const [banks, setBanks] = React.useState<{ name: string; code: string }[]>([])
+  const [selectedBankCode, setSelectedBankCode] = React.useState('')
+  const [payoutAccountNumber, setPayoutAccountNumber] = React.useState('')
+  const [resolvedName, setResolvedName] = React.useState('')
+  const [isResolving, setIsResolving] = React.useState(false)
+  const [isSavingPayout, setIsSavingPayout] = React.useState(false)
+
+  // Load saved payout settings once.
+  React.useEffect(() => {
+    let active = true
+    fetch('/api/private/payout/recipient')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (active && d?.payout) setPayout(d.payout)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const openPayoutSettings = async () => {
+    setIsPayoutOpen(true)
+    setResolvedName('')
+    setSelectedBankCode(payout?.bankCode || '')
+    setPayoutAccountNumber(payout?.accountNumber || '')
+    if (banks.length === 0) {
+      try {
+        const res = await fetch('/api/private/payout/banks')
+        const data = await res.json()
+        if (res.ok) setBanks(data.banks || [])
+        else toast.error(data.error || 'Could not load banks.')
+      } catch {
+        toast.error('Could not load banks.')
+      }
+    }
+  }
+
+  const onVerifyAccount = async () => {
+    if (!selectedBankCode || !/^\d{10}$/.test(payoutAccountNumber)) {
+      toast.error('Select a bank and enter a valid 10-digit account number.')
+      return
+    }
+    setIsResolving(true)
+    setResolvedName('')
+    try {
+      const res = await fetch('/api/private/payout/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankCode: selectedBankCode, accountNumber: payoutAccountNumber }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not verify account.')
+      setResolvedName(data.accountName)
+    } catch (err: any) {
+      toast.error(err.message || 'Could not verify account.')
+    } finally {
+      setIsResolving(false)
+    }
+  }
+
+  const onSavePayout = async () => {
+    if (!resolvedName) {
+      toast.error('Verify your account first.')
+      return
+    }
+    setIsSavingPayout(true)
+    try {
+      const bankName = banks.find((b) => b.code === selectedBankCode)?.name || ''
+      const res = await fetch('/api/private/payout/recipient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankCode: selectedBankCode, accountNumber: payoutAccountNumber, bankName }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not save payout details.')
+      setPayout(data.payout)
+      toast.success('Payout details saved.')
+      setIsPayoutOpen(false)
+    } catch (err: any) {
+      toast.error(err.message || 'Could not save payout details.')
+    } finally {
+      setIsSavingPayout(false)
+    }
+  }
 
   React.useEffect(() => {
     setWallet(initialWallet)

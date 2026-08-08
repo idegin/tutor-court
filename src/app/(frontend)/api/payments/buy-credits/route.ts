@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { CREDIT_RATE } from '@/lib/constants'
+import { spendBalanceForCreditsAtomic } from '@/lib/escrow'
 
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
@@ -40,50 +41,51 @@ export async function POST(request: Request) {
     }
 
     const wallet = wallets.docs[0]
-    const balance = (wallet.balance as number) || 0
-    const locked = (wallet.lockedBalance as number) || 0
-    const creditBalance = (wallet.creditBalance as number) || 0
 
-    // Spendable only — funds reserved for escrow / a pending withdrawal can't be
-    // spent on credits (otherwise a tutor could double-spend a reserved payout).
-    if (balance - locked < cost) {
-      return NextResponse.json(
-        { error: 'Insufficient available wallet balance. Please fund your wallet first.' },
-        { status: 400 },
-      )
+    // Atomic + all-or-nothing: debit spendable and grant credits in one guarded
+    // statement (no double-spend of reserved funds), then book the ledger row in
+    // the same transaction.
+    const transactionID = (await payload.db.beginTransaction()) || undefined
+    const req = transactionID ? ({ transactionID } as any) : undefined
+    try {
+      // Spendable only — funds reserved for escrow / a pending withdrawal can't
+      // be spent on credits (otherwise a tutor could double-spend a reserved payout).
+      const spend = await spendBalanceForCreditsAtomic(payload, req, wallet.id, cost, credits)
+      if (!spend.ok) {
+        if (transactionID) await payload.db.rollbackTransaction(transactionID)
+        return NextResponse.json(
+          { error: 'Insufficient available wallet balance. Please fund your wallet first.' },
+          { status: 400 },
+        )
+      }
+
+      await payload.create({
+        collection: 'transactions',
+        data: {
+          reference: `credits-${user.id}-${Date.now()}`,
+          gateway: 'wallet',
+          type: 'payment',
+          sender: user.id,
+          receiver: user.id,
+          amount: cost,
+          currency: 'ngn',
+          status: 'success',
+          description: `Purchased ${credits} credits from wallet balance.`,
+        } as any,
+        req,
+        overrideAccess: true,
+      })
+
+      if (transactionID) await payload.db.commitTransaction(transactionID)
+      return NextResponse.json({
+        success: true,
+        balance: spend.balance,
+        creditBalance: spend.creditBalance,
+      })
+    } catch (e: any) {
+      if (transactionID) await payload.db.rollbackTransaction(transactionID)
+      throw e
     }
-
-    // Update wallet
-    const updatedWallet = await payload.update({
-      collection: 'wallets',
-      id: wallet.id,
-      data: {
-        balance: balance - cost,
-        creditBalance: creditBalance + credits,
-      } as any,
-    })
-
-    // Create debit transaction for buying credits (sender and receiver point to the user)
-    await payload.create({
-      collection: 'transactions',
-      data: {
-        reference: `credits-${user.id}-${Date.now()}`,
-        gateway: 'wallet',
-        type: 'payment',
-        sender: user.id,
-        receiver: user.id,
-        amount: cost,
-        currency: 'ngn',
-        status: 'success',
-        description: `Purchased ${credits} credits from wallet balance.`,
-      } as any,
-    })
-
-    return NextResponse.json({
-      success: true,
-      balance: updatedWallet.balance,
-      creditBalance: updatedWallet.creditBalance,
-    })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

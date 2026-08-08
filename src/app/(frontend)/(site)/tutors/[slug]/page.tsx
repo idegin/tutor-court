@@ -64,7 +64,9 @@ export default async function TutorDetailsPage({
                         {
                             or: [
                                 { status: { equals: 'pending' } },
-                                { status: { equals: 'confirmed' } }
+                                { status: { equals: 'confirmed' } },
+                                { status: { equals: 'in_progress' } },
+                                { status: { equals: 'awaiting_release' } }
                             ]
                         }
                     ]

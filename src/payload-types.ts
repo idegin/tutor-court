@@ -645,7 +645,11 @@ export interface Booking {
    * Parent user when the booking is made on behalf of a managed student.
    */
   parent?: (number | null) | User;
-  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'refunded';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'awaiting_release' | 'completed' | 'cancelled' | 'refunded';
+  /**
+   * When the tutor marked work delivered (status → awaiting_release). Drives the auto-release grace window.
+   */
+  awaitingReleaseAt?: string | null;
   paymentStatus: 'unpaid' | 'held' | 'paid' | 'refunded' | 'failed';
   /**
    * Linked transaction that paid for this booking.
@@ -1618,6 +1622,7 @@ export interface BookingsSelect<T extends boolean = true> {
   student?: T;
   parent?: T;
   status?: T;
+  awaitingReleaseAt?: T;
   paymentStatus?: T;
   transaction?: T;
   class?: T;
