@@ -4,7 +4,18 @@
  * Docs: https://www.npmjs.com/package/zeptomail
  */
 import { SendMailClient } from 'zeptomail'
-import { MANAGED_ACCOUNT_DOMAIN } from './constants'
+import { MANAGED_ACCOUNT_DOMAIN, SUPPRESSED_EMAIL_ADDRESSES } from './constants'
+
+// Exact addresses we must never send to (seeded QA accounts on the live domain
+// + anything set via EMAIL_SUPPRESS_LIST). Lower-cased for case-insensitive match.
+const SUPPRESSED_ADDRESSES = new Set(
+  [
+    ...SUPPRESSED_EMAIL_ADDRESSES,
+    ...(process.env.EMAIL_SUPPRESS_LIST || '').split(','),
+  ]
+    .map((addr) => addr.trim().toLowerCase())
+    .filter(Boolean),
+)
 
 const ZEPTO_URL = 'https://api.zeptomail.com/v1.1/email'
 const _rawToken = process.env.ZEPTO_MAIL_API_KEY || ''
@@ -52,6 +63,13 @@ export async function sendEmail({ to, subject, html, replyTo }: SendEmailParams)
   if (toAddress.address.toLowerCase().endsWith(`@${MANAGED_ACCOUNT_DOMAIN}`)) {
     console.log(
       `[EmailService] Skipping email to managed account "${toAddress.address}" (local domain).`,
+    )
+    return
+  }
+
+  if (SUPPRESSED_ADDRESSES.has(toAddress.address.toLowerCase())) {
+    console.log(
+      `[EmailService] Skipping suppressed test address "${toAddress.address}" (would hard-bounce).`,
     )
     return
   }

@@ -8,6 +8,18 @@ export const CREDIT_RATE = {
 
 export const MANAGED_ACCOUNT_DOMAIN = 'tutorcourt.local'
 
+// QA / seeded test accounts that live on the real business domain but have no
+// actual mailbox. The email service must NEVER send to these — non-existent
+// mailboxes hard-bounce, which damages the sending domain's reputation and can
+// get it flagged by ZeptoMail. We suppress the exact addresses only, never the
+// whole @tutorcourt.com domain (real business inboxes use it). Extend at runtime
+// via the EMAIL_SUPPRESS_LIST env var (comma-separated addresses).
+export const SUPPRESSED_EMAIL_ADDRESSES = [
+  'tutor1@tutorcourt.com',
+  'parent1@tutorcourt.com',
+  'student1@tutorcourt.com',
+]
+
 // Public support inbox shown in the UI (disputes, help, contact).
 export const SUPPORT_EMAIL = 'support@tutorcourt.com'
 
