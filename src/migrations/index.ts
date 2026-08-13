@@ -17,6 +17,7 @@ import * as migration_20260804_101918_live_classroom_v2_fields from './20260804_
 import * as migration_20260808_000000_booking_awaiting_release from './20260808_000000_booking_awaiting_release';
 import * as migration_20260808_120000_tutor_payout_paystack from './20260808_120000_tutor_payout_paystack';
 import * as migration_20260808_130000_wallet_nonnegative_checks from './20260808_130000_wallet_nonnegative_checks';
+import * as migration_20260813_000000_seed_qa_test_accounts from './20260813_000000_seed_qa_test_accounts';
 
 export const migrations = [
   {
@@ -113,5 +114,10 @@ export const migrations = [
     up: migration_20260808_130000_wallet_nonnegative_checks.up,
     down: migration_20260808_130000_wallet_nonnegative_checks.down,
     name: '20260808_130000_wallet_nonnegative_checks',
+  },
+  {
+    up: migration_20260813_000000_seed_qa_test_accounts.up,
+    down: migration_20260813_000000_seed_qa_test_accounts.down,
+    name: '20260813_000000_seed_qa_test_accounts',
   },
 ];
