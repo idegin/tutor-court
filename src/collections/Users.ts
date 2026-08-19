@@ -49,10 +49,23 @@ export const Users: CollectionConfig = {
     },
   },
   access: {
-    create: () => true, // Allow public signup
+    // Gate the Payload admin panel: only admins may access /admin.
+    // Without this, Payload lets ANY authenticated user (student/parent/tutor)
+    // into the admin panel by default.
+    admin: ({ req: { user } }) => user?.accountType === 'admin',
+    create: () => true, // Allow public signup (accountType is guarded in beforeValidate)
     read: () => true,
-    update: ({ req: { user } }) => Boolean(user), // Restrict updates to logged-in
-    delete: ({ req: { user } }) => Boolean(user), // Restrict deletes to logged-in
+    // Non-admins may only update/delete themselves or their managed children.
+    update: ({ req: { user } }) => {
+      if (!user) return false
+      if (user.accountType === 'admin') return true
+      return { or: [{ id: { equals: user.id } }, { parent: { equals: user.id } }] } as any
+    },
+    delete: ({ req: { user } }) => {
+      if (!user) return false
+      if (user.accountType === 'admin') return true
+      return { or: [{ id: { equals: user.id } }, { parent: { equals: user.id } }] } as any
+    },
   },
   hooks: {
     beforeValidate: [
@@ -61,6 +74,29 @@ export const Users: CollectionConfig = {
           data.password = data.password.trim()
         }
         return data
+      },
+      // Prevent privilege escalation: nobody may self-assign the `admin`
+      // account type. Only an existing admin (or the very first-user bootstrap,
+      // when no admin exists yet) may create/set accountType === 'admin'.
+      async ({ data, req, operation, originalDoc }) => {
+        if (!data) return data
+        const isAdminActor = req?.user?.accountType === 'admin'
+        if (isAdminActor) return data
+
+        const becomingAdmin =
+          data.accountType === 'admin' &&
+          (operation !== 'update' || originalDoc?.accountType !== 'admin')
+        if (!becomingAdmin) return data
+
+        // Allow the first admin to be bootstrapped when none exists yet.
+        const existingAdmins = await req.payload.count({
+          collection: 'users',
+          where: { accountType: { equals: 'admin' } },
+          overrideAccess: true,
+        })
+        if ((existingAdmins?.totalDocs ?? 0) === 0) return data
+
+        throw new Error('You are not allowed to create or assign admin accounts.')
       },
     ],
     afterChange: [
