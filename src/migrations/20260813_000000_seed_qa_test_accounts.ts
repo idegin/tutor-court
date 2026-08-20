@@ -41,7 +41,6 @@ const CHILD = {
   lastName: 'One',
   email: 'child.one@tutorcourt.local',
   password: 'Child1Pass!',
-  gradeLevel: undefined as string | undefined,
 }
 
 const COMMON = {
@@ -155,7 +154,6 @@ export async function up({ payload, req }: MigrateUpArgs): Promise<void> {
         lastName: CHILD.lastName,
         generatedEmail: CHILD.email,
         generatedPassword: CHILD.password,
-        gradeLevel: CHILD.gradeLevel,
       },
       req,
     })
