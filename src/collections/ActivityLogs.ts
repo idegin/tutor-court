@@ -60,6 +60,7 @@ export const ActivityLogs: CollectionConfig = {
       options: [
         { label: 'Assessment Assigned', value: 'assessment_assigned' },
         { label: 'Assessment Completed', value: 'assessment_completed' },
+        { label: 'Assessment Graded', value: 'assessment_graded' },
         { label: 'Class Joined', value: 'class_joined' },
         { label: 'Class Left', value: 'class_left' },
         { label: 'Class Ended', value: 'class_ended' },

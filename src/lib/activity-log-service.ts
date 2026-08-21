@@ -5,6 +5,7 @@ import config from '@payload-config'
 export type ActivityLogType =
   | 'assessment_assigned'
   | 'assessment_completed'
+  | 'assessment_graded'
   | 'class_joined'
   | 'class_left'
   | 'class_ended'

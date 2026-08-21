@@ -1215,7 +1215,13 @@ export interface ActivityLog {
    * User who triggered the event (may equal subject).
    */
   actor?: (number | null) | User;
-  type: 'assessment_assigned' | 'assessment_completed' | 'class_joined' | 'class_left' | 'class_ended';
+  type:
+    | 'assessment_assigned'
+    | 'assessment_completed'
+    | 'assessment_graded'
+    | 'class_joined'
+    | 'class_left'
+    | 'class_ended';
   title: string;
   description?: string | null;
   /**
