@@ -82,6 +82,10 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
     const [maxStudents, setMaxStudents] = useState('1');
     const [startDate, setStartDate] = useState<Date>();
     const [endDate, setEndDate] = useState<Date>();
+    // The original start day of the class being edited (normalized to midnight).
+    // A class that already started keeps its past start date; only a *changed*
+    // start date is held to the "not in the past" rule.
+    const [originalStartDay, setOriginalStartDay] = useState<Date | null>(null);
 
     // Delete states
     const [classToDelete, setClassToDelete] = useState<any | null>(null);
@@ -125,6 +129,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
         setMaxStudents('1');
         setStartDate(undefined);
         setEndDate(undefined);
+        setOriginalStartDay(null);
         setScheduleState({
             sun: { checked: false, startTime: '09:00', endTime: '10:00' },
             mon: { checked: false, startTime: '09:00', endTime: '10:00' },
@@ -144,6 +149,9 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
         setMaxStudents(String(cls.maxStudents || 1));
         setStartDate(new Date(cls.startDate));
         setEndDate(new Date(cls.endDate));
+        const os = new Date(cls.startDate);
+        os.setHours(0, 0, 0, 0);
+        setOriginalStartDay(os);
 
         // Reset schedule state
         const newSchedule = {
@@ -193,7 +201,10 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
             return;
         }
 
-        if (!editingClassId && startDate < startOfToday) {
+        const startDay = new Date(startDate);
+        startDay.setHours(0, 0, 0, 0);
+        const startChanged = !originalStartDay || startDay.getTime() !== originalStartDay.getTime();
+        if (startChanged && startDay < startOfToday) {
             toast.error('Start date cannot be in the past.');
             return;
         }
@@ -385,7 +396,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                                 mode="single"
                                                 selected={startDate}
                                                 onSelect={setStartDate}
-                                                disabled={editingClassId ? undefined : (date) => date < startOfToday}
+                                                disabled={(date) => date < startOfToday && !(originalStartDay && date.getTime() === originalStartDay.getTime())}
                                                 initialFocus
                                             />
                                         </PopoverContent>

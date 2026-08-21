@@ -40,6 +40,7 @@ export const metadata = {
 const ACTIVITY_ICON: Record<string, React.ReactNode> = {
   assessment_assigned: <HiOutlineClipboardDocumentList className="h-4 w-4" />,
   assessment_completed: <HiOutlineCheckCircle className="h-4 w-4" />,
+  assessment_graded: <HiOutlineAcademicCap className="h-4 w-4" />,
   class_joined: <HiOutlineUserPlus className="h-4 w-4" />,
   class_left: <HiOutlineUserMinus className="h-4 w-4" />,
   class_ended: <HiOutlineVideoCamera className="h-4 w-4" />,
@@ -48,6 +49,7 @@ const ACTIVITY_ICON: Record<string, React.ReactNode> = {
 const ACTIVITY_TINT: Record<string, string> = {
   assessment_assigned: 'bg-blue-50 text-blue-700 border-blue-100',
   assessment_completed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  assessment_graded: 'bg-indigo-50 text-indigo-700 border-indigo-100',
   class_joined: 'bg-tutor-purple-50 text-tutor-purple-700 border-tutor-purple-100',
   class_left: 'bg-slate-50 text-slate-700 border-slate-100',
   class_ended: 'bg-amber-50 text-amber-700 border-amber-100',

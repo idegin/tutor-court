@@ -2,6 +2,7 @@ import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { createActivityLogs } from '@/lib/activity-log-service'
 
 type IncomingGrade = {
   questionId: string | number
@@ -129,6 +130,56 @@ export async function POST(request: Request) {
       ...(feedback !== undefined ? { feedback } : {}),
     } as any,
   })
+
+  // Surface the grading on both the student's and tutor's recent-activity feeds.
+  // Fire-and-forget: instrumentation must never break the grading response.
+  const ta =
+    typeof result.tutorAssessment === 'object' ? result.tutorAssessment : null
+  const tutorAssessmentId =
+    ta?.id ?? result.tutorAssessment
+  const assessmentTitle =
+    ta && typeof ta.assessment === 'object' ? ta.assessment?.title : 'an assessment'
+  const classId = ta && typeof ta.class === 'object' ? ta.class?.id : ta?.class
+  const assessmentId =
+    ta && typeof ta.assessment === 'object' ? ta.assessment?.id : ta?.assessment
+  const student = typeof result.student === 'object' ? result.student : null
+  const studentId = student?.id ?? result.student
+  const studentName =
+    (student ? `${student.firstName || ''} ${student.lastName || ''}`.trim() : '') ||
+    student?.email ||
+    'A student'
+
+  const tutorLink =
+    classId && assessmentId
+      ? `/dashboard/tutor/classes/${classId}/assessments/${assessmentId}`
+      : `/dashboard/tutor/assessments/${tutorAssessmentId}`
+
+  if (studentId) {
+    createActivityLogs([
+      {
+        subjectId: studentId,
+        actorId: user.id,
+        type: 'assessment_graded',
+        title: `Your "${assessmentTitle}" was graded`,
+        description: `Scored ${score}% (${passed ? 'passed' : 'did not pass'}).`,
+        link: `/dashboard/student/assessments/${tutorAssessmentId}`,
+        relatedCollection: 'assessment-results',
+        relatedId: String(resultId),
+        metadata: { score, passed, tutorAssessmentId },
+      },
+      {
+        subjectId: user.id,
+        actorId: user.id,
+        type: 'assessment_graded',
+        title: `You graded ${studentName}'s "${assessmentTitle}"`,
+        description: `Scored ${score}% (${passed ? 'passed' : 'did not pass'}).`,
+        link: tutorLink,
+        relatedCollection: 'assessment-results',
+        relatedId: String(resultId),
+        metadata: { score, passed, studentId, tutorAssessmentId },
+      },
+    ]).catch(() => {})
+  }
 
   return NextResponse.json({ success: true, result: updated })
 }

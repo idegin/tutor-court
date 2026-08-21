@@ -60,6 +60,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Not authorized to edit this class.' }, { status: 403 })
     }
 
+    // A class that already started legitimately has a past start date, so only
+    // block *moving* the start into the past — not keeping the existing one.
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const existingStart = (existingClass as any).startDate ? new Date((existingClass as any).startDate) : null
+    const startChanged = !existingStart || existingStart.getTime() !== start.getTime()
+    if (startChanged && start < today) {
+      return NextResponse.json({ error: 'Start date cannot be in the past.' }, { status: 400 })
+    }
+
     // Update class
     const updatedClass = await payload.update({
       collection: 'classes',
