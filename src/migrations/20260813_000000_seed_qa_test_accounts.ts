@@ -41,7 +41,10 @@ const CHILD = {
   lastName: 'One',
   email: 'child.one@tutorcourt.local',
   password: 'Child1Pass!',
-  gradeLevel: undefined as string | undefined,
+  // No grade set for the QA child; keep it `undefined` (the students.gradeLevel
+  // field is an enum union | null | undefined, so a widened `string` broke the
+  // production typecheck).
+  gradeLevel: undefined,
 }
 
 const COMMON = {

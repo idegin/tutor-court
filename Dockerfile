@@ -5,7 +5,9 @@
 
 FROM node:22.17.0-alpine AS base
 RUN apk add --no-cache libc6-compat
-RUN corepack enable pnpm
+# Pin pnpm to the version that generated pnpm-lock.yaml (engines requires ^9||^10);
+# `corepack enable` alone would fetch the latest (v11) and fail --frozen-lockfile.
+RUN corepack enable && corepack prepare pnpm@10.33.4 --activate
 WORKDIR /app
 
 # ---- deps ----
