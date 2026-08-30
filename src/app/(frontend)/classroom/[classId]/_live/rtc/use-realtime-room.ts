@@ -75,9 +75,9 @@ export function useRealtimeRoom(opts: {
 
     const attemptJoin = async () => {
       // Retry the initial connection with backoff. Without this, a transient
-      // failure (slow ably-token, ICE hiccup, momentary network drop during
-      // join) leaves the room stuck on "Connection lost" forever — Ably's own
-      // reconnection only kicks in AFTER a first successful connect.
+      // failure (slow socket-token, ICE hiccup, momentary network drop during
+      // join) leaves the room stuck on "Connection lost" forever — Socket.IO's
+      // own reconnection only kicks in AFTER a first successful connect.
       for (let attempt = 1; attempt <= MAX_ATTEMPTS && !cancelled; attempt++) {
         try {
           const iceRes = await fetch(`/api/live/ice?sessionId=${liveSessionId}`, { cache: 'no-store' })

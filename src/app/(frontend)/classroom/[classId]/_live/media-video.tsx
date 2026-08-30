@@ -24,6 +24,10 @@ export function MediaVideo({
     const el = ref.current
     if (!el) return
     if (el.srcObject !== stream) el.srcObject = stream
+    // Unmuted remote video is blocked from autoplaying on iOS Safari without an
+    // explicit play() (the "remote tile stays black" bug on mobile). The user
+    // already gestured by joining, so this resolves; ignore the benign reject.
+    if (stream) el.play().catch(() => {})
   }, [stream])
 
   return (

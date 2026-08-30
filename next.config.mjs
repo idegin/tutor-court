@@ -2,14 +2,9 @@ import { withPayload } from '@payloadcms/next/withPayload'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  // ably's build emits `(...args) => super(...args)` inside a derived-class
-  // constructor. Transpile it here (and see the modern `browserslist` in
-  // package.json) so SWC keeps that valid arrow-super intact instead of
-  // half-downleveling it into an invalid plain-function super() that webpack
-  // then rejects ("'super' keyword outside a method").
-  transpilePackages: ['ably'],
-  // Your Next.js config here
+  // NB: no `output: 'standalone'` — the app is served by a custom Node server
+  // (server.ts) that also hosts the live-classroom Socket.IO plane, so we run
+  // `next build` + `tsx server.ts` rather than Next's standalone server.
   webpack: (webpackConfig) => {
     webpackConfig.resolve.extensionAlias = {
       '.cjs': ['.cts', '.cjs'],

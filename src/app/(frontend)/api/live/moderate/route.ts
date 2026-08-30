@@ -4,17 +4,16 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { toIntId } from '@/lib/id'
 import { resolveSessionAccess } from '@/lib/live/access'
-import { forceCloseParticipantTracks } from '@/lib/live/cf-realtime'
-import { revokeAblyTokens } from '@/lib/live/ably-server'
 
 export const runtime = 'nodejs'
 
 // Host-only moderation for a live class. The tutor's client also broadcasts a
-// control message over Ably for instant UX; THIS route makes it authoritative:
-//   remove  → mark participant.removed (blocks rejoin) + force-close their SFU
-//             tracks + revoke their Ably token (drops them from presence/chat).
-//   promote → add to session.stagePublishers + role='publisher' (grants media publish).
-//   demote  → remove from stagePublishers + role='viewer' + force-close their tracks.
+// control message over Socket.IO for instant UX (and the socket server drops a
+// removed user's connection); THIS route makes it authoritative in the DB:
+//   remove  → mark participant.removed (blocks rejoin: the socket-token mint
+//             refuses a removed participant, so a kick sticks across refresh).
+//   promote → add to session.stagePublishers + role='publisher'.
+//   demote  → remove from stagePublishers + role='viewer'.
 
 const idOf = (v: any) => (v && typeof v === 'object' ? v.id : v)
 
@@ -69,9 +68,7 @@ export async function POST(request: Request) {
           id: log.id,
           data: { removed: true, removedReason: String(body?.reason || 'Removed by tutor'), leftAt: new Date().toISOString() } as any,
         })
-        if (log.sfuSessionId) await forceCloseParticipantTracks(log.sfuSessionId, String(targetUserId))
       }
-      await revokeAblyTokens([String(targetUserId)])
       return NextResponse.json({ success: true })
     }
 
@@ -102,7 +99,8 @@ export async function POST(request: Request) {
       await payload.update({ collection: 'live-sessions', id: sessionId, data: { stagePublishers: next } as any })
       if (log) {
         await payload.update({ collection: 'live-session-participants', id: log.id, data: { role: 'viewer' } as any })
-        if (log.sfuSessionId) await forceCloseParticipantTracks(log.sfuSessionId, String(targetUserId))
+        // The demoted student's client stops sending media on the 'demote'
+        // control signal; no server-side track teardown is needed with mesh.
       }
     }
     return NextResponse.json({ success: true })

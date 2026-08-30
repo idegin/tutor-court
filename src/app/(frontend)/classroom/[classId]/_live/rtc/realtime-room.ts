@@ -1,43 +1,32 @@
 'use client'
 
-import * as Ably from 'ably'
-import { SfuClient } from './sfu-client'
+import { io, type Socket } from 'socket.io-client'
+import { PeerManager } from './webrtc'
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  PresenceData,
+  RoomParticipant,
+  ChatMessagePayload,
+} from '@/lib/live/socket-types'
 
-// The realtime "room": one Ably connection + one SFU client, wired together.
-// Ably presence is the source of truth for WHO is in the room and WHAT SFU
-// tracks they publish; this engine reacts to presence to pull remote media, and
-// carries chat / reactions / hands / whiteboard / control on sub-channels.
+// The realtime "room": one Socket.IO connection + one WebRTC mesh, wired
+// together. This REPLACES the old Ably + Cloudflare SFU engine. The public
+// surface (constructor options, methods, events) is unchanged, so the React hook
+// and the classroom UI don't care how the bytes move.
 //
-// Auth: the Ably client authenticates via /api/live/ably-token (a signed,
-// capability-scoped TokenRequest) — the root key never reaches the browser.
+//  - Data plane (presence / chat / reactions / control / whiteboard): Socket.IO
+//    events on our own server (server.ts).
+//  - Media plane (audio / video): a direct peer-to-peer mesh — every browser
+//    connects straight to every other participant. The server only relays the
+//    WebRTC offer/answer/ICE ("signal") and never sees the media.
+//
+// Auth: the socket presents a short-lived signed token from /api/live/socket-token
+// (which runs the full Payload membership check). Participant identity is the app
+// user id, so peers, presence and remote streams are all keyed the same way.
 
 export type ReactionEmoji = string
-
-export interface PresenceData {
-  name: string
-  accountType: 'tutor' | 'student' | 'parent'
-  role: 'host' | 'publisher' | 'viewer'
-  micOn: boolean
-  camOn: boolean
-  handRaisedAt?: number | null
-  sfuSessionId?: string | null
-  audioTrack?: string | null
-  videoTrack?: string | null
-}
-
-export interface RoomParticipant extends PresenceData {
-  id: string // clientId (app user id)
-  isLocal: boolean
-}
-
-export interface ChatMessagePayload {
-  id: string
-  senderId: string
-  senderName: string
-  senderAccountType: 'tutor' | 'student' | 'parent'
-  body: string
-  sentAt: number
-}
+export type { PresenceData, RoomParticipant, ChatMessagePayload }
 
 export interface RoomEvents {
   onParticipants?: (list: RoomParticipant[]) => void
@@ -48,7 +37,7 @@ export interface RoomEvents {
   onControl?: (action: string, data: any, fromId: string) => void
   onWhiteboard?: (op: any, fromId: string) => void
   onConnectionState?: (state: string) => void
-  /** SFU PeerConnection state (media plane) — for diagnostics. */
+  /** Aggregate PeerConnection (media) state — for diagnostics. */
   onMediaState?: (state: string) => void
 }
 
@@ -60,40 +49,24 @@ export interface RoomOptions {
   events: RoomEvents
 }
 
-const CH = {
-  base: (id: string | number) => `live:${id}`,
-  chat: (id: string | number) => `live:${id}:chat`,
-  reactions: (id: string | number) => `live:${id}:reactions`,
-  hands: (id: string | number) => `live:${id}:hands`,
-  whiteboard: (id: string | number) => `live:${id}:whiteboard`,
-  control: (id: string | number) => `live:${id}:control`,
-}
-
 export class RealtimeRoom {
-  private client: Ably.Realtime | null = null
-  private sfu: SfuClient | null = null
-  private base!: Ably.RealtimeChannel
-  private chat!: Ably.RealtimeChannel
-  private reactions!: Ably.RealtimeChannel
-  private hands!: Ably.RealtimeChannel
-  private whiteboard!: Ably.RealtimeChannel
-  private control!: Ably.RealtimeChannel
+  private socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null
+  private pm: PeerManager | null = null
+  private token: string | null = null
 
-  private local: PresenceData
-  private streams = new Map<string, MediaStream>() // userId → aggregated stream
-  private pulled = new Set<string>() // `${sfuSessionId}:${trackName}` already pulled
-  private sfuToUser = new Map<string, string>() // sfuSessionId → userId
-  private closed = false
-  private entered = false
-  private published = false
-  private publishing = false
+  private readonly selfId: string
   private canPublishNow: boolean
-  private reconciling = false
-  private reconcileQueued = false
-  private pullFailures = new Map<string, number>() // key → failed attempts
-  private lastStream: MediaStream | null = null // last stream we published (for media rebuild)
+  private closed = false
+  private joinedOnce = false
+  /** Aggregated remote stream per peer (userId → stream) for teardown events. */
+  private streams = new Map<string, MediaStream>()
+  /** The current local stream we publish (kept so a reconnect re-attaches it). */
+  private localStream: MediaStream | null = null
+  private local: PresenceData
 
   constructor(private readonly opts: RoomOptions) {
+    this.selfId = String(opts.user.id)
+    this.canPublishNow = opts.canPublish
     this.local = {
       name: opts.user.name,
       accountType: opts.user.accountType,
@@ -101,396 +74,243 @@ export class RealtimeRoom {
       micOn: true,
       camOn: true,
       handRaisedAt: null,
-      sfuSessionId: null,
-      audioTrack: null,
-      videoTrack: null,
     }
-    this.canPublishNow = opts.canPublish
   }
 
   async join(localStream: MediaStream | null): Promise<void> {
-    const sessionId = this.opts.liveSessionId
+    this.localStream = localStream
 
-    this.client = new Ably.Realtime({
-      clientId: String(this.opts.user.id),
-      authCallback: async (_params, callback) => {
-        try {
-          const res = await fetch(`/api/live/ably-token?sessionId=${sessionId}`, { cache: 'no-store' })
-          if (!res.ok) {
-            // Surface the server's reason (e.g. realtime_not_configured, access
-            // denied) so a dead connection is diagnosable instead of silent.
-            const body = await res.text().catch(() => '')
-            throw new Error(`ably-token ${res.status} ${body}`)
-          }
-          const tokenRequest = await res.json()
-          callback(null, tokenRequest)
-        } catch (err: any) {
-          console.error('[room] ably token fetch failed:', err?.message ?? err)
-          callback(err?.message ?? 'auth failed', null)
-        }
+    // Mint the socket token first (fails fast with a clear reason if we're not a
+    // member / the session ended). The React hook retries join() with backoff.
+    const res = await fetch(`/api/live/socket-token?sessionId=${this.opts.liveSessionId}`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`socket-token ${res.status} ${body}`)
+    }
+    this.token = (await res.json()).token as string
+    if (this.closed) return
+
+    // Build the mesh engine now — selfId is the stable app user id, so we don't
+    // need the socket id first. Publishers attach their real tracks; observers
+    // (parents) attach an empty stream and still receive everyone else.
+    const meshStream = this.canPublishNow && localStream ? localStream : new MediaStream()
+    this.pm = new PeerManager(
+      this.selfId,
+      meshStream,
+      {
+        sendSignal: (to, data) => this.socket?.emit('signal', { to, data }),
+        onTrack: (peerId, stream) => {
+          this.streams.set(peerId, stream)
+          this.opts.events.onStream?.(peerId, stream)
+        },
+        onState: (_peerId, state) => this.opts.events.onMediaState?.(state),
       },
-    })
-
-    this.client.connection.on((stateChange) => {
-      // Log the failure reason (Ably error code + message) so "Connection lost"
-      // is diagnosable — e.g. 40160 capability mismatch (key lacks the live:*
-      // channels/presence) or 40100 invalid credentials.
-      if (stateChange.current === 'failed' || stateChange.current === 'suspended') {
-        console.error('[room] ably connection', stateChange.current, stateChange.reason)
-      }
-      this.opts.events.onConnectionState?.(stateChange.current)
-    })
-
-    this.base = this.client.channels.get(CH.base(sessionId))
-    // rewind replays recent chat so a late joiner arrives to context, not a
-    // blank thread.
-    this.chat = this.client.channels.get(CH.chat(sessionId), { params: { rewind: '50' } })
-    this.reactions = this.client.channels.get(CH.reactions(sessionId))
-    this.hands = this.client.channels.get(CH.hands(sessionId))
-    // rewind replays recent whiteboard ops so a late joiner sees the current
-    // board instead of a blank one. (Beyond the rewind window, a server-side
-    // snapshot is the durable fix — tracked for a later pass.)
-    this.whiteboard = this.client.channels.get(CH.whiteboard(sessionId), { params: { rewind: '100' } })
-    this.control = this.client.channels.get(CH.control(sessionId))
-
-    // Everyone gets an SFU session (publishers to publish, viewers to pull).
-    // Rebuild media on a terminal PeerConnection failure so a transient network
-    // drop doesn't leave video/audio dead forever (Ably reconnects on its own).
-    this.sfu = new SfuClient(sessionId, this.opts.iceServers, (e) => this.onRemoteTrack(e), (s) =>
-      this.onMediaConnectionState(s),
+      this.opts.iceServers,
     )
-    await this.sfu.connect()
-    // The effect may have unmounted us while connect() was in flight — bail and
-    // tear down instead of leaking the SFU session + Ably connection.
-    if (this.closed) {
-      this.sfu.close()
-      this.client.close()
-      this.client = null
-      return
-    }
 
-    // Publish now if the local stream is already available; otherwise
-    // publishStream() is called later (from the hook) once media is granted.
-    // NON-FATAL: a media-publish failure (e.g. a 403 or transient SFU error)
-    // must NOT abort join — presence + chat/reactions/hands are a separate plane
-    // and have to come up regardless, or a media hiccup blacks out the whole room.
-    if (this.canPublishNow && localStream && localStream.getTracks().length > 0) {
-      try {
-        await this.doPublish(localStream)
-      } catch (err) {
-        console.error('[room] initial media publish failed (continuing with data plane)', err)
-      }
-    }
+    await new Promise<void>((resolve, reject) => {
+      this.opts.events.onConnectionState?.('connecting')
+      const socket = io({
+        autoConnect: false,
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 8,
+        reconnectionDelay: 800,
+      })
+      this.socket = socket
 
-    // Sub-channel subscriptions.
-    this.chat.subscribe('message', (m) => this.opts.events.onChat?.(m.data as ChatMessagePayload))
-    this.reactions.subscribe('react', (m) =>
-      this.opts.events.onReaction?.((m.data as any).emoji, m.clientId ?? ''),
+      let settled = false
+      const timeout = setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(new Error('socket connect timeout'))
+      }, 15000)
+
+      socket.on('connect', () => {
+        // (Re)join on every connect — a reconnect gets a new socket id, so we
+        // rebuild the mesh from scratch (peers evicted our stale connection).
+        if (this.joinedOnce) {
+          this.rebuildMesh()
+        }
+        socket.emit('join', { token: this.token! })
+      })
+
+      socket.on('joined', ({ self, peers, chat, whiteboard, whiteboardWritable }) => {
+        this.joinedOnce = true
+        this.opts.events.onConnectionState?.('connected')
+        void self
+        void whiteboardWritable
+        // Replay buffered history (dedup happens in the UI by message/op id).
+        for (const m of chat) this.opts.events.onChat?.(m)
+        for (const op of whiteboard) this.opts.events.onWhiteboard?.(op, '')
+        this.applyRoster([self, ...peers])
+        if (!settled) {
+          settled = true
+          clearTimeout(timeout)
+          resolve()
+        }
+      })
+
+      socket.on('roster', (participants) => this.applyRoster(participants))
+
+      socket.on('signal', ({ from, data }) => {
+        void this.pm?.handleSignal(from, data)
+      })
+
+      socket.on('chat', (m) => this.opts.events.onChat?.(m))
+      socket.on('reaction', ({ emoji, from }) => this.opts.events.onReaction?.(emoji, from))
+      socket.on('control', ({ action, data, from }) => this.opts.events.onControl?.(action, data, from))
+      socket.on('whiteboard', ({ op, from }) => this.opts.events.onWhiteboard?.(op, from))
+
+      socket.on('denied', ({ message }) => {
+        console.error('[room] socket join denied:', message)
+        this.opts.events.onConnectionState?.('failed')
+        if (!settled) {
+          settled = true
+          clearTimeout(timeout)
+          reject(new Error(message))
+        }
+      })
+
+      socket.on('kicked', () => {
+        this.opts.events.onConnectionState?.('failed')
+      })
+
+      socket.on('disconnect', () => {
+        if (this.closed) return
+        // Socket.IO will attempt to reconnect; show "Reconnecting…", not "lost".
+        this.opts.events.onConnectionState?.('connecting')
+      })
+
+      socket.io.on('reconnect_failed', () => {
+        this.opts.events.onConnectionState?.('failed')
+      })
+
+      socket.connect()
+    })
+  }
+
+  /** Rebuild the mesh after a reconnect: drop stale peer connections + streams. */
+  private rebuildMesh(): void {
+    for (const userId of [...this.streams.keys()]) {
+      this.streams.delete(userId)
+      this.opts.events.onStreamGone?.(userId)
+    }
+    this.pm?.destroy()
+    const meshStream =
+      this.canPublishNow && this.localStream ? this.localStream : new MediaStream()
+    this.pm = new PeerManager(
+      this.selfId,
+      meshStream,
+      {
+        sendSignal: (to, data) => this.socket?.emit('signal', { to, data }),
+        onTrack: (peerId, stream) => {
+          this.streams.set(peerId, stream)
+          this.opts.events.onStream?.(peerId, stream)
+        },
+        onState: (_peerId, state) => this.opts.events.onMediaState?.(state),
+      },
+      this.opts.iceServers,
     )
-    this.control.subscribe((m) => this.opts.events.onControl?.(m.name ?? '', m.data, m.clientId ?? ''))
-    this.whiteboard.subscribe((m) => this.opts.events.onWhiteboard?.(m.data, m.clientId ?? ''))
-
-    // Presence: react to the roster, enter ourselves.
-    this.base.presence.subscribe(() => this.reconcile())
-    if (this.closed) return
-    await this.base.presence.enter(this.local)
-    this.entered = true
-    await this.reconcile()
-  }
-
-  private rebuilding = false
-  private rebuildAttempts = 0 // consecutive attempts since the last 'connected' (backoff)
-  private rebuildTotal = 0 // session-lifetime cap so a flapping link can't churn forever
-
-  /** Force an Ably token re-auth (e.g. whiteboard-writable was toggled → the
-   *  student's capability changed and their token must be re-minted now). */
-  reauth(): void {
-    // ably-js re-runs the authCallback and re-applies channel capabilities.
-    this.client?.auth.authorize().catch((err) => console.warn('[room] reauth failed', err))
-  }
-
-  private onMediaConnectionState(state: string): void {
-    this.opts.events.onMediaState?.(state)
-    if (this.closed) return
-    if (state === 'connected') this.rebuildAttempts = 0
-    if (state === 'failed') void this.rebuildMedia()
-  }
-
-  /**
-   * Rebuild the SFU media layer after a terminal PeerConnection failure: tear
-   * down the dead PC/session, create a fresh one, re-publish our local tracks,
-   * and let the next presence reconcile re-pull everyone. Ably (presence/chat)
-   * is unaffected and keeps running. Bounded + backed-off so a persistently
-   * broken network doesn't spin.
-   */
-  private async rebuildMedia(): Promise<void> {
-    if (this.closed || this.rebuilding) return
-    if (this.rebuildAttempts >= 4 || this.rebuildTotal >= 15) return
-    this.rebuilding = true
-    this.rebuildAttempts++
-    this.rebuildTotal++
-    try {
-      await new Promise((r) => setTimeout(r, 500 * this.rebuildAttempts))
-      if (this.closed) return
-      const hadStream = this.published
-      this.sfu?.close()
-      this.published = false
-      this.publishing = false
-      this.pulled.clear()
-      this.pullFailures.clear()
-      this.sfuToUser.clear()
-      this.sfu = new SfuClient(this.opts.liveSessionId, this.opts.iceServers, (e) => this.onRemoteTrack(e), (s) =>
-        this.onMediaConnectionState(s),
-      )
-      await this.sfu.connect()
-      if (this.closed) { this.sfu.close(); return }
-      this.local.sfuSessionId = this.sfu.id
-      this.local.audioTrack = null
-      this.local.videoTrack = null
-      // Re-publish our own tracks on the fresh session if we were on stage.
-      if (this.canPublishNow && hadStream && this.lastStream && this.lastStream.getTracks().length > 0) {
-        await this.doPublish(this.lastStream)
-      }
-      if (this.entered) await this.base?.presence.update(this.local).catch(() => {})
-      await this.reconcile()
-    } catch (err) {
-      console.warn('[room] media rebuild failed', err)
-    } finally {
-      this.rebuilding = false
+    // Re-apply the current outgoing tracks on the fresh mesh.
+    if (this.canPublishNow && this.localStream) {
+      this.pm.replaceAudioTrack(this.localStream.getAudioTracks()[0] ?? null)
+      this.pm.replaceVideoTrack(this.localStream.getVideoTracks()[0] ?? null)
     }
   }
 
   /**
-   * Publish the local stream to the SFU and advertise the tracks over presence.
-   * Called from join() when media is ready, and later by the hook once
-   * getUserMedia resolves (publishers often go live before the camera grants).
-   * Idempotent.
+   * Reconcile the roster: surface the participant list to the UI, open a mesh
+   * connection to every remote peer, and tear down anyone who left.
    */
+  private applyRoster(participants: RoomParticipant[]): void {
+    if (this.closed || !this.pm) return
+    const list = participants.map((p) => ({ ...p, isLocal: p.id === this.selfId }))
+    this.opts.events.onParticipants?.(list)
+
+    const presentIds = new Set(list.map((p) => p.id))
+    // Connect to every remote peer (idempotent; politeness resolves glare).
+    for (const p of list) {
+      if (p.id === this.selfId) continue
+      this.pm.connect(p.id)
+    }
+    // Drop media + connection for anyone who left the roster.
+    for (const peerId of this.pm.peerIds()) {
+      if (presentIds.has(peerId)) continue
+      this.pm.disconnect(peerId)
+      if (this.streams.has(peerId)) {
+        this.streams.get(peerId)?.getTracks().forEach((t) => t.stop())
+        this.streams.delete(peerId)
+      }
+      this.opts.events.onStreamGone?.(peerId)
+    }
+  }
+
+  /** Push the current local tracks to all peers (called when media changes). */
   async publishStream(stream: MediaStream): Promise<void> {
-    if (this.closed || !this.canPublishNow) return
-    if (!this.sfu?.id || stream.getTracks().length === 0) return
-    // Already published (or a publish is in flight carrying the current tracks):
-    // reconcile the outgoing tracks to the current stream. A device switch swaps
-    // media (same trackNames); a camera toggle stops/re-adds the video track.
-    // Keep lastStream current so a media rebuild re-publishes the LIVE stream,
-    // not the ended tracks of the pre-toggle one. Re-advertise the track names
-    // (a newly-added video track has a name peers must learn to pull it).
-    if (this.published || this.publishing) {
-      this.lastStream = stream
-      const pub = await this.sfu.syncTracks(stream)
-      const prevAudio = this.local.audioTrack
-      const prevVideo = this.local.videoTrack
-      this.local.audioTrack = pub.audio ?? null
-      this.local.videoTrack = pub.video ?? null
-      if (this.entered && (prevAudio !== this.local.audioTrack || prevVideo !== this.local.videoTrack)) {
-        await this.base?.presence.update(this.local).catch(() => {})
-      }
-      return
-    }
-    await this.doPublish(stream)
-    if (this.entered) await this.base?.presence.update(this.local).catch(() => {})
+    if (this.closed || !this.pm) return
+    this.localStream = stream
+    if (!this.canPublishNow) return
+    this.pm.replaceAudioTrack(stream.getAudioTracks()[0] ?? null)
+    this.pm.replaceVideoTrack(stream.getVideoTracks()[0] ?? null)
   }
 
-  /**
-   * The host promoted this viewer to the stage: grant publish and start sending
-   * the local stream. The server has already added them to stagePublishers, so
-   * the RTC proxy will accept the publish.
-   */
+  /** Host promoted this viewer to the stage: grant publish + start sending. */
   async promoteToStage(stream: MediaStream | null): Promise<void> {
     this.canPublishNow = true
     this.local.role = 'publisher'
-    if (!stream) {
-      if (this.entered) await this.base?.presence.update(this.local).catch(() => {})
-      return
+    this.localStream = stream
+    if (stream && this.pm) {
+      this.pm.replaceAudioTrack(stream.getAudioTracks()[0] ?? null)
+      this.pm.replaceVideoTrack(stream.getVideoTracks()[0] ?? null)
     }
-    // Retry: the server's stagePublishers write may not be readable yet when we
-    // publish, which the RTC proxy 403s. Back off a few times before giving up.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        await this.publishStream(stream)
-        return
-      } catch {
-        if (this.closed || this.published) return
-        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)))
-      }
-    }
+    this.socket?.emit('presence', { micOn: this.local.micOn, camOn: this.local.camOn })
   }
 
   async demoteSelf(): Promise<void> {
-    // Host took us off stage; the server already force-closed our SFU tracks.
-    // Stop advertising them so peers stop pulling, and keep the SFU session for
-    // viewing. A later re-promote re-publishes.
     this.canPublishNow = false
     this.local.role = 'viewer'
-    this.local.audioTrack = null
-    this.local.videoTrack = null
-    this.published = false
-    // Tear down our send transceivers so a later re-promote publishes cleanly
-    // (no duplicate trackName on the same SFU session).
-    await this.sfu?.unpublish().catch(() => {})
-    if (this.entered) await this.base?.presence.update(this.local).catch(() => {})
-  }
-
-  private async doPublish(stream: MediaStream): Promise<void> {
-    // Synchronous latch closes the double-publish window (two publishStream
-    // callers racing while the first await hasn't set `published` yet).
-    if (this.published || this.publishing || !this.sfu) return
-    this.publishing = true
-    try {
-      const published = await this.sfu.publish(stream, String(this.opts.user.id))
-      this.published = true
-      this.lastStream = stream
-      this.local.sfuSessionId = this.sfu.id
-      this.local.audioTrack = published.audio ?? null
-      this.local.videoTrack = published.video ?? null
-    } finally {
-      this.publishing = false
-    }
-  }
-
-  /**
-   * Rebuild the participant list from presence, pull new remote tracks, and
-   * clean up departed members. Coalesced: overlapping presence bursts don't run
-   * concurrent reconciles (which could apply an out-of-order roster).
-   */
-  private async reconcile(): Promise<void> {
-    if (this.closed || !this.base) return
-    if (this.reconciling) {
-      this.reconcileQueued = true
-      return
-    }
-    this.reconciling = true
-    try {
-      let members: Ably.PresenceMessage[] = []
-      try {
-        members = await this.base.presence.get()
-      } catch {
-        return
-      }
-
-      const list: RoomParticipant[] = members.map((m) => ({
-        id: m.clientId ?? '',
-        isLocal: m.clientId === String(this.opts.user.id),
-        ...(m.data as PresenceData),
-      }))
-      this.opts.events.onParticipants?.(list)
-
-      const presentIds = new Set(list.map((p) => p.id))
-
-      // Drop media for anyone who left.
-      for (const userId of [...this.streams.keys()]) {
-        if (presentIds.has(userId)) continue
-        this.streams.get(userId)?.getTracks().forEach((t) => t.stop())
-        this.streams.delete(userId)
-        for (const [sfuId, uid] of this.sfuToUser) if (uid === userId) this.sfuToUser.delete(sfuId)
-        this.opts.events.onStreamGone?.(userId)
-      }
-      // Purge pulled/failure keys for absent SFU sessions.
-      const presentSfu = new Set(list.filter((p) => p.sfuSessionId).map((p) => p.sfuSessionId as string))
-      for (const key of [...this.pulled]) {
-        const sfuId = key.split(':')[0]
-        if (!presentSfu.has(sfuId)) { this.pulled.delete(key); this.pullFailures.delete(key) }
-      }
-
-      // A still-PRESENT participant who stopped advertising tracks (demoted /
-      // force-closed) must have their stream + tile torn down — the leaver block
-      // above only handles people who left presence entirely.
-      for (const p of list) {
-        if (p.isLocal) continue
-        const hasTracks = Boolean(p.audioTrack || p.videoTrack)
-        if (!hasTracks && this.streams.has(p.id)) {
-          this.streams.get(p.id)?.getTracks().forEach((t) => t.stop())
-          this.streams.delete(p.id)
-          for (const [sfuId, uid] of this.sfuToUser) if (uid === p.id) this.sfuToUser.delete(sfuId)
-          if (p.sfuSessionId) for (const key of [...this.pulled]) if (key.startsWith(`${p.sfuSessionId}:`)) this.pulled.delete(key)
-          this.opts.events.onStreamGone?.(p.id)
-        }
-      }
-
-      // Pull remote publishers' tracks we haven't pulled yet.
-      for (const p of list) {
-        if (p.isLocal || !p.sfuSessionId) continue
-        this.sfuToUser.set(p.sfuSessionId, p.id)
-        for (const trackName of [p.audioTrack, p.videoTrack]) {
-          if (!trackName) continue
-          const key = `${p.sfuSessionId}:${trackName}`
-          if (this.pulled.has(key)) continue
-          if ((this.pullFailures.get(key) ?? 0) >= 3) continue // give up after 3 tries
-          this.pulled.add(key)
-          this.sfu
-            ?.pull(p.sfuSessionId, trackName)
-            .then((track) => this.attachTrack(p.id, track))
-            .catch((err) => {
-              this.pulled.delete(key)
-              this.pullFailures.set(key, (this.pullFailures.get(key) ?? 0) + 1)
-              console.warn('[room] pull failed', p.id, trackName, err)
-            })
-        }
-      }
-    } finally {
-      this.reconciling = false
-      if (this.reconcileQueued) {
-        this.reconcileQueued = false
-        void this.reconcile()
-      }
-    }
-  }
-
-  private onRemoteTrack(e: { sfuSessionId: string; trackName: string; track: MediaStreamTrack }): void {
-    // Safety net for a track that arrives after its pull() promise settled:
-    // map the SFU session back to a participant and attach. attachTrack is
-    // idempotent (dedupes by kind), so a double-attach with pull().then() is safe.
-    const userId = this.sfuToUser.get(e.sfuSessionId)
-    if (userId) this.attachTrack(userId, e.track)
-  }
-
-  private attachTrack(userId: string, track: MediaStreamTrack): void {
-    let stream = this.streams.get(userId)
-    if (!stream) {
-      stream = new MediaStream()
-      this.streams.set(userId, stream)
-    }
-    // Replace an existing track of the same kind (e.g. camera re-publish).
-    stream.getTracks().filter((t) => t.kind === track.kind).forEach((t) => stream!.removeTrack(t))
-    stream.addTrack(track)
-    this.opts.events.onStream?.(userId, stream)
+    // Stop sending media; the PCs stay up so we keep receiving the stage.
+    this.pm?.replaceAudioTrack(null)
+    this.pm?.replaceVideoTrack(null)
   }
 
   // ── outbound ──────────────────────────────────────────────────────────────
   async sendChat(msg: ChatMessagePayload): Promise<void> {
-    await this.chat?.publish('message', msg)
+    this.socket?.emit('chat', msg)
   }
   async sendReaction(emoji: ReactionEmoji): Promise<void> {
-    await this.reactions?.publish('react', { emoji })
+    this.socket?.emit('reaction', { emoji })
   }
   async setHand(raised: boolean): Promise<void> {
     this.local.handRaisedAt = raised ? Date.now() : null
-    await this.base?.presence.update(this.local)
-    await this.hands?.publish(raised ? 'raise' : 'lower', { at: this.local.handRaisedAt })
+    this.socket?.emit('presence', { handRaisedAt: this.local.handRaisedAt })
   }
   async updateMedia(next: { micOn?: boolean; camOn?: boolean }): Promise<void> {
     this.local = { ...this.local, ...next }
-    await this.base?.presence.update(this.local)
+    this.socket?.emit('presence', { micOn: this.local.micOn, camOn: this.local.camOn })
   }
   async sendControl(action: string, data: any = {}): Promise<void> {
-    await this.control?.publish(action, data)
+    this.socket?.emit('control', { action, data })
   }
   async sendWhiteboard(op: any): Promise<void> {
-    await this.whiteboard?.publish('op', op)
+    this.socket?.emit('whiteboard', { op })
   }
+
+  /** No-op: whiteboard-writable capability is now enforced live by the server on
+   *  each op, so there's no token to re-mint (kept for interface compatibility). */
+  reauth(): void {}
 
   async leave(): Promise<void> {
     if (this.closed) return
     this.closed = true
-    try {
-      await this.base?.presence.leave()
-    } catch {
-      /* ignore */
-    }
-    this.sfu?.close()
+    this.pm?.destroy()
+    this.pm = null
+    for (const s of this.streams.values()) s.getTracks().forEach((t) => t.stop())
     this.streams.clear()
-    this.pulled.clear()
-    this.client?.close()
-    this.client = null
+    this.socket?.removeAllListeners()
+    this.socket?.disconnect()
+    this.socket = null
   }
 }

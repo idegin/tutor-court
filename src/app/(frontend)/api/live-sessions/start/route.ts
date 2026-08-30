@@ -7,8 +7,7 @@ export const runtime = 'nodejs'
 import crypto from 'crypto'
 import { CREDIT_RATE } from '@/lib/constants'
 import { toIntId } from '@/lib/id'
-import { isLiveClassroomReady, isSfuConfigured } from '@/lib/live/config'
-import { createSfuSession } from '@/lib/live/cf-realtime'
+import { isLiveClassroomReady } from '@/lib/live/config'
 import { settleBilling } from '@/lib/live/lifecycle'
 
 // A "live" session can be an orphan: there is no background worker, so if the
@@ -17,10 +16,8 @@ import { settleBilling } from '@/lib/live/lifecycle'
 const MAX_LIVE_SESSION_AGE_MS = 6 * 60 * 60 * 1000
 
 export async function POST(request: Request) {
-  // The live backend (Cloudflare Realtime SFU + Ably) must be configured before
-  // a class can go live — otherwise media/chat can't connect and we'd bill the
-  // tutor for a dead room. Surfaces a clear "not yet available" state until the
-  // realtime keys are provisioned.
+  // Media is peer-to-peer and signalling runs on our own server, so the live
+  // backend is always available; this guard stays as a safety valve.
   if (!isLiveClassroomReady()) {
     return NextResponse.json(
       {
@@ -224,29 +221,10 @@ export async function POST(request: Request) {
       await endStaleSession(canonical)
     }
 
-    // Room identity is ours (a stable slug); media routing is a Cloudflare
-    // Realtime SFU session. If the SFU session can't be created we must NOT mark
-    // the class live — the tutor would be billed for a room whose media never
-    // connects. Surface the failure without charging.
+    // Room identity is ours (a stable slug). Media is a direct peer-to-peer mesh
+    // coordinated over our Socket.IO server — there's no external media session
+    // to provision, so nothing here can fail the start.
     const roomId = `room_${crypto.randomUUID()}`
-    let sfuSessionId: string | null = null
-
-    if (isSfuConfigured()) {
-      try {
-        const sfu = await createSfuSession()
-        sfuSessionId = sfu.sessionId
-      } catch (err) {
-        console.error('[live-sessions/start] SFU session creation failed:', err)
-        return NextResponse.json(
-          {
-            error: 'live_classes_unavailable',
-            message:
-              "We couldn't connect to the live video service. Please try again shortly — you have not been charged.",
-          },
-          { status: 502 },
-        )
-      }
-    }
 
     // Create the session. If a concurrent request won the race and created a
     // live session in the meantime, reuse the most recent one instead of leaving
@@ -259,7 +237,6 @@ export async function POST(request: Request) {
           class: classId,
           tutor: user.id,
           roomId,
-          sfuSessionId,
           startedAt: new Date().toISOString(),
           status: 'live',
           attendees: [],

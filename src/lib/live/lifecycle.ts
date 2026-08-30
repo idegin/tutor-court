@@ -1,7 +1,5 @@
 import { CREDIT_RATE } from '@/lib/constants'
 import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
-import { forceCloseParticipantTracks } from '@/lib/live/cf-realtime'
-import { revokeAblyTokens } from '@/lib/live/ably-server'
 
 // Shared live-session billing + teardown, used by the tutor heartbeat
 // (incremental charge + auto-end on zero credits) and the sweep cron
@@ -39,7 +37,9 @@ export async function settleBilling(
 
 /**
  * End a live session authoritatively: final billing settle, close open
- * participant logs, tear down SFU tracks, revoke Ably tokens, mark ended.
+ * participant logs, mark ended. Media is peer-to-peer, so there are no SFU
+ * tracks to tear down; when the session flips to `ended` the socket token mint
+ * refuses re-entry and every client drops its mesh connections on leave.
  * Idempotent-ish (no-ops on an already-ended session).
  */
 export async function endLiveSession(
@@ -62,8 +62,6 @@ export async function endLiveSession(
     depth: 0,
   })
   for (const log of logs.docs as any[]) {
-    const uid = idOf(log.user)
-    if (log.sfuSessionId) await forceCloseParticipantTracks(log.sfuSessionId, uid)
     if (!log.leftAt) {
       const interval = Math.max(0, Math.floor((nowMs - new Date(log.joinedAt).getTime()) / 1000))
       await payload
@@ -75,10 +73,6 @@ export async function endLiveSession(
         .catch(() => {})
     }
   }
-
-  // Kick everyone off the data plane (their tokens are scoped to this session).
-  const clientIds = [...new Set((logs.docs as any[]).map((l) => idOf(l.user)))]
-  await revokeAblyTokens(clientIds).catch(() => {})
 
   const startedMs = new Date(session.startedAt || session.createdAt).getTime()
   // NOT best-effort: if the status write fails the session stays `live` and the
