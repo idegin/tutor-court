@@ -68,7 +68,7 @@ export function DashboardLayout({ children, navItems, userRoleLabel }: Dashboard
     }, [fetchCredits, pathname]);
 
     const handleLogout = async () => {
-        await fetch('/api/users/logout', { method: 'POST' });
+        await fetch('/api/auth/logout', { method: 'POST' });
         window.location.href = '/';
     };
 

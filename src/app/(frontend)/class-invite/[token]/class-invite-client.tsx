@@ -115,7 +115,7 @@ export function ClassInviteClient({
 
   const handleLogout = async () => {
     try {
-      const res = await fetch('/api/users/logout', { method: 'POST' })
+      const res = await fetch('/api/auth/logout', { method: 'POST' })
       if (res.ok) {
         toast.success('Logged out successfully.')
         window.location.reload()

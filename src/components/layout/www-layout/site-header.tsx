@@ -23,7 +23,7 @@ export function SiteHeader() {
     const initials = user ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() : '';
 
     const handleLogout = async () => {
-        await fetch('/api/users/logout', { method: 'POST' });
+        await fetch('/api/auth/logout', { method: 'POST' });
         window.location.href = '/';
     };
 
