@@ -10,6 +10,7 @@ import {
   HiOutlineArrowUpRight,
   HiOutlineCreditCard,
   HiOutlineArrowRight,
+  HiOutlineCog6Tooth,
 } from 'react-icons/hi2'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -307,33 +308,36 @@ export function TutorWalletClient({
           <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Wallet</h1>
           <p className="text-sm text-gray-500 mt-1">Manage your earnings, payouts, and purchase class credits.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             onClick={() => setIsFundingOpen(true)}
-            className="rounded-full px-5 bg-gray-900 text-white hover:bg-gray-800"
+            className="rounded-full px-4 sm:px-5 bg-gray-900 text-white hover:bg-gray-800"
           >
             Fund Wallet
           </Button>
           <Button
             onClick={() => setIsBuyingOpen(true)}
-            className="rounded-full px-5 bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+            className="rounded-full px-4 sm:px-5 bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
           >
             Buy Credits
           </Button>
           <Button
             variant="outline"
-            onClick={openPayoutSettings}
-            className="rounded-full px-5"
+            onClick={() => setIsWithdrawOpen(true)}
+            disabled={spendable <= 0}
+            className="rounded-full px-4 sm:px-5"
           >
-            Payout Settings
+            Withdraw
           </Button>
           <Button
             variant="outline"
-            onClick={() => setIsWithdrawOpen(true)}
-            disabled={spendable <= 0}
-            className="rounded-full px-5"
+            size="icon"
+            onClick={openPayoutSettings}
+            aria-label="Payout settings"
+            title="Payout settings"
+            className="rounded-full shrink-0 h-12 w-12"
           >
-            Withdraw
+            <HiOutlineCog6Tooth className="h-5 w-5" />
           </Button>
         </div>
       </div>

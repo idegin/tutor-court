@@ -43,38 +43,43 @@ const CustomToolbar = (toolbar: ToolbarProps) => {
     };
 
     return (
-        <div className="flex items-center justify-between py-4 px-2 mb-2 bg-background border-b border-border/50">
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={goToCurrent}
-                    className="px-4 py-2 text-sm font-medium border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground cursor-pointer"
-                >
-                    Today
-                </button>
-                <div className="flex items-center ml-2 space-x-1">
+        <div className="flex flex-col gap-3 py-3 px-2 mb-2 bg-background border-b border-border/50 md:flex-row md:items-center md:justify-between md:py-4">
+            <div className="flex items-center justify-between gap-2 md:justify-start">
+                <div className="flex items-center gap-2">
                     <button
-                        onClick={goToBack}
-                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
+                        onClick={goToCurrent}
+                        className="px-3 py-2 text-sm font-medium border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground cursor-pointer sm:px-4"
                     >
-                        <HiOutlineChevronLeft className="w-4 h-4" />
+                        Today
                     </button>
-                    <button
-                        onClick={goToNext}
-                        className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
-                    >
-                        <HiOutlineChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-1 md:ml-2">
+                        <button
+                            onClick={goToBack}
+                            className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
+                        >
+                            <HiOutlineChevronLeft className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={goToNext}
+                            className="p-2 border border-border/80 rounded-lg hover:bg-muted transition-colors text-foreground flex items-center justify-center cursor-pointer"
+                        >
+                            <HiOutlineChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+                <div className="text-base font-bold text-foreground capitalize md:hidden">
+                    {toolbar.label}
                 </div>
             </div>
-            <div className="text-lg font-bold text-foreground capitalize">
+            <div className="hidden text-lg font-bold text-foreground capitalize md:block">
                 {toolbar.label}
             </div>
-            <div className="flex bg-muted/30 p-1 rounded-lg border border-border/50">
+            <div className="flex bg-muted/30 p-1 rounded-lg border border-border/50 overflow-x-auto -mx-1 px-1 md:mx-0">
                 {(['month', 'week', 'day', 'agenda'] as const).map((view) => (
                     <button
                         key={view}
                         onClick={() => toolbar.onView(view)}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-md capitalize transition-colors cursor-pointer ${toolbar.view === view
+                        className={`shrink-0 px-3 py-1.5 text-sm font-medium rounded-md capitalize transition-colors cursor-pointer whitespace-nowrap sm:px-4 ${toolbar.view === view
                             ? 'bg-background border border-border/60 text-foreground'
                             : 'text-muted-foreground hover:text-foreground'
                             }`}
@@ -117,7 +122,7 @@ interface DashboardCalendarProps {
 
 export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendarProps) {
     const router = useRouter();
-    const [view, setView] = useState<any>('week');
+    const [view, setView] = useState<any>('day');
     const [date, setDate] = useState<Date>(new Date());
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -151,7 +156,7 @@ export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendar
     };
 
     return (
-        <div className="h-full bg-card overflow-hidden flex flex-col p-4 md:p-6 lg:p-8">
+        <div className="h-full bg-card overflow-hidden flex flex-col p-3 sm:p-4 md:p-6 lg:p-8">
             <style>
                 {`
             .rbc-calendar {
@@ -275,6 +280,33 @@ export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendar
             }
             .rbc-event-label {
                color: var(--foreground) !important;
+            }
+
+            /* Mobile responsiveness */
+            @media (max-width: 640px) {
+              .rbc-calendar {
+                min-height: 520px;
+              }
+              .rbc-header {
+                padding: 8px 2px;
+                font-size: 0.6rem;
+              }
+              .rbc-label {
+                padding: 2px;
+                font-size: 0.65rem;
+              }
+              .rbc-time-gutter .rbc-timeslot-group {
+                min-width: 52px;
+              }
+              .rbc-agenda-view table.rbc-agenda-table thead > tr > th,
+              .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+                padding: 8px;
+                font-size: 0.8rem;
+              }
+              .rbc-btn-group,
+              .rbc-toolbar-label {
+                font-size: 0.8rem;
+              }
             }
           `}
             </style>
