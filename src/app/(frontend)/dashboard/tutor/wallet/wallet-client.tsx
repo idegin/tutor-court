@@ -305,19 +305,19 @@ export function TutorWalletClient({
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Wallet</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900">Wallet</h1>
           <p className="text-sm text-gray-500 mt-1">Manage your earnings, payouts, and purchase class credits.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
           <Button
             onClick={() => setIsFundingOpen(true)}
-            className="rounded-full px-4 sm:px-5 bg-gray-900 text-white hover:bg-gray-800"
+            className="flex-1 rounded-full px-4 sm:flex-none sm:px-5 bg-gray-900 text-white hover:bg-gray-800"
           >
             Fund Wallet
           </Button>
           <Button
             onClick={() => setIsBuyingOpen(true)}
-            className="rounded-full px-4 sm:px-5 bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
+            className="flex-1 rounded-full px-4 sm:flex-none sm:px-5 bg-tutor-purple-600 text-white hover:bg-tutor-purple-700"
           >
             Buy Credits
           </Button>
@@ -325,7 +325,7 @@ export function TutorWalletClient({
             variant="outline"
             onClick={() => setIsWithdrawOpen(true)}
             disabled={spendable <= 0}
-            className="rounded-full px-4 sm:px-5"
+            className="flex-1 rounded-full px-4 sm:flex-none sm:px-5"
           >
             Withdraw
           </Button>
@@ -335,7 +335,7 @@ export function TutorWalletClient({
             onClick={openPayoutSettings}
             aria-label="Payout settings"
             title="Payout settings"
-            className="rounded-full shrink-0 h-12 w-12"
+            className="rounded-full shrink-0"
           >
             <HiOutlineCog6Tooth className="h-5 w-5" />
           </Button>
@@ -411,9 +411,9 @@ export function TutorWalletClient({
                 return (
                   <li
                     key={tx.id}
-                    className="p-5 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    className="p-4 sm:p-5 hover:bg-gray-50 transition-colors flex items-center justify-between gap-3"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                       <div
                         className={`p-2.5 rounded-full flex-shrink-0 border ${isIncoming
                           ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
@@ -426,8 +426,8 @@ export function TutorWalletClient({
                           <HiOutlineArrowUpRight className="w-5 h-5" />
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-gray-900 text-sm">
                           {isIncoming ? 'Wallet Deposit / Funding' : 'Coin Purchase / Live Class Debit'}
                         </p>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -441,7 +441,7 @@ export function TutorWalletClient({
                         </div>
                       </div>
                     </div>
-                    <div className="text-right flex flex-col items-end gap-1">
+                    <div className="text-right flex flex-col items-end gap-1 shrink-0">
                       <p
                         className={`font-semibold ${isIncoming ? 'text-emerald-600' : 'text-gray-900'
                           }`}

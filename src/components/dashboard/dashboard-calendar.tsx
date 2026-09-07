@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, dateFnsLocalizer, EventProps, ToolbarProps } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
@@ -122,8 +122,15 @@ interface DashboardCalendarProps {
 
 export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendarProps) {
     const router = useRouter();
+    // Day view by default on mobile; upgrade to week on larger screens after mount.
     const [view, setView] = useState<any>('day');
     const [date, setDate] = useState<Date>(new Date());
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mq = window.matchMedia('(min-width: 768px)');
+        if (mq.matches) setView('week');
+    }, []);
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [isLoadingClassInfo, setIsLoadingClassInfo] = useState(false);

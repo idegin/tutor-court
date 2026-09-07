@@ -167,7 +167,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-6 lg:px-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Wallet</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Wallet</h1>
           <p className="text-sm text-muted-foreground">
             Fund your wallet to pay tutors and buy credits for live classes.
           </p>
@@ -230,11 +230,11 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
               const isIncoming = tx.receiver === wallet.user || tx.receiver?.id === wallet.user
               const symbol = tx.currency === 'ngn' ? '₦' : '$'
               return (
-                <li key={tx.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/10 transition-colors">
-                  <div className="flex items-center gap-3">
+                <li key={tx.id} className="flex items-center justify-between gap-3 px-4 py-4 hover:bg-muted/10 transition-colors sm:px-6">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div
                       className={
-                        'flex h-9 w-9 items-center justify-center rounded-full border ' +
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ' +
                         (isIncoming
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
                           : 'border-rose-200 bg-rose-50 text-rose-600')
@@ -246,8 +246,8 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
                         <HiOutlineArrowUpRight className="h-4 w-4" />
                       )}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
                         {isIncoming ? 'Incoming payment / Funding' : 'Outgoing payment / Coin Purchase'}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -257,7 +257,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
                   </div>
                   <p
                     className={
-                      'text-sm font-semibold ' +
+                      'shrink-0 text-sm font-semibold ' +
                       (isIncoming ? 'text-emerald-600' : 'text-foreground')
                     }
                   >
