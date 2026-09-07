@@ -10,6 +10,16 @@ export const Users: CollectionConfig = {
     defaultColumns: ['firstName', 'lastName', 'email', 'accountType', 'isActive'],
   },
   auth: {
+    // Stateless JWT auth (no server-side session store). Payload 3 defaults
+    // `useSessions` to true, which only accepts a token whose session row also
+    // exists in the `users_sessions` table. After the Mongo -> Postgres + Fly
+    // migration those session rows didn't carry over, so every pre-existing
+    // token failed to authenticate — `payload.auth()` returned no user and the
+    // role guards misreported it as "Only tutors can…". Disabling sessions
+    // validates tokens by signature + expiry alone, which is what this app
+    // relied on before the migration. (Revisit only if we need server-side
+    // session revocation, which would require backfilling users_sessions.)
+    useSessions: false,
     tokenExpiration: 60 * 60 * 24 * 7, // 7 days
     maxLoginAttempts: 5,
     lockTime: 15 * 60 * 1000, // 15 minutes

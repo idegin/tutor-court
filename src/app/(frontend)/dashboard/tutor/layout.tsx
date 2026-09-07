@@ -114,6 +114,19 @@ export default function TutorDashboardLayout({ children }: { children: React.Rea
         }
     }, [user, router]);
 
+    // Don't render tutor-only UI (e.g. the "Start live class" action) until auth
+    // is confirmed. Rendering children while unauthenticated showed controls that
+    // then failed server-side with a misleading "Only tutors can…" error.
+    if (!isAuthorized) {
+        return (
+            <DashboardLayout navItems={tutorNavItems} userRoleLabel="Tutor">
+                <div className="flex min-h-[60vh] w-full items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
     return (
         <DashboardLayout navItems={tutorNavItems} userRoleLabel="Tutor">
             {children}

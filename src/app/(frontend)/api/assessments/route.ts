@@ -9,8 +9,11 @@ export async function GET(request: Request) {
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
 
-  if (!user || user.accountType !== 'tutor') {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+  if (!user) {
+    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+  }
+  if (user.accountType !== 'tutor') {
+    return NextResponse.json({ error: 'Only tutors can access assessments.' }, { status: 403 })
   }
 
   const { searchParams } = new URL(request.url)
@@ -39,7 +42,10 @@ export async function POST(request: Request) {
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
 
-  if (!user || user.accountType !== 'tutor') {
+  if (!user) {
+    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+  }
+  if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can create assessments.' }, { status: 403 })
   }
 

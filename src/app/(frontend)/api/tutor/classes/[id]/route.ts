@@ -9,7 +9,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { user } = await payload.auth({ headers })
   const { id } = await params
 
-  if (!user || user.accountType !== 'tutor') {
+  if (!user) {
+    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+  }
+  if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can edit classes.' }, { status: 403 })
   }
 
@@ -102,7 +105,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { user } = await payload.auth({ headers })
   const { id } = await params
 
-  if (!user || user.accountType !== 'tutor') {
+  if (!user) {
+    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+  }
+  if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can delete classes.' }, { status: 403 })
   }
 

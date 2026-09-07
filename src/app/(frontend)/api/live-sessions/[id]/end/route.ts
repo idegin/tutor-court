@@ -28,7 +28,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
   const headers = await getHeaders()
   const { user } = await payload.auth({ headers })
 
-  if (!user || user.accountType !== 'tutor') {
+  if (!user) {
+    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+  }
+  if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can end live classes.' }, { status: 403 })
   }
 
