@@ -385,10 +385,10 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                className={`w-full rounded-full justify-start text-left font-normal ${!startDate && "text-muted-foreground"}`}
+                                                className={`w-full min-w-0 rounded-full justify-start text-left font-normal ${!startDate && "text-muted-foreground"}`}
                                             >
-                                                <HiOutlineCalendar className="mr-2 h-4 w-4" />
-                                                {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                                                <HiOutlineCalendar className="mr-2 h-4 w-4 shrink-0" />
+                                                <span className="truncate">{startDate ? format(startDate, "PPP") : "Pick a date"}</span>
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
@@ -409,10 +409,10 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                className={`w-full rounded-full justify-start text-left font-normal ${!endDate && "text-muted-foreground"}`}
+                                                className={`w-full min-w-0 rounded-full justify-start text-left font-normal ${!endDate && "text-muted-foreground"}`}
                                             >
-                                                <HiOutlineCalendar className="mr-2 h-4 w-4" />
-                                                {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                                                <HiOutlineCalendar className="mr-2 h-4 w-4 shrink-0" />
+                                                <span className="truncate">{endDate ? format(endDate, "PPP") : "Pick a date"}</span>
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
