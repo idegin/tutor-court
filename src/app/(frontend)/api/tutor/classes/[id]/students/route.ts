@@ -1,5 +1,6 @@
 import { headers as getHeaders } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionExpiredResponse } from '@/lib/auth-response'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
@@ -10,7 +11,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params
 
   if (!user) {
-    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+    return sessionExpiredResponse()
   }
   if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can remove students.' }, { status: 403 })

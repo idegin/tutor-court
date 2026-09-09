@@ -1,5 +1,6 @@
 import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { sessionExpiredResponse } from '@/lib/auth-response'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   const { user } = await payload.auth({ headers })
 
   if (!user) {
-    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+    return sessionExpiredResponse()
   }
   if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Only tutors can add questions.' }, { status: 403 })
@@ -139,7 +140,7 @@ export async function PATCH(request: Request) {
   const { user } = await payload.auth({ headers })
 
   if (!user) {
-    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+    return sessionExpiredResponse()
   }
   if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
@@ -182,7 +183,7 @@ export async function DELETE(request: Request) {
   const { user } = await payload.auth({ headers })
 
   if (!user) {
-    return NextResponse.json({ error: 'Your session has expired. Please log in again.' }, { status: 401 })
+    return sessionExpiredResponse()
   }
   if (user.accountType !== 'tutor') {
     return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
