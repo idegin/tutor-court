@@ -115,8 +115,14 @@ export class RealtimeRoom {
       const socket = io({
         autoConnect: false,
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 8,
+        // Keep trying to reconnect for as long as the class is open — a bad
+        // network should recover whenever it comes back, not go permanently dead
+        // after a handful of attempts. Backoff is capped so we don't hammer.
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 800,
+        reconnectionDelayMax: 8000,
+        randomizationFactor: 0.5,
+        timeout: 20000,
       })
       this.socket = socket
 

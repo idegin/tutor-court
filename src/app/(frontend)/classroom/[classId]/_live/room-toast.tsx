@@ -59,10 +59,19 @@ export function roomToast(opts: {
   )
 }
 
-/** Incoming chat message toast with the sender's avatar. */
-export function messageToast(m: ChatMessage) {
-  toast.custom(() => (
-    <div className="pointer-events-auto flex w-[340px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-white/15 bg-neutral-900 p-3 shadow-2xl shadow-black/60 ring-1 ring-black/40">
+/** Incoming chat message toast with the sender's avatar. Clicking it opens the
+ *  chat panel (via `onOpen`) and dismisses the toast, so a message is one tap
+ *  away from being read. */
+export function messageToast(m: ChatMessage, onOpen?: () => void) {
+  toast.custom((id) => (
+    <button
+      type="button"
+      onClick={() => {
+        onOpen?.()
+        toast.dismiss(id)
+      }}
+      className="pointer-events-auto flex w-[340px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-2xl border border-white/15 bg-neutral-900 p-3 text-left shadow-2xl shadow-black/60 ring-1 ring-black/40 transition-colors hover:bg-neutral-800"
+    >
       <Avatar className="size-9 shrink-0 ring-1 ring-white/15">
         <AvatarImage src={resolveAvatar(m.senderName, m.senderAvatar)} alt="" />
         <AvatarFallback className="bg-neutral-800 text-xs text-white">{initials(m.senderName)}</AvatarFallback>
@@ -70,7 +79,8 @@ export function messageToast(m: ChatMessage) {
       <div className="min-w-0">
         <p className="text-xs font-semibold text-white">{m.senderName}</p>
         <p className="truncate text-sm text-white/80">{m.body}</p>
+        <p className="mt-0.5 text-[11px] font-medium text-primary">Tap to reply</p>
       </div>
-    </div>
+    </button>
   ))
 }

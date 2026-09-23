@@ -34,6 +34,17 @@ function LoginContent() {
     const [errors, setErrors] = React.useState<ReturnType<typeof validateLogin>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
+    // When SessionGuard bounces an expired session here, tell the user plainly
+    // why they're back on the login screen instead of leaving them guessing.
+    React.useEffect(() => {
+        if (searchParams.get('reason') === 'expired') {
+            toast.info('Please log in again to continue.', {
+                description: 'Your session ended. Signing back in takes a moment.',
+                position: 'top-center',
+            })
+        }
+    }, [searchParams])
+
     const mutation = useMutation({
         mutationFn: async (vars: any) => {
             const res = await fetch('/api/users/login', {

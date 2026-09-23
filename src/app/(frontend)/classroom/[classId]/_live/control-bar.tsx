@@ -9,8 +9,9 @@ import {
   HiOutlineFaceSmile,
   HiOutlineChatBubbleOvalLeft,
   HiOutlinePhoneXMark,
+  HiOutlineComputerDesktop,
 } from 'react-icons/hi2'
-import { LuMicOff } from 'react-icons/lu'
+import { LuMicOff, LuScreenShareOff } from 'react-icons/lu'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { CtrlButton } from './ui'
 import { ReactionPicker } from './reactions'
@@ -24,10 +25,14 @@ import type { ReactionEmoji } from './types'
 export function ControlBar({
   micOn,
   camOn,
+  screenOn,
+  canShareScreen,
+  isTutor,
   handRaised,
   unreadChat,
   onToggleMic,
   onToggleCam,
+  onToggleScreen,
   onToggleHand,
   onReact,
   onToggleChat,
@@ -35,16 +40,39 @@ export function ControlBar({
 }: {
   micOn: boolean
   camOn: boolean
+  screenOn: boolean
+  canShareScreen: boolean
+  isTutor: boolean
   handRaised: boolean
   unreadChat: number
   onToggleMic: () => void
   onToggleCam: () => void
+  onToggleScreen: () => void
   onToggleHand: () => void
   onReact: (e: ReactionEmoji) => void
   onToggleChat: () => void
   onLeave: () => void
 }) {
   const [pickerOpen, setPickerOpen] = React.useState(false)
+  const reactRef = React.useRef<HTMLDivElement>(null)
+
+  // Close the reaction picker on an outside click or Escape — but NOT when a
+  // reaction inside it is clicked, so the tutor can fire several in a row.
+  React.useEffect(() => {
+    if (!pickerOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!reactRef.current?.contains(e.target as Node)) setPickerOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPickerOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [pickerOpen])
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -63,6 +91,17 @@ export function ControlBar({
         tone={camOn ? 'default' : 'muted'}
         onClick={onToggleCam}
       />
+
+      {canShareScreen && (
+        <CtrlButton
+          label={screenOn ? 'Stop sharing' : 'Share screen'}
+          caption={screenOn ? 'Stop sharing' : 'Share your screen'}
+          icon={screenOn ? <LuScreenShareOff /> : <HiOutlineComputerDesktop />}
+          tone={screenOn ? 'active' : 'default'}
+          onClick={onToggleScreen}
+        />
+      )}
+
       <CtrlButton
         label={handRaised ? 'Lower hand' : 'Raise hand'}
         caption={handRaised ? 'Lower hand' : 'Raise hand'}
@@ -71,8 +110,8 @@ export function ControlBar({
         onClick={onToggleHand}
       />
 
-      <div className="relative">
-        <ReactionPicker open={pickerOpen} onPick={(e) => { onReact(e); setPickerOpen(false) }} />
+      <div className="relative" ref={reactRef}>
+        <ReactionPicker open={pickerOpen} onPick={onReact} />
         <CtrlButton
           label="React"
           caption="Send a reaction"
@@ -92,8 +131,8 @@ export function ControlBar({
       />
 
       <CtrlButton
-        label="Leave class"
-        caption="Leave"
+        label={isTutor ? 'End class' : 'Leave class'}
+        caption={isTutor ? 'End class for everyone' : 'Leave'}
         icon={<HiOutlinePhoneXMark />}
         tone="danger"
         onClick={onLeave}

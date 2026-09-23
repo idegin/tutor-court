@@ -49,7 +49,11 @@ export default function SessionGuard() {
           if (isApi && !ignored) {
             redirecting = true
             const here = window.location.pathname + window.location.search
-            window.location.href = `/auth/login?redirect=${encodeURIComponent(here)}`
+            window.location.href = `/auth/login?reason=expired&redirect=${encodeURIComponent(here)}`
+            // Hang this request so the caller never runs its own error path
+            // (e.g. a generic "session timed out" toast) — we're navigating
+            // away to a clean login, and the login page shows the message.
+            return new Promise<Response>(() => {})
           }
         }
       } catch {

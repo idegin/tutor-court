@@ -44,6 +44,8 @@ interface PeerEntry {
   audioSender: RTCRtpSender | null
   videoSender: RTCRtpSender | null
   mediaAttached: boolean
+  /** Pending grace timer before forcing an ICE restart on a transient drop. */
+  iceRestartTimer: ReturnType<typeof setTimeout> | null
 }
 
 export class PeerManager {
@@ -102,6 +104,7 @@ export class PeerManager {
       audioSender: null,
       videoSender: null,
       mediaAttached: false,
+      iceRestartTimer: null,
     }
     this.peers.set(peerId, entry)
 
@@ -133,12 +136,32 @@ export class PeerManager {
       // A dropped/blocked media path lands here. restartIce() re-triggers
       // onnegotiationneeded → a fresh offer with new ICE, which actually recovers
       // the connection.
-      if (pc.iceConnectionState === 'failed') {
+      const state = pc.iceConnectionState
+      if (state === 'failed') {
         console.warn(`[webrtc] ICE failed for ${peerId} — restarting ICE`)
         try {
           pc.restartIce()
         } catch {
           /* not fatal */
+        }
+      } else if (state === 'disconnected') {
+        // A transient drop (network blip) often heals on its own; give it a few
+        // seconds, then force an ICE restart to actively reconnect the media.
+        if (entry.iceRestartTimer) clearTimeout(entry.iceRestartTimer)
+        entry.iceRestartTimer = setTimeout(() => {
+          entry.iceRestartTimer = null
+          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+            try {
+              pc.restartIce()
+            } catch {
+              /* not fatal */
+            }
+          }
+        }, 4000)
+      } else if (state === 'connected' || state === 'completed') {
+        if (entry.iceRestartTimer) {
+          clearTimeout(entry.iceRestartTimer)
+          entry.iceRestartTimer = null
         }
       }
     }
@@ -257,6 +280,7 @@ export class PeerManager {
   disconnect(peerId: string): void {
     const entry = this.peers.get(peerId)
     if (!entry) return
+    if (entry.iceRestartTimer) clearTimeout(entry.iceRestartTimer)
     entry.pc.onnegotiationneeded = null
     entry.pc.close()
     this.peers.delete(peerId)
@@ -264,9 +288,10 @@ export class PeerManager {
 
   destroy(): void {
     this.destroyed = true
-    for (const { pc } of this.peers.values()) {
-      pc.onnegotiationneeded = null
-      pc.close()
+    for (const entry of this.peers.values()) {
+      if (entry.iceRestartTimer) clearTimeout(entry.iceRestartTimer)
+      entry.pc.onnegotiationneeded = null
+      entry.pc.close()
     }
     this.peers.clear()
   }

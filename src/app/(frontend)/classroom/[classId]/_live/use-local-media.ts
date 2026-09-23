@@ -21,6 +21,8 @@ export interface LocalMedia {
   error: string | null
   micOn: boolean
   camOn: boolean
+  /** True while the local user is sharing their screen (screen replaces camera). */
+  screenOn: boolean
   /** 0..1 smoothed microphone level for the meter. */
   level: number
   cameras: DeviceOption[]
@@ -32,6 +34,8 @@ export interface LocalMedia {
   ensureAccess: () => Promise<void>
   toggleMic: () => void
   toggleCam: () => void
+  shareScreen: () => Promise<void>
+  stopScreenShare: () => Promise<void>
   selectDevice: (kind: 'camera' | 'mic' | 'speaker', deviceId: string) => void
   stop: () => void
 }
@@ -58,6 +62,7 @@ export function useLocalMedia(): LocalMedia {
   const [error, setError] = React.useState<string | null>(null)
   const [micOn, setMicOn] = React.useState(true)
   const [camOn, setCamOn] = React.useState(true)
+  const [screenOn, setScreenOn] = React.useState(false)
   const [level, setLevel] = React.useState(0)
   const [cameras, setCameras] = React.useState<DeviceOption[]>([])
   const [mics, setMics] = React.useState<DeviceOption[]>([])
@@ -253,6 +258,54 @@ export function useLocalMedia(): LocalMedia {
     }
   }, [reacquireVideo, rebuildStream])
 
+  // Screen share: swap the camera video track for a display-capture track. The
+  // new stream identity re-fires the publish effect, so peers receive the screen
+  // through the existing video sender (zero renegotiation). Mic audio is untouched.
+  const screenTrackRef = React.useRef<MediaStreamTrack | null>(null)
+  const camBeforeShareRef = React.useRef(false)
+
+  const stopScreenShare = React.useCallback(async () => {
+    const track = screenTrackRef.current
+    screenTrackRef.current = null
+    if (track) {
+      track.onended = null
+      track.stop()
+    }
+    setScreenOn(false)
+    // Restore whatever the camera was doing before the share started.
+    if (camBeforeShareRef.current) await reacquireVideo()
+    else rebuildStream(null)
+  }, [reacquireVideo, rebuildStream])
+
+  const shareScreen = React.useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
+      setError('Screen sharing is not supported in this browser.')
+      return
+    }
+    try {
+      const ds = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      const track = ds.getVideoTracks()[0]
+      if (!track) return
+      // Remember camera state, then release the live camera device so its
+      // indicator light goes off while the screen is shared.
+      camBeforeShareRef.current = camOnRef.current
+      streamRef.current?.getVideoTracks().forEach((t) => t.stop())
+      screenTrackRef.current = track
+      // The browser's own "Stop sharing" bar ends the track — mirror it in-app.
+      track.onended = () => {
+        void stopScreenShare()
+      }
+      rebuildStream(track)
+      setScreenOn(true)
+      setError(null)
+    } catch (e) {
+      // A cancelled picker (NotAllowedError) isn't a real error worth surfacing.
+      if ((e as DOMException)?.name !== 'NotAllowedError') {
+        setError('Could not start screen sharing.')
+      }
+    }
+  }, [rebuildStream, stopScreenShare])
+
   const selectDevice = React.useCallback(
     (kind: 'camera' | 'mic' | 'speaker', deviceId: string) => {
       if (kind === 'speaker') {
@@ -302,6 +355,7 @@ export function useLocalMedia(): LocalMedia {
     error,
     micOn,
     camOn,
+    screenOn,
     level,
     cameras,
     mics,
@@ -312,6 +366,8 @@ export function useLocalMedia(): LocalMedia {
     ensureAccess,
     toggleMic,
     toggleCam,
+    shareScreen,
+    stopScreenShare,
     selectDevice,
     stop,
   }

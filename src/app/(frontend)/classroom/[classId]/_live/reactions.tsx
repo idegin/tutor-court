@@ -47,7 +47,9 @@ export function ReactionPicker({
   return (
     <div
       className={cn(
-        'absolute bottom-full left-1/2 mb-3 -translate-x-1/2 origin-bottom transition-all duration-200',
+        // z-50 keeps the picker above the docked chat/people panel and the
+        // reactions overlay so it's never hidden behind them.
+        'absolute bottom-full left-1/2 z-50 mb-3 -translate-x-1/2 origin-bottom transition-all duration-200',
         open ? 'pointer-events-auto scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0',
       )}
     >

@@ -112,7 +112,14 @@ export function BoardsPanel({
 
   const start = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!canDraw || !active) return
-    e.currentTarget.setPointerCapture(e.pointerId)
+    // Pointer capture keeps touch strokes flowing when the finger strays off the
+    // element — but it can throw on some mobile browsers; never let that abort
+    // the stroke itself.
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* capture unavailable — drawing still works via the move handler */
+    }
     const { x, y } = pt(e)
     drawing.current = `M ${x} ${y}`
     setStrokes((s) => ({ ...s, [active.id]: [...(s[active.id] ?? []), { d: drawing.current!, color }] }))
@@ -131,14 +138,24 @@ export function BoardsPanel({
     if (drawing.current && active) {
       const arr = strokes[active.id] ?? []
       const last = arr[arr.length - 1]
-      if (last) onDraw?.({ id: crypto.randomUUID(), boardId: active.id, type: 'stroke', stroke: last })
+      if (last) {
+        const id = crypto.randomUUID()
+        // We've already drawn this stroke optimistically above. Record its op id
+        // so when the server echoes it back (it's no longer filtered upstream) the
+        // remote-ops effect dedupes it instead of drawing a duplicate — while the
+        // op still lands in the shared buffer so it replays after any reconnect.
+        appliedRef.current.add(id)
+        onDraw?.({ id, boardId: active.id, type: 'stroke', stroke: last })
+      }
     }
     drawing.current = null
   }
   const clear = () => {
     if (!active) return
+    const id = crypto.randomUUID()
+    appliedRef.current.add(id)
     setStrokes((s) => ({ ...s, [active.id]: [] }))
-    onDraw?.({ id: crypto.randomUUID(), boardId: active.id, type: 'clear' })
+    onDraw?.({ id, boardId: active.id, type: 'clear' })
   }
 
   return (
@@ -182,6 +199,7 @@ export function BoardsPanel({
           onPointerMove={move}
           onPointerUp={end}
           onPointerLeave={end}
+          onPointerCancel={end}
           className={cn('absolute inset-0 size-full touch-none', canDraw ? 'cursor-crosshair' : 'cursor-default')}
         >
           <defs>

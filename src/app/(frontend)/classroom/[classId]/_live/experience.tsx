@@ -30,6 +30,7 @@ import { useSfx } from './use-sfx'
 import { useLocalMedia } from './use-local-media'
 import { useIsDesktop } from './use-media-query'
 import { useRealtimeRoom } from './rtc/use-realtime-room'
+import type { RealtimeRoomActions } from './rtc/use-realtime-room'
 import type { RoomParticipant } from './rtc/realtime-room'
 import { roomToast, messageToast } from './room-toast'
 import { PreJoinLobby } from './pre-join-lobby'
@@ -108,6 +109,15 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   React.useEffect(() => {
     setDebug(new URLSearchParams(window.location.search).get('debug') === '1')
   }, [])
+  // Screen capture (getDisplayMedia) does not exist on mobile browsers, so the
+  // share button would silently do nothing there. Detect support client-side and
+  // hide the button on phones/tablets rather than offer a control that can't work.
+  const [screenShareSupported, setScreenShareSupported] = React.useState(false)
+  React.useEffect(() => {
+    setScreenShareSupported(
+      typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getDisplayMedia === 'function',
+    )
+  }, [])
 
   const playSfx = useSfx(soundOn)
   const media = useLocalMedia()
@@ -128,17 +138,13 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const realtimeEnabled = bootstrap.ready && !!realtime
   const localId = identity?.id ?? local.id
   const lowFiredRef = React.useRef(false)
+  const urgentCreditRef = React.useRef(false)
   // The Ably presence roster + connection state, mirrored into a ref so the
   // billing heartbeat (a long-lived interval) can read the CURRENT roster without
   // re-subscribing every render.
   const rosterRef = React.useRef<{ ids: string[]; connected: boolean }>({ ids: [], connected: false })
   // Peak attendee count seen this session — used for the ended-screen summary.
   const peakAttendeesRef = React.useRef(1)
-  // Op ids we originated this session — used to drop Ably's LIVE echo of our own
-  // whiteboard ops (which our optimistic local draw already applied) WITHOUT
-  // dropping rewound history on rejoin (a fresh mount has an empty set, so our
-  // own replayed ops repaint the board instead of vanishing).
-  const wbLocalOpIds = React.useRef<Set<string>>(new Set())
 
   // The media hook owns the real mic/cam track state; mirror it onto the local
   // participant so the stage tile + roster reflect it.
@@ -266,11 +272,18 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   // (finalising their billable duration). Best-effort — teardown also runs
   // server-side via presence reconciliation + the live-sweep cron.
   const endedRef = React.useRef(false)
+  // Filled in after the realtime room is created (below) so leave(), which is
+  // declared earlier, can still reach the live actions without a TDZ on `room`.
+  const roomActionsRef = React.useRef<RealtimeRoomActions | null>(null)
   const leave = React.useCallback(() => {
     const sid = liveSessionIdRef.current
     if (sid && !endedRef.current) {
       endedRef.current = true
       if (isTutor) {
+        // Explicit end → tell everyone still connected to drop out NOW. This only
+        // runs on the End-class button; a network blip never calls leave(), so a
+        // dropped tutor connection alone can't kick the class.
+        roomActionsRef.current?.sendControl('end')
         fetch(`/api/live-sessions/${sid}/end`, { method: 'POST', keepalive: true }).catch(() => {})
       } else {
         fetch('/api/live-sessions/leave', {
@@ -366,7 +379,13 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
         }
         if (data.lowCredit && !lowFiredRef.current) {
           lowFiredRef.current = true
-          roomToast({ title: 'Credits running low', description: `About ${data.minutesRemaining} minutes of class left.`, tone: 'warning', icon: <HiBolt />, duration: 8000 })
+          roomToast({ title: 'Credits running low', description: `About ${data.minutesRemaining} minutes of class left. Top up to keep going.`, tone: 'warning', icon: <HiBolt />, duration: 8000 })
+        }
+        // Second, more urgent warning as the wallet nears empty so the tutor isn't
+        // blindsided when the class auto-ends on zero credits.
+        if (typeof data.minutesRemaining === 'number' && data.minutesRemaining <= 2 && !urgentCreditRef.current) {
+          urgentCreditRef.current = true
+          roomToast({ title: 'Credits almost gone', description: `About ${data.minutesRemaining} minute(s) left — the class will end when they run out.`, tone: 'error', icon: <HiOutlineExclamationTriangle />, duration: 12000 })
         }
       } catch {
         /* transient — next beat retries */
@@ -401,7 +420,11 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       })
       if (!isNew) return
       playSfx('message')
-      if (panel !== 'chat') { setUnread((u) => u + 1); messageToast(cm) }
+      if (panel !== 'chat') {
+        setUnread((u) => u + 1)
+        // Tapping the toast jumps straight into the conversation.
+        messageToast(cm, () => { setPanel('chat'); setUnread(0) })
+      }
     },
     onReaction: (emoji, fromId) => {
       if (fromId === localId) return
@@ -410,7 +433,16 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       setTimeout(() => setFloating((f) => f.filter((x) => x.id !== r.id)), 2500)
     },
     onControl: (action, data) => {
-      // Host-only channel (enforced server-side). Act only if we're the target.
+      // Host-only channel (enforced server-side). The tutor ended the class for
+      // everyone — this is a broadcast (no targetId), so every non-host drops out.
+      if (action === 'end') {
+        if (!isTutor && !endedRef.current) {
+          roomToast({ title: 'The tutor ended the class', tone: 'default', icon: <HiOutlineNoSymbol /> })
+          setTimeout(leave, 800)
+        }
+        return
+      }
+      // Everything else is targeted moderation — act only if we're the target.
       if (data?.targetId !== localId) return
       if (action === 'mute') {
         if (media.micOn) media.toggleMic()
@@ -431,9 +463,10 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     onWhiteboard: (payload) => {
       // Presentation + stroke sync from the tutor (and writable students).
       if (payload?.kind === 'op' && payload.op) {
-        // Drop the LIVE echo of an op we just drew (already applied optimistically),
-        // but let rewound history through (its id isn't in our local set on rejoin).
-        if (wbLocalOpIds.current.has(payload.op.id)) return
+        // Every op — including the echo of one we just drew — flows into the
+        // shared buffer. The boards panel dedupes by op id (so our optimistic
+        // stroke is never drawn twice), and keeping our own ops here means they
+        // repaint the board after a reconnect instead of vanishing for the drawer.
         setWbOps((o) => [...o, payload.op].slice(-1000))
       } else if (payload?.kind === 'show') setWhiteboardOn(Boolean(payload.on))
       else if (payload?.kind === 'active') setActiveBoard(payload.boardId ?? null)
@@ -448,6 +481,29 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
       }
     },
   })
+
+  // Expose the live actions to leave() (declared above, before `room` existed).
+  roomActionsRef.current = room.actions
+
+  // Distinct chime + toast when a REMOTE participant raises their hand (their
+  // handRaisedAt flips null → timestamp). Diffed against the previous roster so
+  // lowering a hand, re-renders, or our own raise never re-trigger it.
+  const prevHandsRef = React.useRef<Map<string, boolean>>(new Map())
+  React.useEffect(() => {
+    if (!realtimeEnabled) return
+    const prev = prevHandsRef.current
+    const next = new Map<string, boolean>()
+    for (const p of room.participants) {
+      const raised = Boolean(p.handRaisedAt)
+      next.set(p.id, raised)
+      if (p.id === String(localId)) continue
+      if (raised && !(prev.get(p.id) ?? false)) {
+        playSfx('hand')
+        roomToast({ title: `${p.name} raised their hand`, tone: 'warning', icon: <HiOutlineHandRaised /> })
+      }
+    }
+    prevHandsRef.current = next
+  }, [room.participants, realtimeEnabled, localId, playSfx])
 
   // Mirror the live presence roster + connection state into a ref for the
   // heartbeat interval (which can't depend on them without re-subscribing).
@@ -480,6 +536,20 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     setFloating((f) => [...f, r])
     setTimeout(() => setFloating((f) => f.filter((x) => x.id !== r.id)), 2500)
     if (realtimeEnabled) room.actions.sendReaction(emoji)
+  }
+
+  // Screen share swaps the outgoing video track (camera ⇄ screen) on the mesh, so
+  // every peer sees the shared screen in the sharer's tile. Both the tutor and
+  // enrolled students can share (anyone who may publish).
+  const toggleScreen = () => {
+    if (media.screenOn) void media.stopScreenShare()
+    else void media.shareScreen()
+  }
+  // Toggling the camera while sharing stops the share first (they share one video
+  // sender), so the two controls never fight over the outgoing track.
+  const handleToggleCam = () => {
+    if (media.screenOn) { void media.stopScreenShare(); return }
+    media.toggleCam()
   }
 
   const sendChat = (body: string) => {
@@ -624,15 +694,32 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   }
 
   const toggleWhiteboard = () => {
+    // Tutor opening the whiteboard with no board yet → make one immediately so
+    // there's an actual surface to draw on (otherwise it opens blank and nothing
+    // you draw registers — easy to hit, especially on a phone).
+    if (isTutor && !whiteboardOn && boards.length === 0) {
+      void createBoard()
+      return
+    }
     const next = !whiteboardOn
     setWhiteboardOn(next)
-    if (realtimeEnabled) room.actions.sendWhiteboard({ kind: 'show', on: next })
-    roomToast({
-      title: next ? 'Whiteboard is live' : 'Whiteboard hidden',
-      description: next ? 'Everyone can see it now.' : undefined,
-      tone: 'default',
-      icon: <HiOutlinePresentationChartBar />,
-    })
+    if (isTutor) {
+      // Only the tutor presents to everyone; students toggle their own view.
+      if (realtimeEnabled) room.actions.sendWhiteboard({ kind: 'show', on: next })
+      roomToast({
+        title: next ? 'Whiteboard is live' : 'Whiteboard hidden',
+        description: next ? 'Everyone can see it now.' : undefined,
+        tone: 'default',
+        icon: <HiOutlinePresentationChartBar />,
+      })
+    } else {
+      roomToast({
+        title: next ? 'Whiteboard shown' : 'Whiteboard hidden',
+        description: next ? undefined : 'Tap the whiteboard button up top to bring it back.',
+        tone: 'default',
+        icon: <HiOutlinePresentationChartBar />,
+      })
+    }
   }
 
   // ── render by phase ──────────────────────────────────────────────────────
@@ -718,8 +805,15 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           {isTutor && <CreditMeter credit={credit} compact />}
-          {isTutor && (
-            <TopButton active={whiteboardOn} onClick={toggleWhiteboard} label="Present whiteboard">
+          {/* Tutor always has the present toggle. Students get it too once a board
+              exists, so if they close the whiteboard they can reopen it easily —
+              their toggle only affects their own view. */}
+          {(isTutor || boards.length > 0) && (
+            <TopButton
+              active={whiteboardOn}
+              onClick={toggleWhiteboard}
+              label={isTutor ? 'Present whiteboard' : whiteboardOn ? 'Hide whiteboard' : 'Show whiteboard'}
+            >
               <HiOutlinePresentationChartBar />
             </TopButton>
           )}
@@ -777,7 +871,6 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
                 onClose={toggleWhiteboard}
                 onDraw={(op) => {
                   if (!realtimeEnabled) return
-                  wbLocalOpIds.current.add(op.id)
                   room.actions.sendWhiteboard({ kind: 'op', op })
                 }}
                 onSnapshot={saveSnapshot}
@@ -811,10 +904,14 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
         <ControlBar
           micOn={media.micOn}
           camOn={media.camOn}
+          screenOn={media.screenOn}
+          canShareScreen={Boolean((realtime?.canPublish ?? isTutor) && screenShareSupported)}
+          isTutor={isTutor}
           handRaised={Boolean(local.handRaisedAt)}
           unreadChat={unread}
           onToggleMic={media.toggleMic}
-          onToggleCam={media.toggleCam}
+          onToggleCam={handleToggleCam}
+          onToggleScreen={toggleScreen}
           onToggleHand={toggleHand}
           onReact={pushReaction}
           onToggleChat={() => openPanel('chat')}
