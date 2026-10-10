@@ -27,7 +27,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG DATABASE_URL="postgresql://build:build@localhost:5432/build"
 ENV DATABASE_URL=$DATABASE_URL
 ENV PAYLOAD_SECRET="build-time-secret-not-used-at-runtime"
-RUN pnpm run build:next
+# Override the 8 GB limit in package.json — Depot builders cap at ~8 GB total;
+# leaving headroom for the OS keeps the build from being OOM-killed silently.
+ENV NODE_OPTIONS="--no-deprecation --max-old-space-size=3072"
+ENV SKIP_BUILD_CHECKS=1
+RUN pnpm exec next build
 
 # ---- runner ----
 FROM base AS runner

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Lato } from 'next/font/google'
+import localFont from 'next/font/local'
 import { QueryProvider } from '@/components/providers/query-provider'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { OptionsProvider } from '@/components/providers/options-provider'
@@ -8,10 +8,14 @@ import { getServerSideUser } from '@/lib/auth'
 import './global.css'
 import Providers from '@/components/providers'
 
-const lato = Lato({
-  weight: ['400', '700', '900'],
-  subsets: ['latin'],
+const lato = localFont({
+  src: [
+    { path: '../../../public/fonts/lato-400.woff2', weight: '400', style: 'normal' },
+    { path: '../../../public/fonts/lato-700.woff2', weight: '700', style: 'normal' },
+    { path: '../../../public/fonts/lato-900.woff2', weight: '900', style: 'normal' },
+  ],
   variable: '--font-sans',
+  display: 'swap',
 })
 
 export const viewport = {

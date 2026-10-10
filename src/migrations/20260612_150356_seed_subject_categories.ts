@@ -43,7 +43,17 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
 
   const subjectsData = [
     { name: 'Mathematics', categoryName: 'Mathematics' },
+    { name: 'Further Mathematics', categoryName: 'Mathematics' },
     { name: 'English', categoryName: 'Language Arts / English' },
+    { name: 'Literature in English', categoryName: 'Language Arts / English' },
+    { name: 'Biology', categoryName: 'Science' },
+    { name: 'Chemistry', categoryName: 'Science' },
+    { name: 'Physics', categoryName: 'Science' },
+    { name: 'Agricultural Science', categoryName: 'Science' },
+    { name: 'Economics', categoryName: 'Social Studies' },
+    { name: 'Government', categoryName: 'Social Studies' },
+    { name: 'Commerce', categoryName: 'Social Studies' },
+    { name: 'Geography', categoryName: 'Social Studies' },
   ]
 
   for (const sub of subjectsData) {
@@ -88,7 +98,7 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   await payload.delete({
     collection: 'subjects',
     where: {
-      name: { in: ['Mathematics', 'English'] },
+      name: { in: ['Mathematics', 'Further Mathematics', 'English', 'Literature in English', 'Biology', 'Chemistry', 'Physics', 'Agricultural Science', 'Economics', 'Government', 'Commerce', 'Geography'] },
     },
     req,
   })

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { HiMagnifyingGlass } from 'react-icons/hi2'
 import { useOptions } from '@/components/providers/options-provider'
 import { Input } from '@/components/ui/input'
@@ -14,9 +15,11 @@ export function SiteHero() {
     const { subjects } = useOptions()
     const dropdownRef = useRef<HTMLFormElement>(null)
 
+    const inputContainerRef = useRef<HTMLDivElement>(null)
     const [query, setQuery] = useState('')
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null)
     const [isOpen, setIsOpen] = useState(false)
+    const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null)
 
     const subjectOptions = useMemo(
         () =>
@@ -41,17 +44,29 @@ export function SiteHero() {
     useEffect(() => {
         const handleOutsideClick = (event: MouseEvent) => {
             if (!dropdownRef.current) return
-
             if (!dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false)
             }
         }
-
         document.addEventListener('mousedown', handleOutsideClick)
-        return () => {
-            document.removeEventListener('mousedown', handleOutsideClick)
-        }
+        return () => document.removeEventListener('mousedown', handleOutsideClick)
     }, [])
+
+    useEffect(() => {
+        if (!isOpen || !inputContainerRef.current) return
+        const update = () => {
+            if (inputContainerRef.current) {
+                setDropdownRect(inputContainerRef.current.getBoundingClientRect())
+            }
+        }
+        update()
+        window.addEventListener('scroll', update, true)
+        window.addEventListener('resize', update)
+        return () => {
+            window.removeEventListener('scroll', update, true)
+            window.removeEventListener('resize', update)
+        }
+    }, [isOpen])
 
     const handleSubjectSelect = (subject: { id: string; name: string }) => {
         setSelectedSubjectId(subject.id)
@@ -128,7 +143,7 @@ export function SiteHero() {
 
                     <form onSubmit={handleSubmit} className="w-full max-w-4xl relative z-10" ref={dropdownRef}>
                         <div className="flex flex-col md:flex-row gap-3 rounded-3xl border-2 border-foreground bg-card p-3">
-                            <div className="relative flex-1">
+                            <div className="relative flex-1" ref={inputContainerRef}>
                                 <Input
                                     value={query}
                                     onFocus={() => setIsOpen(true)}
@@ -138,8 +153,16 @@ export function SiteHero() {
                                     aria-label="Search subject"
                                 />
 
-                                {isOpen && (
-                                    <div className="absolute top-[calc(100%+0.5rem)] left-0 right-0 z-50">
+                                {isOpen && dropdownRect && typeof document !== 'undefined' && createPortal(
+                                    <div
+                                        style={{
+                                            position: 'fixed',
+                                            top: dropdownRect.bottom + 8,
+                                            left: dropdownRect.left,
+                                            width: dropdownRect.width,
+                                            zIndex: 9999,
+                                        }}
+                                    >
                                         <ScrollArea className="w-full rounded-2xl border-2 border-foreground bg-card p-2 h-72 shadow-xl [&_[data-slot=scroll-area-viewport]]:focus-visible:ring-0 [&_[data-slot=scroll-area-viewport]]:focus-visible:outline-none">
                                             {filteredSubjects.length === 0 ? (
                                                 <div className="px-3 py-3 text-sm font-medium text-muted-foreground">
@@ -149,7 +172,6 @@ export function SiteHero() {
                                                 <ul className="space-y-1">
                                                     {filteredSubjects.map((subject) => {
                                                         const isSelected = selectedSubjectId === subject.id
-
                                                         return (
                                                             <li key={subject.id}>
                                                                 <button
@@ -171,7 +193,8 @@ export function SiteHero() {
                                                 </ul>
                                             )}
                                         </ScrollArea>
-                                    </div>
+                                    </div>,
+                                    document.body,
                                 )}
                             </div>
 

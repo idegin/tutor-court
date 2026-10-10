@@ -17,7 +17,7 @@ import * as migration_20260804_101918_live_classroom_v2_fields from './20260804_
 import * as migration_20260808_000000_booking_awaiting_release from './20260808_000000_booking_awaiting_release';
 import * as migration_20260808_120000_tutor_payout_paystack from './20260808_120000_tutor_payout_paystack';
 import * as migration_20260808_130000_wallet_nonnegative_checks from './20260808_130000_wallet_nonnegative_checks';
-import * as migration_20260813_000000_seed_qa_test_accounts from './20260813_000000_seed_qa_test_accounts';
+import * as migration_20261010_000000_seed_nigerian_subjects from './20261010_000000_seed_nigerian_subjects';
 
 export const migrations = [
   {
@@ -116,8 +116,8 @@ export const migrations = [
     name: '20260808_130000_wallet_nonnegative_checks',
   },
   {
-    up: migration_20260813_000000_seed_qa_test_accounts.up,
-    down: migration_20260813_000000_seed_qa_test_accounts.down,
-    name: '20260813_000000_seed_qa_test_accounts',
+    up: migration_20261010_000000_seed_nigerian_subjects.up,
+    down: migration_20261010_000000_seed_nigerian_subjects.down,
+    name: '20261010_000000_seed_nigerian_subjects',
   },
 ];
