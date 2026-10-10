@@ -137,8 +137,44 @@ export default function TutorOnboarding() {
             variant="split"
             flipped={true}
             panelContent={
-                <div className="absolute inset-0 flex items-center justify-center p-12">
-                    {renderPanelContent()}
+                <div className="absolute inset-0 overflow-hidden">
+                    {/* Gradient background */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_#8d31ec_0%,_#541b88_35%,_#1a0a30_70%,_#0a0618_100%)]" />
+
+                    {/* Grid overlay */}
+                    <div
+                        className="absolute inset-0 opacity-10"
+                        style={{
+                            backgroundImage: 'linear-gradient(#bc82fe 1px, transparent 1px), linear-gradient(90deg, #bc82fe 1px, transparent 1px)',
+                            backgroundSize: '48px 48px',
+                        }}
+                    />
+
+                    {/* Decorative blobs */}
+                    <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-[#a253f9]/20 blur-3xl" />
+                    <div className="absolute bottom-0 -left-16 w-72 h-72 rounded-full bg-[#8d31ec]/25 blur-3xl" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-[#7820d0]/15 blur-2xl" />
+
+                    {/* Floating dots */}
+                    {[
+                        { top: '12%', left: '8%', size: 6, opacity: 0.4 },
+                        { top: '25%', left: '88%', size: 4, opacity: 0.3 },
+                        { top: '60%', left: '6%', size: 5, opacity: 0.35 },
+                        { top: '78%', left: '85%', size: 6, opacity: 0.3 },
+                        { top: '88%', left: '40%', size: 4, opacity: 0.25 },
+                        { top: '5%', left: '55%', size: 5, opacity: 0.3 },
+                    ].map((dot, i) => (
+                        <div
+                            key={i}
+                            className="absolute rounded-full bg-[#ddc1ff]"
+                            style={{ top: dot.top, left: dot.left, width: dot.size, height: dot.size, opacity: dot.opacity }}
+                        />
+                    ))}
+
+                    {/* Step card content */}
+                    <div className="absolute inset-0 flex items-center justify-center p-12 z-10">
+                        {renderPanelContent()}
+                    </div>
                 </div>
             }
         >
