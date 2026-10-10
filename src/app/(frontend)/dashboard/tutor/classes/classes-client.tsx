@@ -57,6 +57,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { TutorOnboardingGateModal } from '@/components/dashboard/tutor-onboarding-gate-modal';
 
 const DAYS_OF_WEEK = [
     { id: 'sun', label: 'Sun', name: 'sunday' },
@@ -68,11 +69,12 @@ const DAYS_OF_WEEK = [
     { id: 'sat', label: 'Sat', name: 'saturday' },
 ];
 
-export function ClassesClient({ initialClasses, subjects }: { initialClasses: any[], subjects: any[] }) {
+export function ClassesClient({ initialClasses, subjects, onboardingCompleted }: { initialClasses: any[], subjects: any[], onboardingCompleted: boolean }) {
     const router = useRouter();
     const [classes, setClasses] = useState(initialClasses);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [gateOpen, setGateOpen] = useState(false);
 
     // Form states
     const [editingClassId, setEditingClassId] = useState<string | null>(null);
@@ -309,6 +311,7 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                 }}>
                     <Button
                         onClick={() => {
+                            if (!onboardingCompleted) { setGateOpen(true); return; }
                             resetForm();
                             setIsOpen(true);
                         }}
@@ -640,6 +643,12 @@ export function ClassesClient({ initialClasses, subjects }: { initialClasses: an
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <TutorOnboardingGateModal
+                open={gateOpen}
+                onClose={() => setGateOpen(false)}
+                featureLabel="create a class"
+            />
         </div>
     );
 }

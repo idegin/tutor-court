@@ -67,13 +67,14 @@ export function AccountBasicsStep({ onNext }: AccountBasicsStepProps) {
     })
 
     useEffect(() => {
-        if (user) {
-            setValues((prev) => ({
-                ...prev,
-                firstName: prev.firstName || user.firstName || '',
-                lastName: prev.lastName || user.lastName || '',
-            }))
-        }
+        const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        setValues((prev) => ({
+            ...prev,
+            firstName: prev.firstName || user?.firstName || '',
+            lastName: prev.lastName || user?.lastName || '',
+            timezone: prev.timezone || detectedTimezone || 'Africa/Lagos',
+            country: prev.country || 'NG',
+        }))
     }, [user])
 
     const handleSubmit = (e: React.FormEvent) => {

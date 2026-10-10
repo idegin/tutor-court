@@ -118,9 +118,10 @@ const CustomEvent = ({ event }: EventProps<any>) => {
 interface DashboardCalendarProps {
     initialEvents: any[];
     userRole: 'tutor' | 'student' | 'parent';
+    onboardingCompleted?: boolean;
 }
 
-export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendarProps) {
+export function DashboardCalendar({ initialEvents, userRole, onboardingCompleted = true }: DashboardCalendarProps) {
     const router = useRouter();
     // Day view by default on mobile; upgrade to week on larger screens after mount.
     const [view, setView] = useState<any>('day');
@@ -161,6 +162,28 @@ export function DashboardCalendar({ initialEvents, userRole }: DashboardCalendar
             setIsLoadingClassInfo(false);
         }
     };
+
+    if (userRole === 'tutor' && !onboardingCompleted) {
+        return (
+            <div className="h-full flex items-center justify-center p-6">
+                <div className="text-center max-w-sm">
+                    <div className="flex items-center justify-center w-16 h-16 rounded-full bg-tutor-purple-50 border border-tutor-purple-100 mx-auto mb-4">
+                        <HiOutlineCalendar className="w-8 h-8 text-tutor-purple-600" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-foreground mb-2">Complete Your Profile First</h2>
+                    <p className="text-sm text-muted-foreground mb-6">
+                        Your calendar will show scheduled classes once you finish setting up your tutor profile and create your first class.
+                    </p>
+                    <Button
+                        onClick={() => window.location.href = '/tutor-onboarding'}
+                        className="bg-tutor-purple-600 hover:bg-tutor-purple-700 text-white cursor-pointer"
+                    >
+                        Complete Profile Now
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full bg-card overflow-hidden flex flex-col p-3 sm:p-4 md:p-6 lg:p-8">

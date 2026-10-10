@@ -135,7 +135,6 @@ export default function TutorOnboarding() {
     return (
         <AuthLayout
             variant="split"
-            imageUrl="/images/office-workers.jpg"
             flipped={true}
             panelContent={
                 <div className="absolute inset-0 flex items-center justify-center p-12">

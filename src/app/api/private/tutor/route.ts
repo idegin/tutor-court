@@ -3,6 +3,16 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
 
+export async function GET() {
+    try {
+        const { user, tutorProfile } = await getServerSideUser()
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return NextResponse.json({ onboardingCompleted: tutorProfile?.onboardingCompleted ?? false })
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
+
 export async function PATCH(request: Request) {
     try {
         const { user } = await getServerSideUser()

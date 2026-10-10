@@ -1,5 +1,5 @@
-app = "tutor-court"
-primary_region = "ord"
+app = "tutorcourt"
+primary_region = "jnb"
 
 [build]
 
@@ -12,13 +12,16 @@ primary_region = "ord"
   NODE_ENV = "production"
   HOSTNAME = "0.0.0.0"
   PORT = "3000"
+  NEXT_PUBLIC_SERVER_URL = "https://www.tutorcourt.com"
+  CRON_TARGET_BASE_URL = "https://www.tutorcourt.com"
+  PAYLOAD_ALLOWED_ORIGINS = "https://tutorcourt.com"
 
 [http_service]
   internal_port = 3000
   force_https = true
   auto_stop_machines = "suspend"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   # Live classes hold a long-lived WebSocket per participant, so scale on
   # concurrent CONNECTIONS, not HTTP requests.

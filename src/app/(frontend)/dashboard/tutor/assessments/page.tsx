@@ -19,6 +19,7 @@ import {
   HiOutlineTrash, HiOutlineChevronRight, HiOutlineSparkles,
   HiOutlineDocumentText, HiOutlineCheckCircle, HiOutlineXCircle,
 } from 'react-icons/hi2'
+import { TutorOnboardingGateModal } from '@/components/dashboard/tutor-onboarding-gate-modal'
 
 // ─────────────────── Types ───────────────────
 interface Subject { id: string; name: string }
@@ -229,6 +230,9 @@ export default function TutorAssessmentsPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [qLoading, setQLoading] = useState(false)
 
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true)
+  const [gateOpen, setGateOpen] = useState(false)
+
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState({ title: '', description: '', subject: '', type: 'quiz', timeLimitMinutes: 0, passingScore: 70 })
   const [saving, setSaving] = useState(false)
@@ -248,6 +252,7 @@ export default function TutorAssessmentsPage() {
 
   useEffect(() => {
     fetch('/api/subjects?limit=100').then(r => r.json()).then(d => setSubjects(d?.docs || []))
+    fetch('/api/private/tutor').then(r => r.json()).then(d => setOnboardingCompleted(d?.onboardingCompleted ?? true))
     loadAssessments()
     return () => {
       if (editTimer.current) clearTimeout(editTimer.current)
@@ -392,7 +397,7 @@ export default function TutorAssessmentsPage() {
             <h1 className="text-base font-bold">Assessments</h1>
             <p className="text-xs text-muted-foreground">{assessments.length} total</p>
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)} className="bg-secondary hover:bg-secondary/90 text-secondary-foreground gap-1 cursor-pointer">
+          <Button size="sm" onClick={() => onboardingCompleted ? setCreateOpen(true) : setGateOpen(true)} className="bg-secondary hover:bg-secondary/90 text-secondary-foreground gap-1 cursor-pointer">
             <HiPlus className="h-4 w-4" /> New
           </Button>
         </div>
@@ -404,7 +409,7 @@ export default function TutorAssessmentsPage() {
                 <div className="text-center py-16">
                   <HiOutlineClipboardDocumentCheck className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">No assessments yet.</p>
-                  <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)} className="mt-3 cursor-pointer">Create First</Button>
+                  <Button size="sm" variant="outline" onClick={() => onboardingCompleted ? setCreateOpen(true) : setGateOpen(true)} className="mt-3 cursor-pointer">Create First</Button>
                 </div>
               )
               : assessments.map(a => {
@@ -601,6 +606,12 @@ export default function TutorAssessmentsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <TutorOnboardingGateModal
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        featureLabel="create an assessment"
+      />
     </div>
   )
 }
