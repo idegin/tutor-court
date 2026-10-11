@@ -1,16 +1,12 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
-import { createNotification } from '@/lib/notification-service'
+import { createNotification, notifyParent } from '@/lib/notification-service'
 import { createActivityLogs } from '@/lib/activity-log-service'
 
 // GET – list tutor assessments sent by tutor or received by student
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
@@ -42,9 +38,7 @@ export async function GET(request: Request) {
 
 // POST – tutor sends an assessment to a student
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()
@@ -109,6 +103,17 @@ export async function POST(request: Request) {
   })
 
   const studentName = `${(student as any)?.firstName || ''} ${(student as any)?.lastName || ''}`.trim() || (student as any)?.email
+
+  // Notify the parent
+  const dueDateStr = dueDate ? new Date(dueDate).toLocaleDateString() : 'no deadline'
+  notifyParent(studentId, {
+    type: 'assessment_sent',
+    title: 'New Assessment Assigned',
+    message: `${tutorName} has assigned ${(student as any)?.firstName || 'your child'} a new assessment: "${assessmentTitle}". Due: ${dueDateStr}.`,
+    link: `/dashboard/parent/students/${studentId}/assessments/${tutorAssessment.id}`,
+    relatedCollection: 'tutor-assessments',
+    relatedId: String(tutorAssessment.id),
+  }).catch(() => {})
   createActivityLogs([
     {
       subjectId: studentId,

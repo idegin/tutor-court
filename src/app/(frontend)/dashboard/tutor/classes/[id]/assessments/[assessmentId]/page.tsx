@@ -1,8 +1,6 @@
 import Link from 'next/link'
-import { headers as getHeaders } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import {
   HiOutlineChevronLeft,
   HiOutlineClipboardDocumentList,
@@ -44,9 +42,7 @@ export default async function AssessmentPerformancePage({
 }) {
   const { id: classId, assessmentId } = await params
 
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user || user.accountType !== 'tutor') {
     redirect('/auth/login')

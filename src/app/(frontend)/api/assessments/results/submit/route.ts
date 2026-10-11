@@ -1,9 +1,8 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { headers as getHeaders } from 'next/headers'
+import { getRouteUser } from '@/lib/auth'
 
-import { createNotification } from '@/lib/notification-service'
+import { createNotification, notifyParent } from '@/lib/notification-service'
 import { createActivityLogs } from '@/lib/activity-log-service'
 import { sendEmail } from '@/lib/email-service'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
@@ -15,6 +14,8 @@ type SubmittedAnswer = {
 }
 
 const MANUAL_TYPES = ['short_answer', 'essay']
+// Flashcards use a separate submit route (flashcard-study) and should never reach here.
+// If they do, treat them like a manual question (no auto-grade).
 
 function gradeAnswer(
   question: any,
@@ -24,10 +25,9 @@ function gradeAnswer(
   const points = Number(question?.points ?? 1)
   const selected = new Set((answer.selectedOptionIndices || []).filter((n) => Number.isInteger(n)))
 
-  // Short-answer/essay questions can't be auto-graded. Leave them at 0 points
-  // and flag them for manual review by the tutor rather than marking them wrong.
-  if (MANUAL_TYPES.includes(question?.type)) {
-    return { isCorrect: false, pointsEarned: 0, needsReview: true }
+  // Short-answer/essay/flashcard questions can't be auto-graded.
+  if (MANUAL_TYPES.includes(question?.type) || question?.type === 'flashcard') {
+    return { isCorrect: false, pointsEarned: 0, needsReview: question?.type !== 'flashcard' }
   }
 
   if (question?.type === 'single_choice' || question?.type === 'true_false') {
@@ -56,9 +56,8 @@ function gradeAnswer(
  * the tutor-assessment completed and notifies the tutor.
  */
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
+  const { user, payload } = await getRouteUser()
   const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
 
   if (!user || user.accountType !== 'student') {
     return NextResponse.json({ error: 'Only students can submit assessments.' }, { status: 403 })
@@ -224,6 +223,16 @@ export async function POST(request: Request) {
       relatedId: String(tutorAssessmentId),
     })
   }
+
+  // Notify the parent (fire-and-forget)
+  notifyParent(user.id, {
+    type: 'assessment_completed',
+    title: 'Assessment Submitted',
+    message: `${studentName} has submitted their assessment: "${assessmentTitle}".`,
+    link: `/dashboard/parent/students/${user.id}/assessments/${tutorAssessmentId}`,
+    relatedCollection: 'tutor-assessments',
+    relatedId: String(tutorAssessmentId),
+  }).catch(() => {})
 
   createActivityLogs([
     {

@@ -1,12 +1,10 @@
 import Link from 'next/link'
-import { headers as getHeaders } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import { HiOutlineChevronLeft } from 'react-icons/hi2'
 
 import { Button } from '@/components/ui/button'
 import { AssessmentDetail } from '@/components/assessments/assessment-detail'
+import { getRouteUser } from '@/lib/auth'
 
 export default async function ParentChildAssessmentPerformancePage({
   params,
@@ -15,9 +13,7 @@ export default async function ParentChildAssessmentPerformancePage({
 }) {
   const { id: studentId, tutorAssessmentId } = await params
 
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user || user.accountType !== 'parent') {
     redirect('/auth/login')

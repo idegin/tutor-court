@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { CREDIT_RATE } from '@/lib/constants'
 import { resolveSessionAccess } from '@/lib/live/access'
 import { rateLimit } from '@/lib/live/rate-limit'
@@ -17,9 +15,7 @@ const idOfTutor = (session: any): string =>
 // lastHeartbeatAt (so the sweep cron knows the session is alive), and auto-ends
 // the class when the wallet hits zero. Host-only — the wallet is the tutor's.
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   let body: any

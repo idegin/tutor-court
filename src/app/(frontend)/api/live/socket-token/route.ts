@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { resolveSessionAccess } from '@/lib/live/access'
 import { rateLimit } from '@/lib/live/rate-limit'
 import { signSocketToken } from '@/lib/live/socket-auth'
@@ -15,9 +13,7 @@ export const runtime = 'nodejs'
 // session's class get a token; the claims carry the host flag + publish/
 // whiteboard rights the socket server enforces. Media itself is peer-to-peer.
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   const limited = rateLimit(`sock:${user.id}`, 10, 60)

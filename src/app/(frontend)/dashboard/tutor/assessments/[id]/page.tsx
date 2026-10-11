@@ -1,21 +1,17 @@
-import { headers as getHeaders } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import Link from 'next/link'
 import { HiOutlineChevronLeft } from 'react-icons/hi2'
 
 import { Button } from '@/components/ui/button'
 import { AssessmentDetail } from '@/components/assessments/assessment-detail'
+import { getRouteUser } from '@/lib/auth'
 
 export default async function TutorAssessmentDetailPage({
     params,
 }: {
     params: Promise<{ id: string }>
 }) {
-    const payload = await getPayload({ config })
-    const headers = await getHeaders()
-    const { user } = await payload.auth({ headers })
+    const { user, payload } = await getRouteUser()
 
     if (!user || user.accountType !== 'tutor') {
         redirect('/auth/login')

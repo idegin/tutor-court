@@ -19,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { QuestionRenderer } from './question-renderer'
 
 export type TakeQuestion = {
   id: string
@@ -274,11 +275,13 @@ export function TakeAssessment(props: TakeAssessmentProps) {
           <Card key={q.id}>
             <CardContent className="pt-5 space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                     Question {idx + 1}
                   </p>
-                  <p className="text-sm font-medium mt-1 whitespace-pre-wrap">{q.questionText}</p>
+                  <div className="mt-1">
+                    <QuestionRenderer content={q.questionText} />
+                  </div>
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0">
                   {q.points} {q.points === 1 ? 'pt' : 'pts'}

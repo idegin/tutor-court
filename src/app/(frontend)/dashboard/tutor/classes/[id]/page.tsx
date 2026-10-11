@@ -1,8 +1,8 @@
 import React from 'react'
 import { notFound, redirect } from 'next/navigation'
-import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getServerSideUser } from '@/lib/auth'
 import { ClassDetailsClient } from './class-details-client'
 
 interface PageProps {
@@ -12,8 +12,7 @@ interface PageProps {
 export default async function TutorClassDetailPage(props: PageProps) {
   const params = await props.params;
   const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user } = await getServerSideUser()
 
   if (!user || user.accountType !== 'tutor') {
     redirect('/auth/login')

@@ -2,6 +2,20 @@ import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+// Shared auth helper for Route Handlers (API routes).
+// Strips the Origin header before calling payload.auth() for the same reason
+// getServerSideUser does — Payload v3 validates Origin against the CSRF whitelist
+// even in the local API, which breaks when the browser sends www.tutorcourt.com
+// but NEXT_PUBLIC_SERVER_URL is tutorcourt.com (or vice versa).
+export async function getRouteUser() {
+  const rawHeaders = await getHeaders()
+  const headers = new Headers(rawHeaders)
+  headers.delete('origin')
+  const payload = await getPayload({ config })
+  const { user } = await payload.auth({ headers })
+  return { user, payload }
+}
+
 export const getServerSideUser = async () => {
   const requestHeaders = await getHeaders()
 

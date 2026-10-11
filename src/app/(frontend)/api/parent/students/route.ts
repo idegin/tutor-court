@@ -1,7 +1,6 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { headers as getHeaders } from 'next/headers'
+import { getRouteUser } from '@/lib/auth'
 
 import { generateManagedEmail, generateManagedPassword } from '@/lib/managed-account'
 import { getBaseEmailLayout, getEmailServerUrl } from '@/lib/email-template'
@@ -9,9 +8,8 @@ import { sendEmail } from '@/lib/email-service'
 import { createNotification } from '@/lib/notification-service'
 
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
+  const { user, payload } = await getRouteUser()
   const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
 
   if (!user || user.accountType !== 'parent') {
     return NextResponse.json({ error: 'Only parents can add children.' }, { status: 403 })

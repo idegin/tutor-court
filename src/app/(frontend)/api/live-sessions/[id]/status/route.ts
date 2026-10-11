@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 import { CREDIT_RATE } from '@/lib/constants'
@@ -38,9 +36,7 @@ async function getActiveParticipantUserIds(_roomId: string): Promise<string[] | 
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   const id = toIntId(params.id)
 
   if (!user) {

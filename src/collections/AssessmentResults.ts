@@ -129,7 +129,7 @@ export const AssessmentResults: CollectionConfig = {
         },
         {
           name: 'textAnswer',
-          type: 'text',
+          type: 'textarea',
         },
         {
           name: 'isCorrect',
@@ -195,6 +195,16 @@ export const AssessmentResults: CollectionConfig = {
       type: 'textarea',
       admin: {
         description: 'Optional tutor feedback on the result',
+      },
+    },
+    {
+      name: 'mastery',
+      type: 'number',
+      defaultValue: 0,
+      min: 0,
+      max: 100,
+      admin: {
+        description: 'Flashcard mastery percentage (0-100). Only meaningful when assessment type is "flashcard".',
       },
     },
     {

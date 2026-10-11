@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { toIntId } from '@/lib/id'
 import { getWhiteboardAccess, canDrawViaLiveSession } from '@/lib/whiteboard-access'
 
@@ -42,9 +40,7 @@ export async function PATCH(
   props: { params: Promise<{ id: string; slideId: string }> }
 ) {
   const params = await props.params;
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -93,9 +89,7 @@ export async function DELETE(
   props: { params: Promise<{ id: string; slideId: string }> }
 ) {
   const params = await props.params;
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

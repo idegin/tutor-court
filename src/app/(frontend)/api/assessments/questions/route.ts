@@ -1,8 +1,6 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 
 // Postgres integer PKs: a stringified relationship id fails on create/update.
 const numericId = (v: any) => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v)
@@ -25,9 +23,7 @@ async function loadOwnedQuestion(payload: any, questionId: any, user: any) {
 
 // GET – list questions for an assessment
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
@@ -69,9 +65,7 @@ export async function GET(request: Request) {
 
 // POST – add a question to an assessment
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()
@@ -87,14 +81,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { assessmentId, questionText, type, options, points, explanation, order } = body
+  const { assessmentId, questionText, backText, type, options, points, explanation, order } = body
 
   if (!assessmentId || !questionText || !type) {
     return NextResponse.json({ error: 'assessmentId, questionText, and type are required.' }, { status: 400 })
   }
 
   // Choice-based questions are auto-graded, so they must have a correct option.
-  // Short-answer/essay questions are graded manually and carry no options.
+  // Short-answer/essay and flashcard questions carry no options.
   const CHOICE_TYPES = ['single_choice', 'multiple_choice', 'true_false']
   const opts: { optionText: string; isCorrect?: boolean }[] = options || []
   if (CHOICE_TYPES.includes(type)) {
@@ -122,6 +116,7 @@ export async function POST(request: Request) {
     data: {
       assessment: numericId(assessmentId),
       questionText,
+      ...(backText !== undefined ? { backText } : {}),
       type,
       options: options || [],
       points: points ?? 1,
@@ -135,9 +130,7 @@ export async function POST(request: Request) {
 
 // PATCH – update a question
 export async function PATCH(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()
@@ -178,9 +171,7 @@ export async function PATCH(request: Request) {
 
 // DELETE – remove a question
 export async function DELETE(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()

@@ -483,6 +483,10 @@ export interface TutorProfile {
    * Paystack transfer recipient code.
    */
   payoutRecipientCode?: string | null;
+  /**
+   * Reason for rejection, included in the rejection email to the tutor.
+   */
+  rejectionReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1534,6 +1538,7 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   payoutAccountNumber?: T;
   payoutAccountName?: T;
   payoutRecipientCode?: T;
+  rejectionReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { liveCapabilities } from '@/lib/live/config'
 import { generateIceServers } from '@/lib/live/turn'
 import { resolveSessionAccess } from '@/lib/live/access'
@@ -14,9 +12,7 @@ export const runtime = 'nodejs'
 // session plus whether a working TURN relay is available (without it, cross-NAT
 // audio/video can fail even though presence/chat/signalling work fine).
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   const caps = liveCapabilities()

@@ -50,7 +50,14 @@ export const AssessmentQuestions: CollectionConfig = {
       type: 'textarea',
       required: true,
       admin: {
-        description: 'Supports Markdown syntax',
+        description: 'Supports Markdown syntax. For flashcard questions this is the front (term/question).',
+      },
+    },
+    {
+      name: 'backText',
+      type: 'textarea',
+      admin: {
+        description: 'Flashcard back side (definition/answer). Only used when type is "flashcard".',
       },
     },
     {
@@ -65,6 +72,7 @@ export const AssessmentQuestions: CollectionConfig = {
         { label: 'True / False', value: 'true_false' },
         { label: 'Short Answer', value: 'short_answer' },
         { label: 'Essay', value: 'essay' },
+        { label: 'Flashcard', value: 'flashcard' },
       ],
     },
     {

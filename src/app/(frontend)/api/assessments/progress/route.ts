@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 
 /** Safely read an id from a relationship field that may be an id or a populated object. */
 function relId(rel: any): string | null {
@@ -21,9 +19,7 @@ function relId(rel: any): string | null {
  *   - classId:   (tutor only) focus a single class
  */
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

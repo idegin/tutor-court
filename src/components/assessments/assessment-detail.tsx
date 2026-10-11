@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { QuestionRenderer } from './question-renderer'
 import { format } from 'date-fns'
 import {
     HiOutlineCheckCircle,
@@ -63,6 +64,7 @@ export interface AssessmentDetailTutorAssessment {
 export interface AssessmentDetailResult {
     id: string
     score: number
+    mastery?: number
     passed: boolean
     totalPoints: number
     earnedPoints: number
@@ -117,6 +119,7 @@ type GradeState = Record<string, { pointsEarned: number; isCorrect: boolean }>
 export function AssessmentDetail({ tutorAssessment, result, canGrade = false }: AssessmentDetailProps) {
     const router = useRouter()
     const { assessment, student, status, dueDate, instructions, createdAt } = tutorAssessment
+    const isFlashcard = assessment.type === 'flashcard'
 
     // Manual (short-answer/essay) answers on this result.
     const manualAnswers = React.useMemo(
@@ -247,13 +250,15 @@ export function AssessmentDetail({ tutorAssessment, result, canGrade = false }: 
                 )}
             </Card>
 
-            {/* Score summary */}
+            {/* Score / mastery summary */}
             {result && (
                 <Card>
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <CardTitle className="text-base">Result Summary</CardTitle>
-                            {pending && (
+                            <CardTitle className="text-base">
+                                {isFlashcard ? 'Mastery Summary' : 'Result Summary'}
+                            </CardTitle>
+                            {pending && !isFlashcard && (
                                 <Badge
                                     variant="outline"
                                     className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]"
@@ -264,68 +269,93 @@ export function AssessmentDetail({ tutorAssessment, result, canGrade = false }: 
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {pending && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800">
-                                {canGrade
-                                    ? 'This result has short-answer/essay questions awaiting your grading. The score below is provisional until you save grades.'
-                                    : 'Some answers are still being reviewed by your tutor. The score below is provisional and may change.'}
-                            </div>
-                        )}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
-                                <p className="text-3xl font-black text-foreground">{result.score}%</p>
-                                <p className="text-xs text-muted-foreground mt-1">Score</p>
-                            </div>
-                            <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
-                                <p className="text-2xl font-bold text-foreground">
-                                    {result.earnedPoints}/{result.totalPoints}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">Points</p>
-                            </div>
-                            <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
-                                <p
-                                    className={`text-xl font-bold ${
-                                        pending
-                                            ? 'text-amber-600'
-                                            : result.passed
-                                              ? 'text-emerald-600'
-                                              : 'text-red-600'
-                                    }`}
-                                >
-                                    {pending ? 'Pending' : result.passed ? 'Passed' : 'Failed'}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Passing: {assessment.passingScore ?? 70}%
-                                </p>
-                            </div>
-                            {result.timeTakenSeconds != null && result.timeTakenSeconds > 0 && (
-                                <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
-                                    <p className="text-xl font-bold text-foreground">
-                                        {formatTime(result.timeTakenSeconds)}
+                        {isFlashcard ? (
+                            // Flashcard mastery display
+                            <>
+                                {(() => {
+                                    const m = result.mastery ?? result.score ?? 0
+                                    const color = m >= 80 ? 'text-emerald-600' : m >= 50 ? 'text-amber-600' : 'text-red-500'
+                                    const bg = m >= 80 ? 'bg-emerald-50 border-emerald-100' : m >= 50 ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100'
+                                    return (
+                                        <div className={`rounded-xl border p-6 text-center ${bg}`}>
+                                            <p className={`text-6xl font-black ${color}`}>{m}%</p>
+                                            <p className="text-sm text-muted-foreground mt-1">Mastery</p>
+                                        </div>
+                                    )
+                                })()}
+                                {result.submittedAt && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Completed {format(new Date(result.submittedAt), 'MMM d, yyyy h:mm a')}
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">Time Taken</p>
+                                )}
+                            </>
+                        ) : (
+                            // Quiz / test score display
+                            <>
+                                {pending && (
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-800">
+                                        {canGrade
+                                            ? 'This result has short-answer/essay questions awaiting your grading. The score below is provisional until you save grades.'
+                                            : 'Some answers are still being reviewed by your tutor. The score below is provisional and may change.'}
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                    <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
+                                        <p className="text-3xl font-black text-foreground">{result.score}%</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Score</p>
+                                    </div>
+                                    <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
+                                        <p className="text-2xl font-bold text-foreground">
+                                            {result.earnedPoints}/{result.totalPoints}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">Points</p>
+                                    </div>
+                                    <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
+                                        <p
+                                            className={`text-xl font-bold ${
+                                                pending
+                                                    ? 'text-amber-600'
+                                                    : result.passed
+                                                      ? 'text-emerald-600'
+                                                      : 'text-red-600'
+                                            }`}
+                                        >
+                                            {pending ? 'Pending' : result.passed ? 'Passed' : 'Failed'}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Passing: {assessment.passingScore ?? 70}%
+                                        </p>
+                                    </div>
+                                    {result.timeTakenSeconds != null && result.timeTakenSeconds > 0 && (
+                                        <div className="text-center p-4 rounded-xl bg-muted/20 border border-border">
+                                            <p className="text-xl font-bold text-foreground">
+                                                {formatTime(result.timeTakenSeconds)}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground mt-1">Time Taken</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
 
-                        {result.submittedAt && (
-                            <p className="text-xs text-muted-foreground">
-                                Submitted {format(new Date(result.submittedAt), 'MMM d, yyyy h:mm a')}
-                            </p>
-                        )}
+                                {result.submittedAt && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Submitted {format(new Date(result.submittedAt), 'MMM d, yyyy h:mm a')}
+                                    </p>
+                                )}
 
-                        {result.feedback && !showGrading && (
-                            <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm">
-                                <span className="font-semibold text-blue-900">Tutor Feedback: </span>
-                                <span className="text-blue-800">{result.feedback}</span>
-                            </div>
+                                {result.feedback && !showGrading && (
+                                    <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg text-sm">
+                                        <span className="font-semibold text-blue-900">Tutor Feedback: </span>
+                                        <span className="text-blue-800">{result.feedback}</span>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </CardContent>
                 </Card>
             )}
 
-            {/* Per-question breakdown */}
-            {result?.answers && result.answers.length > 0 && (
+            {/* Per-question breakdown (not shown for flashcard sessions) */}
+            {!isFlashcard && result?.answers && result.answers.length > 0 && (
                 <div className="space-y-3">
                     <h3 className="font-bold text-sm text-foreground">Question Breakdown</h3>
                     {result.answers.map((answer, idx) => {
@@ -369,9 +399,10 @@ export function AssessmentDetail({ tutorAssessment, result, canGrade = false }: 
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <p className="text-sm font-medium">
-                                                    {question?.questionText || '(Question details not available)'}
-                                                </p>
+                                                                {question?.questionText
+                                                    ? <QuestionRenderer content={question.questionText} className="text-sm font-medium" />
+                                                    : <p className="text-sm font-medium text-muted-foreground italic">(Question details not available)</p>
+                                                }
 
                                                 {/* Choice options */}
                                                 {question?.options && question.options.length > 0 && (

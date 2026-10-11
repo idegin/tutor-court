@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { QuestionEditor as TipTapEditor } from '@/components/assessments/question-editor'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
@@ -18,8 +19,10 @@ import {
   HiPlus, HiOutlineClipboardDocumentCheck, HiOutlinePencil,
   HiOutlineTrash, HiOutlineChevronRight, HiOutlineSparkles,
   HiOutlineDocumentText, HiOutlineCheckCircle, HiOutlineXCircle,
+  HiOutlineExclamationCircle,
 } from 'react-icons/hi2'
 import { TutorOnboardingGateModal } from '@/components/dashboard/tutor-onboarding-gate-modal'
+import { QuestionRenderer } from '@/components/assessments/question-renderer'
 
 // ─────────────────── Types ───────────────────
 interface Subject { id: string; name: string }
@@ -31,23 +34,18 @@ interface QuestionOption { optionText: string; isCorrect: boolean }
 interface QuestionDraft {
   _draftId: string   // client-only key, never sent to the API
   questionText: string
+  backText?: string
   type: string
   points: number
   options: QuestionOption[]
 }
 interface Question {
-  id: string; questionText: string; type: string
+  id: string; questionText: string; backText?: string; type: string
   points: number; order: number; options: QuestionOption[]
 }
 type DraftShape = Omit<QuestionDraft, '_draftId'>
 
 // ─────────────────── Constants ───────────────────
-const TYPES = [
-  { value: 'quiz', label: 'Quiz' },
-  { value: 'flashcard', label: 'Flashcard' },
-  { value: 'practice_test', label: 'Practice Test' },
-  { value: 'homework', label: 'Homework' },
-]
 const Q_TYPES = [
   { value: 'single_choice', label: 'Single Choice' },
   { value: 'multiple_choice', label: 'Multiple Choice' },
@@ -65,7 +63,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 function isComplete(q: DraftShape): boolean {
   if (!q.questionText.trim()) return false
-  // Short-answer/essay questions are graded manually and need no options.
+  if (q.type === 'flashcard') return Boolean(q.backText?.trim())
   if (TEXT_TYPES.includes(q.type)) return true
   if (q.options.length < 2) return false
   if (q.options.some(o => !o.optionText.trim())) return false
@@ -73,7 +71,17 @@ function isComplete(q: DraftShape): boolean {
   return true
 }
 function makeDraftId() { return Math.random().toString(36).slice(2) }
-function emptyDraft(): QuestionDraft {
+function emptyDraft(assessmentType?: string): QuestionDraft {
+  if (assessmentType === 'flashcard') {
+    return {
+      _draftId: makeDraftId(),
+      questionText: '',
+      backText: '',
+      type: 'flashcard',
+      points: 1,
+      options: [],
+    }
+  }
   return {
     _draftId: makeDraftId(),
     questionText: '',
@@ -98,15 +106,14 @@ function QuestionEditor({
     set({ options: q.options.map((o, ix) => ix === i ? { ...o, ...patch } : o) })
   const isSingle = q.type === 'single_choice' || q.type === 'true_false'
   const isText = TEXT_TYPES.includes(q.type)
+  const isFlashcard = q.type === 'flashcard'
 
   const handleTypeChange = (v: string) => {
     if (v === 'true_false') {
       set({ type: v, options: [{ optionText: 'True', isCorrect: true }, { optionText: 'False', isCorrect: false }] })
     } else if (TEXT_TYPES.includes(v)) {
-      // Text questions carry no options.
       set({ type: v, options: [] })
     } else {
-      // Choice type: ensure there are at least two option rows to fill in.
       const resetOpts =
         q.options.length >= 2 && q.type !== 'true_false'
           ? q.options
@@ -123,6 +130,57 @@ function QuestionEditor({
     }
   }
 
+  // ── Flashcard layout ──────────────────────────────────────────────────────
+  if (isFlashcard) {
+    return (
+      <div className="border border-sky-200 rounded-xl p-4 space-y-4 bg-sky-50/30">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {headerSlot}
+            {complete !== undefined && (
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${complete
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                {complete ? '✓ complete' : '⚠ both front & back are required'}
+              </span>
+            )}
+          </div>
+          {onDelete && (
+            <button onClick={onDelete} className="text-muted-foreground hover:text-red-500 transition-colors cursor-pointer flex-shrink-0">
+              <HiOutlineTrash className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold text-sky-700">Front — term / question</Label>
+          <TipTapEditor
+            value={q.questionText}
+            onChange={text => set({ questionText: text })}
+            placeholder="e.g. What is photosynthesis?"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold text-sky-700">Back — definition / answer</Label>
+          <TipTapEditor
+            value={q.backText || ''}
+            onChange={text => set({ backText: text })}
+            placeholder="e.g. The process by which plants convert light into energy…"
+          />
+        </div>
+
+        <div className="space-y-1 w-32">
+          <Label className="text-xs">Points</Label>
+          <Input type="number" min={1} value={q.points}
+            onChange={e => set({ points: Math.max(1, Number(e.target.value)) })}
+            className="text-sm" />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Standard quiz question layout ─────────────────────────────────────────
   return (
     <div className="border border-border rounded-xl p-4 space-y-4 bg-card">
       <div className="flex items-center justify-between gap-2">
@@ -133,10 +191,10 @@ function QuestionEditor({
               ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
               : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
               {complete
-                ? '\u2713 complete — ready to save'
+                ? '✓ complete — ready to save'
                 : isText
-                  ? '\u26a0 add question text before saving'
-                  : '\u26a0 set a correct answer before saving'}
+                  ? '⚠ add question text before saving'
+                  : '⚠ set a correct answer before saving'}
             </span>
           )}
         </div>
@@ -148,14 +206,23 @@ function QuestionEditor({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Question Text (supports Markdown)</Label>
-        <Textarea
+        <Label className="text-xs">Question</Label>
+        <TipTapEditor
           value={q.questionText}
-          onChange={e => set({ questionText: e.target.value })}
+          onChange={text => set({ questionText: text })}
           placeholder="e.g. What is the capital of Nigeria?"
-          rows={2} className="text-sm resize-none"
         />
       </div>
+
+      {isText && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs text-amber-800">
+          <HiOutlineExclamationCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+          <span>
+            <strong>{q.type === 'essay' ? 'Essay' : 'Short Answer'}</strong> questions are graded manually.
+            You&apos;ll need to score this yourself after the student submits.
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
@@ -295,7 +362,14 @@ export default function TutorAssessmentsPage() {
     const pendingDrafts = drafts
     const incomplete = pendingDrafts.filter(d => !isComplete(d))
     if (incomplete.length > 0) {
-      if (incomplete.some(d => !d.questionText.trim())) { toast.error('All questions need text'); return }
+      if (incomplete.some(d => !d.questionText.trim())) {
+        toast.error('All questions need text')
+        return
+      }
+      if (incomplete.some(d => d.type === 'flashcard' && !d.backText?.trim())) {
+        toast.error('Flashcard questions need both front and back text')
+        return
+      }
       toast.error('Mark at least one correct answer per question before saving')
       return
     }
@@ -330,7 +404,13 @@ export default function TutorAssessmentsPage() {
   const startEdit = (q: Question) => {
     if (editTimer.current) clearTimeout(editTimer.current)
     setEditingId(q.id)
-    setEditDraft({ questionText: q.questionText, type: q.type, points: q.points, options: q.options || [] })
+    setEditDraft({
+      questionText: q.questionText,
+      backText: q.backText || '',
+      type: q.type,
+      points: q.points,
+      options: q.options || [],
+    })
   }
 
   const handleEditChange = (updated: DraftShape) => {
@@ -353,7 +433,14 @@ export default function TutorAssessmentsPage() {
 
   const finishEdit = async () => {
     if (!editingId || !editDraft) { setEditingId(null); setEditDraft(null); return }
-    if (!isComplete(editDraft)) { toast.error('Mark at least one correct answer before finishing'); return }
+    if (!isComplete(editDraft)) {
+      toast.error(
+        editDraft.type === 'flashcard'
+          ? 'Both front and back are required for flashcard questions'
+          : 'Mark at least one correct answer before finishing'
+      )
+      return
+    }
     if (editTimer.current) clearTimeout(editTimer.current)
     try {
       const r = await fetch('/api/assessments/questions', {
@@ -388,6 +475,8 @@ export default function TutorAssessmentsPage() {
     } catch (err: any) { toast.error(err.message) }
     finally { setSaving(false) }
   }
+
+  const isFlashcardSelected = selected?.type === 'flashcard'
 
   return (
     <div className="flex h-full">
@@ -438,22 +527,36 @@ export default function TutorAssessmentsPage() {
             <button onClick={() => setSelected(null)} className="lg:hidden text-muted-foreground hover:text-foreground cursor-pointer">←</button>
             <div className="flex-1 min-w-0">
               <h2 className="font-bold truncate">{selected.title}</h2>
-              <p className="text-xs text-muted-foreground">{questions.length} saved · {drafts.length} drafts</p>
+              <p className="text-xs text-muted-foreground">
+                {questions.length} saved · {drafts.length} drafts
+                {isFlashcardSelected && (
+                  <span className="ml-1.5 text-sky-600 font-medium">· Flashcard set</span>
+                )}
+              </p>
             </div>
             {drafts.length > 0 && (
               <Button size="sm" onClick={saveAllDrafts} disabled={savingQ}
                 className="bg-secondary hover:bg-secondary/90 text-secondary-foreground gap-1 cursor-pointer">
                 <HiOutlineCheckCircle className="h-4 w-4" />
-                {savingQ ? 'Saving…' : `Save ${drafts.length} Question${drafts.length > 1 ? 's' : ''}`}
+                {savingQ ? 'Saving…' : `Save ${drafts.length} Card${drafts.length > 1 ? 's' : ''}`}
               </Button>
             )}
             <Button size="sm" variant="outline"
-              onClick={() => setDrafts(prev => [...prev, emptyDraft()])}
+              onClick={() => setDrafts(prev => [...prev, emptyDraft(selected?.type)])}
               disabled={questions.length + drafts.length >= 100}
               className="gap-1 cursor-pointer">
-              <HiPlus className="h-4 w-4" /> Add Question
+              <HiPlus className="h-4 w-4" />
+              {isFlashcardSelected ? 'Add Card' : 'Add Question'}
             </Button>
           </div>
+
+          {/* Manual-grading warning banner (quiz only) */}
+          {!isFlashcardSelected && (questions.some(q => TEXT_TYPES.includes(q.type)) || drafts.some(d => TEXT_TYPES.includes(d.type))) && (
+            <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+              <HiOutlineExclamationCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+              <span>This assessment has questions that require <strong>manual grading</strong>. After the student submits, you&apos;ll need to review and score those answers before a final grade is set.</span>
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {qLoading
@@ -463,7 +566,9 @@ export default function TutorAssessmentsPage() {
                   return (
                     <div key={q.id} className="relative pt-3">
                       <div className="absolute top-0 left-3 z-10">
-                        <Badge className="bg-blue-500 text-white text-[10px] px-2 py-0">Editing Q{idx + 1}</Badge>
+                        <Badge className="bg-blue-500 text-white text-[10px] px-2 py-0">
+                          Editing {isFlashcardSelected ? 'Card' : 'Q'}{idx + 1}
+                        </Badge>
                       </div>
                       <QuestionEditor
                         q={editDraft}
@@ -481,7 +586,9 @@ export default function TutorAssessmentsPage() {
                   )
                 }
                 return (
-                  <div key={q.id} className="border border-border rounded-xl p-4 bg-card space-y-2 group relative">
+                  <div key={q.id} className={`border rounded-xl p-4 bg-card space-y-2 group relative ${
+                    isFlashcardSelected ? 'border-sky-200' : 'border-border'
+                  }`}>
                     <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => startEdit(q)} title="Edit"
                         className="text-muted-foreground hover:text-secondary p-1 cursor-pointer">
@@ -493,24 +600,46 @@ export default function TutorAssessmentsPage() {
                       </button>
                     </div>
                     <div className="flex items-center gap-2 pr-16">
-                      <span className="text-xs font-bold text-muted-foreground">Q{idx + 1}</span>
-                      <Badge variant="outline" className="text-[10px] px-2 py-0">{q.type.replace(/_/g, ' ')}</Badge>
-                      <span className="text-[10px] text-muted-foreground ml-auto">{q.points} pt{q.points !== 1 ? 's' : ''}</span>
+                      <span className="text-xs font-bold text-muted-foreground">
+                        {isFlashcardSelected ? `Card ${idx + 1}` : `Q${idx + 1}`}
+                      </span>
+                      {!isFlashcardSelected && (
+                        <Badge variant="outline" className="text-[10px] px-2 py-0">{q.type.replace(/_/g, ' ')}</Badge>
+                      )}
+                      {!isFlashcardSelected && (
+                        <span className="text-[10px] text-muted-foreground ml-auto">{q.points} pt{q.points !== 1 ? 's' : ''}</span>
+                      )}
                     </div>
-                    <p className="text-sm font-medium">{q.questionText}</p>
-                    {q.options?.length > 0 && (
-                      <div className="space-y-1">
-                        {q.options.map((opt, i) => (
-                          <div key={i} className={`flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 ${opt.isCorrect
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                            : 'bg-muted/30 text-muted-foreground'}`}>
-                            {opt.isCorrect
-                              ? <HiOutlineCheckCircle className="h-3 w-3 shrink-0" />
-                              : <HiOutlineDocumentText className="h-3 w-3 shrink-0" />}
-                            {opt.optionText}
-                          </div>
-                        ))}
+
+                    {isFlashcardSelected ? (
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-sky-500 uppercase tracking-wide mb-0.5">Front</p>
+                          <QuestionRenderer content={q.questionText} className="text-sm font-medium" />
+                        </div>
+                        <div className="pt-2 border-t border-sky-100">
+                          <p className="text-[10px] font-bold text-sky-500 uppercase tracking-wide mb-0.5">Back</p>
+                          <QuestionRenderer content={q.backText || ''} className="text-sm text-muted-foreground" />
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <QuestionRenderer content={q.questionText} className="text-sm font-medium" />
+                        {q.options?.length > 0 && (
+                          <div className="space-y-1">
+                            {q.options.map((opt, i) => (
+                              <div key={i} className={`flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 ${opt.isCorrect
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-muted/30 text-muted-foreground'}`}>
+                                {opt.isCorrect
+                                  ? <HiOutlineCheckCircle className="h-3 w-3 shrink-0" />
+                                  : <HiOutlineDocumentText className="h-3 w-3 shrink-0" />}
+                                {opt.optionText}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )
@@ -521,7 +650,7 @@ export default function TutorAssessmentsPage() {
               <div key={d._draftId} className="relative pt-3">
                 <div className="absolute top-0 left-3 z-10">
                   <Badge className="text-white text-[10px] px-2 py-0 bg-amber-500">
-                    Draft Q{questions.length + i + 1}
+                    Draft {isFlashcardSelected ? 'Card' : 'Q'}{questions.length + i + 1}
                   </Badge>
                 </div>
                 <QuestionEditor
@@ -538,8 +667,14 @@ export default function TutorAssessmentsPage() {
             {questions.length === 0 && drafts.length === 0 && !qLoading && (
               <div className="text-center py-20 rounded-2xl border border-dashed border-border">
                 <HiOutlineSparkles className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <p className="font-semibold">No questions yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Click "Add Question" to start building this assessment.</p>
+                <p className="font-semibold">
+                  {isFlashcardSelected ? 'No cards yet' : 'No questions yet'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isFlashcardSelected
+                    ? 'Click "Add Card" to start adding flashcards.'
+                    : 'Click "Add Question" to start building this assessment.'}
+                </p>
               </div>
             )}
           </div>
@@ -575,27 +710,34 @@ export default function TutorAssessmentsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Type *</Label>
+                  <Label>Type</Label>
                   <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      <SelectItem value="quiz">Quiz</SelectItem>
+                      <SelectItem value="flashcard">Flashcard</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Time Limit (min, 0=none)</Label>
-                  <Input type="number" min={0} value={form.timeLimitMinutes}
-                    onChange={e => setForm(f => ({ ...f, timeLimitMinutes: Number(e.target.value) }))} />
-                </div>
+                {form.type !== 'flashcard' && (
+                  <div className="space-y-1.5">
+                    <Label>Time Limit (min, 0=none)</Label>
+                    <Input type="number" min={0} value={form.timeLimitMinutes}
+                      onChange={e => setForm(f => ({ ...f, timeLimitMinutes: Number(e.target.value) }))} />
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Description</Label>
                 <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="Optional instructions..." />
               </div>
-              <div className="space-y-1.5">
-                <Label>Passing Score (%)</Label>
-                <Input type="number" min={0} max={100} value={form.passingScore}
-                  onChange={e => setForm(f => ({ ...f, passingScore: Number(e.target.value) }))} />
-              </div>
+              {form.type !== 'flashcard' && (
+                <div className="space-y-1.5">
+                  <Label>Passing Score (%)</Label>
+                  <Input type="number" min={0} max={100} value={form.passingScore}
+                    onChange={e => setForm(f => ({ ...f, passingScore: Number(e.target.value) }))} />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>

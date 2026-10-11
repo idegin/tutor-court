@@ -1,8 +1,6 @@
 import React from 'react'
 import { notFound, redirect } from 'next/navigation'
-import { headers as getHeaders } from 'next/headers'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import Link from 'next/link'
 import { format, formatDistanceToNow } from 'date-fns'
 import {
@@ -72,9 +70,7 @@ const ENGAGEMENT_TINT: Record<string, string> = {
 
 export default async function ParentStudentDetailPage(props: PageProps) {
   const params = await props.params
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user: parentUser } = await payload.auth({ headers })
+  const { user: parentUser, payload } = await getRouteUser()
 
   if (!parentUser || parentUser.accountType !== 'parent') {
     redirect('/auth/login')

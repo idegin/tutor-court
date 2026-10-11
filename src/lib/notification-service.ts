@@ -63,6 +63,46 @@ export async function createNotification({
 }
 
 /**
+ * Looks up the student's parent (if any) and sends them an in-app notification.
+ * Fire-and-forget: never throws so callers aren't interrupted.
+ */
+export async function notifyParent(
+  studentId: string | number,
+  {
+    type,
+    title,
+    message,
+    link,
+    relatedCollection,
+    relatedId,
+  }: Omit<CreateNotificationParams, 'recipientId'>,
+): Promise<void> {
+  try {
+    const payload = await getPayload({ config })
+    const numericStudentId = /^\d+$/.test(String(studentId)) ? Number(studentId) : studentId
+    const student = await payload.findByID({
+      collection: 'users',
+      id: numericStudentId as any,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const parentId = (student as any)?.parent
+    if (!parentId) return
+    await createNotification({
+      recipientId: String(parentId),
+      type,
+      title,
+      message,
+      link,
+      relatedCollection,
+      relatedId,
+    })
+  } catch (err) {
+    console.error('[NotificationService] Failed to notify parent:', err)
+  }
+}
+
+/**
  * Marks all unread notifications for a recipient as read.
  */
 export async function markAllNotificationsRead(recipientId: string): Promise<void> {

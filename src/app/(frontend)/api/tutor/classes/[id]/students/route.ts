@@ -1,13 +1,9 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   const { id } = await params
 
   if (!user) {

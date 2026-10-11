@@ -1,9 +1,8 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import { createActivityLogs } from '@/lib/activity-log-service'
+import { notifyParent } from '@/lib/notification-service'
 
 type IncomingGrade = {
   questionId: string | number
@@ -16,9 +15,7 @@ type IncomingGrade = {
  * result. Recomputes the score/passed state and clears the pending-grading flag.
  */
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()
@@ -159,6 +156,16 @@ export async function POST(request: Request) {
       : `/dashboard/tutor/assessments/${tutorAssessmentId}`
 
   if (studentId) {
+    // Notify the parent that the assessment was graded (fire-and-forget)
+    notifyParent(studentId, {
+      type: 'assessment_completed',
+      title: 'Assessment Graded',
+      message: `${studentName}'s assessment "${assessmentTitle}" has been graded. Score: ${score}% (${passed ? 'Passed' : 'Did not pass'}).`,
+      link: `/dashboard/parent/students/${studentId}/assessments/${tutorAssessmentId}`,
+      relatedCollection: 'assessment-results',
+      relatedId: String(resultId),
+    }).catch(() => {})
+
     createActivityLogs([
       {
         subjectId: studentId,

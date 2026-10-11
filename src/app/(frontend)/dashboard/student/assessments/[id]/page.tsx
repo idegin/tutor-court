@@ -1,22 +1,19 @@
-import { headers as getHeaders } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 import Link from 'next/link'
 import { HiOutlineChevronLeft } from 'react-icons/hi2'
 
 import { Button } from '@/components/ui/button'
 import { AssessmentDetail } from '@/components/assessments/assessment-detail'
 import { TakeAssessment, TakeQuestion } from '@/components/assessments/take-assessment'
+import { FlashcardPlayer, FlashCard } from '@/components/assessments/flashcard-player'
+import { getRouteUser } from '@/lib/auth'
 
 export default async function StudentAssessmentDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user || user.accountType !== 'student') {
     redirect('/auth/login')
@@ -58,20 +55,34 @@ export default async function StudentAssessmentDetailPage({
   const assessment =
     typeof tutorAssessment.assessment === 'object' ? tutorAssessment.assessment : null
 
-  // Strip answer keys from selectedQuestions before sending to the take-flow client
-  const safeQuestions: TakeQuestion[] = isSubmitted
-    ? []
-    : ((tutorAssessment.selectedQuestions || []) as any[])
+  const isFlashcard = assessment?.type === 'flashcard'
+
+  // Build flashcard data (includes backText from depth:2 populate)
+  const flashCards: FlashCard[] = isFlashcard
+    ? ((tutorAssessment.selectedQuestions || []) as any[])
         .filter((q) => typeof q === 'object' && q)
         .map((q) => ({
           id: String(q.id),
-          questionText: String(q.questionText || ''),
-          type: q.type as TakeQuestion['type'],
-          points: Number(q.points ?? 1),
-          options: (Array.isArray(q.options) ? q.options : []).map((o: any) => ({
-            optionText: String(o?.optionText || ''),
-          })),
+          front: String(q.questionText || ''),
+          back: String(q.backText || ''),
         }))
+    : []
+
+  // Strip answer keys from selectedQuestions for non-flashcard take flow
+  const safeQuestions: TakeQuestion[] =
+    isFlashcard || isSubmitted
+      ? []
+      : ((tutorAssessment.selectedQuestions || []) as any[])
+          .filter((q) => typeof q === 'object' && q)
+          .map((q) => ({
+            id: String(q.id),
+            questionText: String(q.questionText || ''),
+            type: q.type as TakeQuestion['type'],
+            points: Number(q.points ?? 1),
+            options: (Array.isArray(q.options) ? q.options : []).map((o: any) => ({
+              optionText: String(o?.optionText || ''),
+            })),
+          }))
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 md:px-6">
@@ -90,6 +101,13 @@ export default async function StudentAssessmentDetailPage({
 
       {isSubmitted ? (
         <AssessmentDetail tutorAssessment={tutorAssessment} result={result as any} />
+      ) : isFlashcard ? (
+        <FlashcardPlayer
+          tutorAssessmentId={String(tutorAssessment.id)}
+          assessmentTitle={assessment?.title || 'Flashcard Set'}
+          assessmentDescription={assessment?.description}
+          cards={flashCards}
+        />
       ) : (
         <TakeAssessment
           tutorAssessmentId={String(tutorAssessment.id)}

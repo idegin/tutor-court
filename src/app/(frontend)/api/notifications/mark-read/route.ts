@@ -1,13 +1,9 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 
 // POST /api/notifications/mark-read – mark one or all notifications as read
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

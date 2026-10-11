@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { generateIceServers } from '@/lib/live/turn'
 import { resolveSessionAccess } from '@/lib/live/access'
 import { rateLimit } from '@/lib/live/rate-limit'
@@ -13,9 +11,7 @@ export const runtime = 'nodejs'
 // by session membership + rate-limited — TURN relay is metered Cloudflare
 // bandwidth, so only confirmed members may mint credentials, and not in a loop.
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
 
   const limited = rateLimit(`ice:${user.id}`, 10, 60)

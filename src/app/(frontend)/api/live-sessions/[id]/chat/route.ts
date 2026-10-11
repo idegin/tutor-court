@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 import { toIntId } from '@/lib/id'
@@ -71,9 +69,7 @@ function serialize(doc: any) {
 // just the delta instead of refetching the whole history each tick.
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   const id = toIntId(params.id)
 
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
@@ -111,9 +107,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 // POST /api/live-sessions/:id/chat  body: { message: string }
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
   const id = toIntId(params.id)
 
   if (!user) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

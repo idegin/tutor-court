@@ -1,7 +1,5 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import { holdBookingEscrow, creditWalletAtomic } from '@/lib/escrow'
 
 export async function GET(request: Request) {
@@ -12,9 +10,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Reference is required.' }, { status: 400 })
   }
 
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

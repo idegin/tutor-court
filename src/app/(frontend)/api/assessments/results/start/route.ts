@@ -1,16 +1,12 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 
 /**
  * POST – the student starts (or resumes) an assessment.
  * Idempotent: returns the existing draft result if one exists.
  */
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user || user.accountType !== 'student') {
     return NextResponse.json({ error: 'Only students can start an assessment.' }, { status: 403 })

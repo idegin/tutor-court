@@ -1,14 +1,10 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 
 // GET – list assessments for the logged-in tutor
 export async function GET(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()
@@ -39,9 +35,7 @@ export async function GET(request: Request) {
 
 // POST – create a new assessment
 export async function POST(request: Request) {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()

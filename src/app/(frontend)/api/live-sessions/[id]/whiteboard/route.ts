@@ -1,17 +1,13 @@
-import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { getRouteUser } from '@/lib/auth'
 import { sessionExpiredResponse } from '@/lib/auth-response'
-import { getPayload } from 'payload'
-import config from '@payload-config'
 
 export const runtime = 'nodejs'
 import { toIntId } from '@/lib/id'
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   if (!user) {
     return sessionExpiredResponse()

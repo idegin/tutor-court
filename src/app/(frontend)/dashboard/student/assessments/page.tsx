@@ -1,7 +1,5 @@
 import Link from 'next/link'
-import { headers as getHeaders } from 'next/headers'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { getRouteUser } from '@/lib/auth'
 import {
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
@@ -32,9 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default async function StudentAssessmentsPage() {
-  const payload = await getPayload({ config })
-  const headers = await getHeaders()
-  const { user } = await payload.auth({ headers })
+  const { user, payload } = await getRouteUser()
 
   const [tutorAssessmentsRes, resultsRes] = await Promise.all([
     payload.find({
