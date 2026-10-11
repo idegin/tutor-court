@@ -7,7 +7,9 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('tutorcourt-token')
 
   const pathname = request.nextUrl.pathname;
-  
+
+  const isAdminRoute = pathname.startsWith('/admin')
+
   const isProtectedRoute =
     pathname.startsWith('/tutor-onboarding') ||
     pathname.startsWith('/parent-onboarding') ||
@@ -25,6 +27,13 @@ export function middleware(request: NextRequest) {
       } catch (err) {
         console.error("Error decoding token in middleware:", err)
       }
+  }
+
+  // Restrict /admin to admin accounts only
+  if (isAdminRoute) {
+    if (!token || accountType !== 'admin') {
+      return NextResponse.redirect(new URL('/auth/login', request.url))
+    }
   }
 
   // If user is trying to access an auth route with a token, redirect to home
@@ -66,6 +75,13 @@ export function middleware(request: NextRequest) {
       if (accountType === 'student' && pathname.startsWith('/dashboard/') && !pathname.startsWith('/dashboard/student') && !pathname.startsWith('/dashboard/profile')) {
           return NextResponse.redirect(new URL(`/dashboard/student`, request.url))
       }
+      // Admin cross-route guards
+      if (accountType === 'admin' && pathname.startsWith('/dashboard/') && !pathname.startsWith('/dashboard/admin') && !pathname.startsWith('/dashboard/profile')) {
+          return NextResponse.redirect(new URL(`/dashboard/admin`, request.url))
+      }
+      if (accountType !== 'admin' && pathname.startsWith('/dashboard/admin')) {
+          return NextResponse.redirect(new URL(`/dashboard/${accountType}`, request.url))
+      }
   }
 
   return NextResponse.next()
@@ -73,6 +89,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/admin/:path*',
     '/tutor-onboarding/:path*',
     '/parent-onboarding/:path*',
     '/student-onboarding/:path*',

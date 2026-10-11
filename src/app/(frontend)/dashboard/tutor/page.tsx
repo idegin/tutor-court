@@ -380,9 +380,9 @@ export default async function TutorOverviewPage() {
                 <p className="text-muted-foreground mt-1">Here is a summary of your students and upcoming classes.</p>
             </div>
 
-            {/* Profile Completion Banner */}
-            {tutorProfile && !tutorProfile.onboardingCompleted && (
-                <div className="bg-tutor-purple-100 border-2 border-foreground rounded p-6 flex flex-col md:flex-row items-center justify-between gap-4 mb-4">
+            {/* Profile State Banner */}
+            {tutorProfile && !tutorProfile.onboardingCompleted ? (
+                <div className="bg-tutor-purple-100 border-2 border-foreground rounded p-6 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
                         <div className="h-12 w-12 shrink-0 rounded-full border-2 border-foreground bg-white flex items-center justify-center text-tutor-purple-600">
                             <HiOutlineInformationCircle className="h-6 w-6" />
@@ -400,7 +400,22 @@ export default async function TutorOverviewPage() {
                         </Link>
                     </Button>
                 </div>
-            )}
+            ) : tutorProfile?.onboardingCompleted && !tutorProfile?.isApproved ? (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded p-6 flex flex-col md:flex-row items-start gap-4">
+                    <div className="h-12 w-12 shrink-0 rounded-full border-2 border-amber-300 bg-amber-100 flex items-center justify-center text-amber-600">
+                        <HiOutlineClock className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-black text-amber-900 uppercase tracking-tight">Your Profile is Under Review</h3>
+                        <p className="text-sm font-medium text-amber-800/90 mt-1 max-w-2xl">
+                            Thanks for completing your profile! Our team is reviewing your application. This usually takes 1–3 business days. You&apos;ll get an email once you&apos;re approved.
+                        </p>
+                        <p className="text-sm text-amber-700 mt-2">
+                            In the meantime, you can set up your classes and assessments — they&apos;ll go live for students to find once you&apos;re approved.
+                        </p>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Stats Overview */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

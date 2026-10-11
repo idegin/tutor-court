@@ -339,6 +339,17 @@ export const TutorProfiles: CollectionConfig = {
       index: true,
       admin: { readOnly: true, description: 'Paystack transfer recipient code.' },
     },
+    {
+      name: 'rejectionReason',
+      type: 'textarea',
+      admin: {
+        description: 'Reason for rejection, included in the rejection email to the tutor.',
+        condition: (data) => !data?.isApproved,
+      },
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
   ],
   timestamps: true,
 }

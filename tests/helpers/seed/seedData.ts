@@ -68,6 +68,8 @@ export async function seedData() {
     { name: 'Social Studies', slug: 'social-studies' },
     { name: 'Computing', slug: 'computing' },
     { name: 'Arts', slug: 'arts' },
+    { name: 'Languages', slug: 'languages' },
+    { name: 'Business Studies', slug: 'business-studies' },
   ]
 
   const categoryMap: Record<string, any> = {}
@@ -92,6 +94,17 @@ export async function seedData() {
     { name: 'Geography', category: 'Social Studies' },
     { name: 'Economics', category: 'Social Studies' },
     { name: 'Art', category: 'Arts' },
+    // Additional Nigerian school subjects
+    { name: 'Further Mathematics', category: 'Mathematics' },
+    { name: 'Agricultural Science', category: 'Science' },
+    { name: 'Civic Education', category: 'Social Studies' },
+    { name: 'Government', category: 'Social Studies' },
+    { name: 'Literature in English', category: 'Language Arts / English' },
+    { name: 'Yoruba', category: 'Languages' },
+    { name: 'French', category: 'Languages' },
+    { name: 'Music', category: 'Arts' },
+    { name: 'Financial Accounting', category: 'Business Studies' },
+    { name: 'Commerce', category: 'Business Studies' },
   ]
   const subjects = []
 

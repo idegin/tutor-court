@@ -59,16 +59,25 @@ export const Users: CollectionConfig = {
     },
   },
   access: {
-    create: () => true, // Allow public signup
-    read: () => true,
-    update: ({ req: { user } }) => Boolean(user), // Restrict updates to logged-in
-    delete: ({ req: { user } }) => Boolean(user), // Restrict deletes to logged-in
+    create: () => true,
+    read: ({ req: { user } }) => Boolean(user),
+    update: ({ req: { user } }) => {
+      if (!user) return false
+      if ((user as any).accountType === 'admin') return true
+      // Users may only update their own record
+      return { id: { equals: user.id } }
+    },
+    delete: ({ req: { user } }) => (user as any)?.accountType === 'admin',
   },
   hooks: {
     beforeValidate: [
-      ({ data, req }) => {
+      ({ data, req, operation }) => {
         if (data?.password) {
           data.password = data.password.trim()
+        }
+        // Prevent public self-registration as admin — only an existing admin can create another admin
+        if (operation === 'create' && data?.accountType === 'admin' && (req?.user as any)?.accountType !== 'admin') {
+          data.accountType = 'student'
         }
         return data
       },
