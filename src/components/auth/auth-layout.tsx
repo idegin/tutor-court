@@ -85,28 +85,31 @@ export function AuthLayout({
                         </div>
 
                         {/* Image area */}
-                        <div className={cn("hidden sm:flex flex-col items-center justify-center relative min-h-[600px] p-6 lg:p-12", isImageLeft ? "order-1" : "order-2",
+                        <div className={cn(
+                            "hidden sm:flex flex-col items-center justify-center relative min-h-[600px] p-6 lg:p-12",
+                            isImageLeft ? "order-1" : "order-2",
                             imageStyle === 'floating' ? 'bg-[#e6fcf2]' : 'bg-transparent'
                         )}>
                             {imageStyle === 'full' ? (
                                 <div className="absolute inset-0">
                                     <Image
                                         src={imageUrl}
-                                        alt="Presentation"
+                                        alt=""
                                         fill
                                         className="object-cover"
                                         unoptimized
                                     />
-                                    <div className="absolute inset-0 bg-linear-to-b from-transparent to-black/80" />
+                                    {/* Lighter overlay — image shows through */}
+                                    <div className="absolute inset-0 bg-black/30" />
                                     {panelContent ? (
-                                        <div className="absolute inset-0 z-10">
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center p-8">
                                             {panelContent}
                                         </div>
                                     ) : panelTitle ? (
                                         <div className="absolute bottom-0 left-0 right-0 z-10 p-10 lg:p-14">
                                             <h2 className="text-[2rem] font-bold text-white leading-snug">{panelTitle}</h2>
                                             {panelDescription ? (
-                                                <p className="mt-4 text-white/90 text-[1.05rem]">{panelDescription}</p>
+                                                <p className="mt-4 text-white/80 text-[1.05rem]">{panelDescription}</p>
                                             ) : null}
                                         </div>
                                     ) : null}
@@ -116,7 +119,7 @@ export function AuthLayout({
                                     <div className="relative w-full max-w-[420px] aspect-[4/3] rounded-3xl overflow-hidden shadow-xl border-[6px] border-white mb-8">
                                         <Image
                                             src={imageUrl}
-                                            alt="Presentation"
+                                            alt=""
                                             fill
                                             className="object-cover"
                                             unoptimized
@@ -149,6 +152,7 @@ export function AuthLayout({
         )
     }
 
+    // ── Split layout ──────────────────────────────────────────────────────────
     return (
         <div className={cn('relative flex min-h-screen lg:h-screen flex-col bg-background lg:grid lg:grid-cols-2 lg:overflow-hidden', className)}>
             {/* Absolute Global Header for Split Layout */}
@@ -175,10 +179,8 @@ export function AuthLayout({
                 )}
             </header>
 
-            {/* Left Column (Content) */}
+            {/* Left Column — form */}
             <div className={cn("flex flex-col border-border/50 px-6 sm:px-10 lg:px-16 pt-24 lg:overflow-y-auto h-full", flipped ? "lg:order-2" : "lg:order-1")}>
-
-                {/* Content Wrapper */}
                 <div className="flex flex-1 items-center justify-center py-10 lg:py-20 lg:pr-8">
                     <div className="mx-auto w-full max-w-110">
                         {heading ? (
@@ -194,47 +196,52 @@ export function AuthLayout({
                 </div>
             </div>
 
-            {/* Right Column (Image + Panel) */}
-            <div className={cn("relative hidden w-full h-full lg:block bg-[#0e1f18]", flipped ? "lg:order-1" : "lg:order-2")}>
+            {/* Right Column — image always renders; overlay is light so the photo shows */}
+            <div className={cn("relative hidden w-full h-full lg:block", flipped ? "lg:order-1" : "lg:order-2")}>
+                {/* Background photo */}
+                <Image
+                    src={imageUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    unoptimized
+                    priority
+                />
+
+                {/* Subtle dark overlay — reduced from the previous nearly-opaque gradient */}
+                <div className="absolute inset-0 bg-black/40" />
+
+                {/* Bottom fade for legibility of text content */}
+                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
+
+                {/* Panel content — centered when provided, or quote card at the bottom */}
                 {panelContent ? (
-                    <div className="absolute inset-0 z-10">
+                    <div className="absolute inset-0 z-10 flex items-end justify-center pb-16 px-10">
                         {panelContent}
                     </div>
                 ) : (
-                    <>
-                        <Image
-                            src={imageUrl}
-                            alt="Students studying"
-                            fill
-                            className="object-cover opacity-50 mix-blend-overlay"
-                            unoptimized
-                        />
-                        <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0a1510]/95" />
-                        <div className="absolute bottom-0 left-0 right-0 p-12 lg:p-20">
-                            <div className="mx-auto flex max-w-130 flex-col items-start justify-end h-full">
-                                <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/5 bg-[#1F292E]/60 p-10 pb-12 backdrop-blur-md shadow-2xl">
-                                    <div className="mb-6">
-                                        <svg className="h-8 w-8 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                                        </svg>
+                    <div className="absolute bottom-0 left-0 right-0 z-10 p-12 lg:p-16">
+                        <div className="mx-auto w-full max-w-[480px]">
+                            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-8 pb-9 backdrop-blur-md">
+                                <svg className="mb-5 h-7 w-7 text-primary" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                                </svg>
+                                {panelTitle ? (
+                                    <h2 className="text-[1.6rem] font-bold text-white leading-snug tracking-tight">
+                                        "{panelTitle}"
+                                    </h2>
+                                ) : null}
+                                {panelDescription ? (
+                                    <div className="mt-6 flex items-center gap-3">
+                                        <div className="h-px w-6 bg-primary shrink-0" />
+                                        <p className="text-sm font-semibold text-white/80 tracking-wide uppercase">
+                                            {panelDescription}
+                                        </p>
                                     </div>
-                                    {panelTitle ? (
-                                        <h2 className="text-[1.75rem] font-bold text-white leading-snug tracking-wide">
-                                            "{panelTitle}"
-                                        </h2>
-                                    ) : null}
-                                    {panelDescription ? (
-                                        <div className="mt-8 flex items-center gap-4">
-                                            <div className="h-0.5 w-6 bg-primary" />
-                                            <p className="text-base font-medium text-white/90">
-                                                {panelDescription}
-                                            </p>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                ) : null}
                             </div>
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
         </div>
