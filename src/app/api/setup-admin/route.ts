@@ -32,7 +32,10 @@ export async function POST(request: Request) {
         })
     }
 
-    await payload.create({
+    // Create the user. The beforeValidate hook resets accountType to 'student'
+    // on create when no admin is logged in (even with overrideAccess), so we
+    // patch it in a separate update call (the hook only guards create operations).
+    const created = await payload.create({
         collection: 'users',
         data: {
             email: 'admin@tutorcourt.com',
@@ -44,6 +47,13 @@ export async function POST(request: Request) {
             _verified: true,
         } as any,
         disableVerificationEmail: true,
+        overrideAccess: true,
+    })
+
+    await payload.update({
+        collection: 'users',
+        id: created.id,
+        data: { accountType: 'admin' } as any,
         overrideAccess: true,
     })
 

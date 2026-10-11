@@ -19,6 +19,7 @@ import * as migration_20260808_120000_tutor_payout_paystack from './20260808_120
 import * as migration_20260808_130000_wallet_nonnegative_checks from './20260808_130000_wallet_nonnegative_checks';
 import * as migration_20261010_000000_seed_nigerian_subjects from './20261010_000000_seed_nigerian_subjects';
 import * as migration_20261011_000000_tutor_rejection_reason from './20261011_000000_tutor_rejection_reason';
+import * as migration_20261011_000001_patch_admin_account_type from './20261011_000001_patch_admin_account_type';
 
 export const migrations = [
   {
@@ -125,5 +126,10 @@ export const migrations = [
     up: migration_20261011_000000_tutor_rejection_reason.up,
     down: migration_20261011_000000_tutor_rejection_reason.down,
     name: '20261011_000000_tutor_rejection_reason',
+  },
+  {
+    up: migration_20261011_000001_patch_admin_account_type.up,
+    down: migration_20261011_000001_patch_admin_account_type.down,
+    name: '20261011_000001_patch_admin_account_type',
   },
 ];
