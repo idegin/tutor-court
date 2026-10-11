@@ -174,7 +174,7 @@ export default buildConfig({
           secretAccessKey: process.env.TIGRIS_STORAGE_SECRET_ACCESS_KEY || '',
         },
         region: 'auto',
-        endpoint: 'https://fly.storage.tigris.dev',
+        endpoint: process.env.TIGRIS_ENDPOINT || 'https://t3.storage.dev',
       },
     }),
   ],
