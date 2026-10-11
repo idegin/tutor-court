@@ -196,43 +196,46 @@ export function AuthLayout({
 
             {/* Right Column (Image + Panel) */}
             <div className={cn("relative hidden w-full h-full lg:block bg-[#0e1f18]", flipped ? "lg:order-1" : "lg:order-2")}>
-                <Image
-                    src={imageUrl}
-                    alt="Students studying"
-                    fill
-                    className="object-cover opacity-50 mix-blend-overlay"
-                    unoptimized
-                />
-                <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0a1510]/95" />
-
-                <div className="absolute bottom-0 left-0 right-0 p-12 lg:p-20">
-                    <div className="mx-auto flex max-w-130 flex-col items-start justify-end h-full">
-                        {panelContent ? (
-                            panelContent
-                        ) : (
-                            <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/5 bg-[#1F292E]/60 p-10 pb-12 backdrop-blur-md shadow-2xl">
-                                <div className="mb-6">
-                                    <svg className="h-8 w-8 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-                                    </svg>
-                                </div>
-                                {panelTitle ? (
-                                    <h2 className="text-[1.75rem] font-bold text-white leading-snug tracking-wide">
-                                        "{panelTitle}"
-                                    </h2>
-                                ) : null}
-                                {panelDescription ? (
-                                    <div className="mt-8 flex items-center gap-4">
-                                        <div className="h-0.5 w-6 bg-primary" />
-                                        <p className="text-base font-medium text-white/90">
-                                            {panelDescription}
-                                        </p>
-                                    </div>
-                                ) : null}
-                            </div>
-                        )}
+                {panelContent ? (
+                    <div className="absolute inset-0 z-10">
+                        {panelContent}
                     </div>
-                </div>
+                ) : (
+                    <>
+                        <Image
+                            src={imageUrl}
+                            alt="Students studying"
+                            fill
+                            className="object-cover opacity-50 mix-blend-overlay"
+                            unoptimized
+                        />
+                        <div className="absolute inset-0 bg-linear-to-b from-transparent to-[#0a1510]/95" />
+                        <div className="absolute bottom-0 left-0 right-0 p-12 lg:p-20">
+                            <div className="mx-auto flex max-w-130 flex-col items-start justify-end h-full">
+                                <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/5 bg-[#1F292E]/60 p-10 pb-12 backdrop-blur-md shadow-2xl">
+                                    <div className="mb-6">
+                                        <svg className="h-8 w-8 text-primary" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                                        </svg>
+                                    </div>
+                                    {panelTitle ? (
+                                        <h2 className="text-[1.75rem] font-bold text-white leading-snug tracking-wide">
+                                            "{panelTitle}"
+                                        </h2>
+                                    ) : null}
+                                    {panelDescription ? (
+                                        <div className="mt-8 flex items-center gap-4">
+                                            <div className="h-0.5 w-6 bg-primary" />
+                                            <p className="text-base font-medium text-white/90">
+                                                {panelDescription}
+                                            </p>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     )
