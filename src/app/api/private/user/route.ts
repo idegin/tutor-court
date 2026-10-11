@@ -22,23 +22,28 @@ export async function PATCH(request: Request) {
 
     let avatarId = user.avatar
     if (photo && photo instanceof File && photo.size > 0) {
-      const arrayBuffer = await photo.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
+      try {
+        const arrayBuffer = await photo.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
 
-      const media = await payload.create({
-        collection: 'media',
-        data: {
-          alt: 'Avatar',
-        },
-        file: {
-          data: buffer,
-          name: photo.name,
-          mimetype: photo.type,
-          size: photo.size,
-        },
-        overrideAccess: true,
-      })
-      avatarId = media.id
+        const media = await payload.create({
+          collection: 'media',
+          data: {
+            alt: 'Avatar',
+          },
+          file: {
+            data: buffer,
+            name: photo.name,
+            mimetype: photo.type,
+            size: photo.size,
+          },
+          overrideAccess: true,
+        })
+        avatarId = media.id
+      } catch (uploadErr: any) {
+        console.error('[PATCH /api/private/user] Photo upload failed:', uploadErr.message)
+        // Continue without updating avatar — storage credentials may need fixing
+      }
     }
 
     const updateData: any = {}

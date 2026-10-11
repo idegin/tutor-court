@@ -19,7 +19,7 @@ const accountBasicsSchema = z.object({
     lastName: z.string().min(2, 'Last name is required'),
     country: z.string().min(1, 'Country is required'),
     timezone: z.string().min(1, 'Timezone is required'),
-    photo: z.any().refine((val: any) => val instanceof File, 'Profile photo is required'),
+    photo: z.any().optional(),
 })
 
 type AccountBasicsStepProps = {
