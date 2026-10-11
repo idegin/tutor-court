@@ -8,8 +8,6 @@ import {
     HiHome,
     HiOutlineUsers,
     HiUsers,
-    HiOutlineChartBar,
-    HiChartBar,
 } from 'react-icons/hi2';
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout';
 import type { NavItem } from '@/components/layout/dashboard-layout/dashboard-layout';
