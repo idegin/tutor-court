@@ -229,7 +229,7 @@ export function TutorsPageClient({
                     <Input
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
-                        placeholder="Search by name or email…"
+                        placeholder="Search by name…"
                         className="pl-9 h-10 shadow-none"
                     />
                 </div>
