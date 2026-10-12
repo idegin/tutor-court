@@ -11,6 +11,8 @@ import {
   HiOutlineCreditCard,
   HiOutlineArrowRight,
   HiOutlineCog6Tooth,
+  HiOutlineChevronUpDown,
+  HiOutlineCheck,
 } from 'react-icons/hi2'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +26,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { formatCredits, formatNaira, CREDIT_RATE } from '@/lib/constants'
 
 type TutorWalletClientProps = {
@@ -60,6 +71,8 @@ export function TutorWalletClient({
   const [isPayoutOpen, setIsPayoutOpen] = React.useState(false)
   const [banks, setBanks] = React.useState<{ name: string; code: string }[]>([])
   const [selectedBankCode, setSelectedBankCode] = React.useState('')
+  const [bankPopoverOpen, setBankPopoverOpen] = React.useState(false)
+  const [isLoadingBanks, setIsLoadingBanks] = React.useState(false)
   const [payoutAccountNumber, setPayoutAccountNumber] = React.useState('')
   const [resolvedName, setResolvedName] = React.useState('')
   const [isResolving, setIsResolving] = React.useState(false)
@@ -85,6 +98,7 @@ export function TutorWalletClient({
     setSelectedBankCode(payout?.bankCode || '')
     setPayoutAccountNumber(payout?.accountNumber || '')
     if (banks.length === 0) {
+      setIsLoadingBanks(true)
       try {
         const res = await fetch('/api/private/payout/banks')
         const data = await res.json()
@@ -92,6 +106,8 @@ export function TutorWalletClient({
         else toast.error(data.error || 'Could not load banks.')
       } catch {
         toast.error('Could not load banks.')
+      } finally {
+        setIsLoadingBanks(false)
       }
     }
   }
@@ -636,22 +652,59 @@ export function TutorWalletClient({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="payoutBank">Bank</Label>
-              <select
-                id="payoutBank"
-                value={selectedBankCode}
-                onChange={(e) => {
-                  setSelectedBankCode(e.target.value)
-                  setResolvedName('')
-                }}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tutor-purple-500"
-              >
-                <option value="">Select your bank…</option>
-                {banks.map((b) => (
-                  <option key={b.code} value={b.code}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              <Popover open={bankPopoverOpen} onOpenChange={setBankPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="payoutBank"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={bankPopoverOpen}
+                    className="w-full justify-between font-normal"
+                    disabled={isLoadingBanks}
+                  >
+                    {isLoadingBanks ? (
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                        </svg>
+                        Loading banks…
+                      </span>
+                    ) : selectedBankCode ? (
+                      banks.find((b) => b.code === selectedBankCode)?.name ?? 'Select your bank…'
+                    ) : (
+                      <span className="text-muted-foreground">Select your bank…</span>
+                    )}
+                    <HiOutlineChevronUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search bank…" />
+                    <CommandList>
+                      <CommandEmpty>No bank found.</CommandEmpty>
+                      <CommandGroup>
+                        {banks.map((b) => (
+                          <CommandItem
+                            key={b.code}
+                            value={b.name}
+                            onSelect={() => {
+                              setSelectedBankCode(b.code)
+                              setResolvedName('')
+                              setBankPopoverOpen(false)
+                            }}
+                          >
+                            <HiOutlineCheck
+                              className={`mr-2 h-4 w-4 ${selectedBankCode === b.code ? 'opacity-100' : 'opacity-0'}`}
+                            />
+                            {b.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="payoutAccountNumber">Account number</Label>
