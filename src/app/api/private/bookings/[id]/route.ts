@@ -323,12 +323,65 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       })
 
       if (recipientEmail) {
+        // Build booking context lines for the email body
+        const tutorName = tutorProfile && typeof tutorProfile === 'object'
+          ? (() => {
+              const u = tutorProfile.user
+              return u && typeof u === 'object'
+                ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                : null
+            })()
+          : null
+
+        const subjectNames: string[] = Array.isArray(booking.subjects)
+          ? (booking.subjects as any[]).map((s: any) =>
+              typeof s === 'object' ? (s.name as string) : String(s),
+            ).filter(Boolean)
+          : []
+
+        const fmt = (d: string) =>
+          new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+
+        const dateStr = booking.date
+          ? booking.endDate && booking.endDate !== booking.date
+            ? `${fmt(booking.date as string)} – ${fmt(booking.endDate as string)}`
+            : fmt(booking.date as string)
+          : null
+
+        const DAY_SHORT: Record<string, string> = {
+          monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu',
+          friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
+        }
+        const scheduleStr = Array.isArray(booking.daysOfWeek) && (booking.daysOfWeek as string[]).length
+          ? `${(booking.daysOfWeek as string[]).map((d) => DAY_SHORT[d] || d).join(', ')}${booking.hoursPerDay ? ` · ${booking.hoursPerDay}h/day` : ''}`
+          : null
+
+        const priceStr = booking.price
+          ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(Number(booking.price))
+          : null
+
+        const detailRows = [
+          tutorName && action !== 'cancel' ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Tutor</td><td style="padding:4px 0;font-size:14px;font-weight:600;">${tutorName}</td></tr>` : '',
+          subjectNames.length ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Subject</td><td style="padding:4px 0;font-size:14px;">${subjectNames.join(', ')}</td></tr>` : '',
+          dateStr ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Dates</td><td style="padding:4px 0;font-size:14px;">${dateStr}</td></tr>` : '',
+          scheduleStr ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Schedule</td><td style="padding:4px 0;font-size:14px;">${scheduleStr}</td></tr>` : '',
+          priceStr ? `<tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Amount</td><td style="padding:4px 0;font-size:14px;font-weight:600;">${priceStr}</td></tr>` : '',
+        ].filter(Boolean).join('')
+
+        const detailTable = detailRows
+          ? `<table style="border-collapse:collapse;margin:16px 0;">${detailRows}</table>`
+          : ''
+
+        const bodyLine = action === 'accept'
+          ? `Your booking request has been <strong>accepted</strong>. You can now proceed to pay and lock in your sessions.`
+          : action === 'decline'
+          ? `Unfortunately your booking request has been <strong>declined</strong> by the tutor. You can browse other tutors and try again.`
+          : `A booking has been <strong>cancelled</strong> by ${user.firstName} ${user.lastName}.`
+
         const htmlContent = `
           <p class="text">Hi there,</p>
-          <p class="text">Your booking has been <strong>${verb}</strong>.</p>
-          <div class="btn-container">
-            <a href="${serverUrl}${recipientLink}" class="btn">View Booking</a>
-          </div>
+          <p class="text">${bodyLine}</p>
+          ${detailTable}
         `
         await sendEmail({
           to: recipientEmail,
