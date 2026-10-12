@@ -85,7 +85,8 @@ export default async function StudentOnboardingPage() {
       pendingInvitations={pendingInvitations}
       enrolledClasses={enrolledClasses}
       initialGradeLevel={(user as any)?.gradeLevel || ''}
-      initialCountry={(user as any)?.country || ''}
+      initialCountry={(user as any)?.country || 'NG'}
+      initialTimezone={(user as any)?.timezone || 'Africa/Lagos'}
       initialSubjectIds={(((user as any)?.subjectsOfInterest || []) as any[]).map((s: any) =>
         String(typeof s === 'object' ? s.id : s),
       )}

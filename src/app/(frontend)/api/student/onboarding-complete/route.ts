@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
 
-  const { gradeLevel, country, learningGoals, subjectIds } = body
+  const { gradeLevel, country, timezone, learningGoals, subjectIds } = body
 
   if (!gradeLevel || typeof gradeLevel !== 'string' || !gradeLevel.trim()) {
     return NextResponse.json({ error: 'Grade level is required.' }, { status: 400 })
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
       data: {
         gradeLevel: gradeLevel.trim(),
         country: country?.trim() || null,
+        timezone: timezone?.trim() || null,
         learningGoals: learningGoals?.trim() || null,
         subjectsOfInterest: cleanSubjectIds,
         hasCompletedOnboarding: true,

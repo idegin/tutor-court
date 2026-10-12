@@ -18,7 +18,6 @@ import {
 } from 'react-icons/hi2'
 
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -29,6 +28,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { NIGERIAN_GRADES } from '@/lib/constants'
+import { SearchableSelect, getSelectClassNames } from '@/components/ui/searchable-select'
+import { Country } from 'country-state-city'
+import TimezoneSelect from 'react-timezone-select'
 
 type Subject = { id: string; name: string }
 
@@ -51,6 +53,7 @@ type Props = {
   enrolledClasses: EnrolledClass[]
   initialGradeLevel: string
   initialCountry: string
+  initialTimezone: string
   initialSubjectIds: string[]
 }
 
@@ -63,6 +66,7 @@ export function StudentOnboardingClient({
   enrolledClasses: initialEnrolled,
   initialGradeLevel,
   initialCountry,
+  initialTimezone,
   initialSubjectIds,
 }: Props) {
   const router = useRouter()
@@ -78,7 +82,10 @@ export function StudentOnboardingClient({
   const currentStep = steps[stepIndex]
 
   const [gradeLevel, setGradeLevel] = React.useState(initialGradeLevel || 'grade_7')
-  const [country, setCountry] = React.useState(initialCountry)
+  const [country, setCountry] = React.useState(initialCountry || 'NG')
+  const [timezone, setTimezone] = React.useState(
+    initialTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Lagos',
+  )
   const [learningGoals, setLearningGoals] = React.useState('')
 
   const [selectedSubjectIds, setSelectedSubjectIds] = React.useState<string[]>(initialSubjectIds)
@@ -141,7 +148,8 @@ export function StudentOnboardingClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gradeLevel: gradeLevel.trim(),
-          country: country.trim() || undefined,
+          country: country || undefined,
+          timezone: timezone || undefined,
           learningGoals: learningGoals.trim() || undefined,
           subjectIds: selectedSubjectIds,
         }),
@@ -197,9 +205,11 @@ export function StudentOnboardingClient({
           <ProfileStep
             gradeLevel={gradeLevel}
             country={country}
+            timezone={timezone}
             learningGoals={learningGoals}
             onChangeGrade={setGradeLevel}
             onChangeCountry={setCountry}
+            onChangeTimezone={setTimezone}
             onChangeGoals={setLearningGoals}
             onNext={handleNextFromProfile}
             onBack={goBack}
@@ -389,30 +399,36 @@ function FeatureBullet({
 function ProfileStep({
   gradeLevel,
   country,
+  timezone,
   learningGoals,
   onChangeGrade,
   onChangeCountry,
+  onChangeTimezone,
   onChangeGoals,
   onNext,
   onBack,
 }: {
   gradeLevel: string
   country: string
+  timezone: string
   learningGoals: string
   onChangeGrade: (v: string) => void
   onChangeCountry: (v: string) => void
+  onChangeTimezone: (v: string) => void
   onChangeGoals: (v: string) => void
   onNext: () => void
   onBack: () => void
 }) {
+  const countries = Country.getAllCountries()
+
   return (
     <StepCard
       icon={<HiOutlineUserCircle className="h-6 w-6" />}
       title="Tell us about yourself"
       description="This helps tutors get to know you and recommend the right classes."
     >
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
+      <div className="grid grid-cols-1 gap-5">
+        <div className="space-y-2">
           <Label>
             Grade level <span className="text-tutor-purple-600">*</span>
           </Label>
@@ -429,16 +445,33 @@ function ProfileStep({
             </SelectContent>
           </Select>
         </div>
+
         <div className="space-y-2">
-          <Label htmlFor="country">Country (optional)</Label>
-          <Input
-            id="country"
-            value={country}
-            onChange={(e) => onChangeCountry(e.target.value)}
-            placeholder="Nigeria"
+          <Label>Country</Label>
+          <SearchableSelect
+            options={countries.map((c) => ({ value: c.isoCode, label: c.name }))}
+            value={
+              countries.find((c) => c.isoCode === country)
+                ? { value: country, label: countries.find((c) => c.isoCode === country)!.name }
+                : null
+            }
+            onChange={(val: any) => onChangeCountry(val?.value || '')}
+            placeholder="Select country"
           />
         </div>
-        <div className="space-y-2 sm:col-span-2">
+
+        <div className="space-y-2">
+          <Label>Timezone</Label>
+          <TimezoneSelect
+            value={timezone}
+            onChange={(val: any) => onChangeTimezone(val.value)}
+            className="react-timezone-select"
+            unstyled
+            classNames={getSelectClassNames(false)}
+          />
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="learningGoals">What do you want to achieve? (optional)</Label>
           <Textarea
             id="learningGoals"
