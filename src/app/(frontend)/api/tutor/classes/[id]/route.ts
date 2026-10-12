@@ -34,14 +34,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Missing required class fields.' }, { status: 400 })
   }
 
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  // Dates arrive as YYYY-MM-DD local strings — compare as strings to avoid
+  // UTC-offset false-positives for tutors in UTC+ timezones.
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRe.test(startDate) || !dateRe.test(endDate)) {
     return NextResponse.json({ error: 'Invalid start or end date.' }, { status: 400 })
   }
-  if (end <= start) {
-    return NextResponse.json({ error: 'End date must be after the start date.' }, { status: 400 })
+  if (endDate < startDate) {
+    return NextResponse.json({ error: 'End date cannot be before the start date.' }, { status: 400 })
   }
+
+  // Parse to ISO for Payload storage (UTC noon avoids any DST/date edge)
+  const start = new Date(startDate + 'T12:00:00.000Z')
+  const end = new Date(endDate + 'T12:00:00.000Z')
 
   try {
     // Check if class belongs to this tutor
@@ -62,11 +67,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // A class that already started legitimately has a past start date, so only
     // block *moving* the start into the past — not keeping the existing one.
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const existingStart = (existingClass as any).startDate ? new Date((existingClass as any).startDate) : null
-    const startChanged = !existingStart || existingStart.getTime() !== start.getTime()
-    if (startChanged && start < today) {
+    const todayStr = new Date().toISOString().split('T')[0]
+    const existingStartStr = (existingClass as any).startDate
+      ? new Date((existingClass as any).startDate).toISOString().split('T')[0]
+      : null
+    const startChanged = !existingStartStr || existingStartStr !== startDate
+    if (startChanged && startDate < todayStr) {
       return NextResponse.json({ error: 'Start date cannot be in the past.' }, { status: 400 })
     }
 

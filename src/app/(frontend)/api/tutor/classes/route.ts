@@ -35,19 +35,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required class fields.' }, { status: 400 })
   }
 
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+  // Dates arrive as YYYY-MM-DD local strings from the client — compare as
+  // strings to avoid UTC-offset false-positives for tutors in UTC+ timezones.
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRe.test(startDate) || !dateRe.test(endDate)) {
     return NextResponse.json({ error: 'Invalid start or end date.' }, { status: 400 })
   }
-  if (end <= start) {
-    return NextResponse.json({ error: 'End date must be after the start date.' }, { status: 400 })
+  if (endDate < startDate) {
+    return NextResponse.json({ error: 'End date cannot be before the start date.' }, { status: 400 })
   }
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  if (start < today) {
+  const todayStr = new Date().toISOString().split('T')[0]
+  if (startDate < todayStr) {
     return NextResponse.json({ error: 'Start date cannot be in the past.' }, { status: 400 })
   }
+
+  // Parse to ISO for Payload storage (UTC noon avoids any DST/date edge)
+  const start = new Date(startDate + 'T12:00:00.000Z')
+  const end = new Date(endDate + 'T12:00:00.000Z')
 
   try {
     // Create class
