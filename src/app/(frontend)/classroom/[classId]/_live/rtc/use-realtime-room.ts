@@ -12,7 +12,7 @@ export interface RealtimeRoomActions {
   sendChat: (msg: ChatMessagePayload) => void
   sendReaction: (emoji: string) => void
   setHand: (raised: boolean) => void
-  updateMedia: (next: { micOn?: boolean; camOn?: boolean }) => void
+  updateMedia: (next: { micOn?: boolean; camOn?: boolean; screenOn?: boolean }) => void
   sendControl: (action: string, data?: any) => void
   sendWhiteboard: (op: any) => void
   promoteSelf: (stream: MediaStream | null) => void

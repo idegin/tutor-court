@@ -146,11 +146,15 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   // Peak attendee count seen this session — used for the ended-screen summary.
   const peakAttendeesRef = React.useRef(1)
 
-  // The media hook owns the real mic/cam track state; mirror it onto the local
-  // participant so the stage tile + roster reflect it.
+  // The media hook owns the real mic/cam/screen track state; mirror it onto the
+  // local participant so the stage tile + roster reflect it.
   React.useEffect(() => {
     setLocal((p) => ({ ...p, micOn: media.micOn, camOn: media.camOn }))
   }, [media.micOn, media.camOn])
+
+  React.useEffect(() => {
+    setLocal((p) => ({ ...p, screenOn: media.screenOn }))
+  }, [media.screenOn])
 
   // Release camera/mic when the class is over.
   const stopMedia = media.stop
@@ -517,11 +521,15 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     peakAttendeesRef.current = Math.max(peakAttendeesRef.current, room.participants.length)
   }, [room.participants, room.ready, room.connectionState])
 
-  // Broadcast local mic/cam changes to presence in real mode.
+  // Broadcast local mic/cam/screen changes to presence in real mode.
   const roomUpdateMedia = room.actions.updateMedia
   React.useEffect(() => {
     if (realtimeEnabled) roomUpdateMedia({ micOn: media.micOn, camOn: media.camOn })
   }, [media.micOn, media.camOn, realtimeEnabled, roomUpdateMedia])
+
+  React.useEffect(() => {
+    if (realtimeEnabled) roomUpdateMedia({ screenOn: media.screenOn })
+  }, [media.screenOn, realtimeEnabled, roomUpdateMedia])
 
   // ── actions ─────────────────────────────────────────────────────────────
   const toggleHand = () => {
@@ -976,7 +984,7 @@ function TopButton({
   )
 }
 
-/** Map an Ably-presence participant to the UI Participant shape. */
+/** Map a presence participant to the UI Participant shape. */
 function roomToParticipant(p: RoomParticipant): Participant {
   return {
     id: p.id,
@@ -987,6 +995,7 @@ function roomToParticipant(p: RoomParticipant): Participant {
     micOn: p.micOn,
     camOn: p.camOn,
     handRaisedAt: p.handRaisedAt ?? null,
+    screenOn: p.screenOn ?? false,
     isLocal: false,
   }
 }

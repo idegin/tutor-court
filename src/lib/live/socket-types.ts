@@ -23,6 +23,8 @@ export interface PresenceData {
   micOn: boolean
   camOn: boolean
   handRaisedAt?: number | null
+  /** True while this participant is actively sharing their screen. */
+  screenOn?: boolean
 }
 
 export interface RoomParticipant extends PresenceData {

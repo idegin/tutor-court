@@ -6,6 +6,7 @@ import {
   HiMiniMicrophone,
   HiOutlineHandRaised,
   HiMiniSignalSlash,
+  HiOutlineComputerDesktop,
 } from 'react-icons/hi2'
 import { LuMicOff } from 'react-icons/lu'
 import type { Participant } from './types'
@@ -70,7 +71,7 @@ export function ParticipantTile({
         </div>
       )}
 
-      {/* Top-left: role / you badges */}
+      {/* Top-left: role / you / screen badges */}
       <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
         {isHost && (
           <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary-foreground uppercase">
@@ -80,6 +81,12 @@ export function ParticipantTile({
         {p.isLocal && (
           <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
             You
+          </span>
+        )}
+        {p.screenOn && (
+          <span className="flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
+            <HiOutlineComputerDesktop className="size-3" />
+            Screen
           </span>
         )}
       </div>

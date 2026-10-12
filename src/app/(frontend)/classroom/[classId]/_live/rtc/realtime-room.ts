@@ -293,9 +293,9 @@ export class RealtimeRoom {
     this.local.handRaisedAt = raised ? Date.now() : null
     this.socket?.emit('presence', { handRaisedAt: this.local.handRaisedAt })
   }
-  async updateMedia(next: { micOn?: boolean; camOn?: boolean }): Promise<void> {
+  async updateMedia(next: { micOn?: boolean; camOn?: boolean; screenOn?: boolean }): Promise<void> {
     this.local = { ...this.local, ...next }
-    this.socket?.emit('presence', { micOn: this.local.micOn, camOn: this.local.camOn })
+    this.socket?.emit('presence', { micOn: this.local.micOn, camOn: this.local.camOn, screenOn: this.local.screenOn })
   }
   async sendControl(action: string, data: any = {}): Promise<void> {
     this.socket?.emit('control', { action, data })

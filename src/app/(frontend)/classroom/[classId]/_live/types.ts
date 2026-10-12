@@ -22,6 +22,8 @@ export interface Participant {
   /** Purely presentational: drives the "speaking" ring in the mock. */
   speaking?: boolean
   isLocal?: boolean
+  /** True while this participant is actively sharing their screen. */
+  screenOn?: boolean
   /** Present for tutor/host so the credit meter has an owner. */
   connection?: 'good' | 'weak'
 }
