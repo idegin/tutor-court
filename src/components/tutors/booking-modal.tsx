@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { HiXMark, HiCheck, HiCheckCircle } from 'react-icons/hi2';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -49,6 +49,7 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     const [step, setStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const submittingRef = useRef(false);
 
     // Closing after a successful request triggers the parent's onSuccess (which
     // refreshes the page) — so the user actually sees the success step first.
@@ -141,6 +142,8 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
     );
 
     const handleSubmit = async () => {
+        if (submittingRef.current) return;
+        submittingRef.current = true;
         setIsSubmitting(true);
         setErrors({});
 
@@ -165,15 +168,18 @@ export function BookingModal({ isOpen, onClose, tutorId, tutorName, pricePerHour
                         ? data.error
                         : 'Something went wrong while creating your booking. Please try again.';
                 setErrors({ form: message });
+                submittingRef.current = false;
                 setIsSubmitting(false);
                 return;
             }
 
+            submittingRef.current = false;
             setIsSubmitting(false);
             setSubmitted(true);
             setStep(4);
         } catch (error: any) {
             setErrors({ form: error?.message || 'An error occurred' });
+            submittingRef.current = false;
             setIsSubmitting(false);
         }
     };

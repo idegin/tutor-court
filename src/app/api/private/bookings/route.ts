@@ -115,20 +115,16 @@ export async function POST(req: Request) {
     // Scope the check to the specific student (the child for a parent booking,
     // or the student themselves) so a parent can still book a DIFFERENT child
     // with the same tutor.
+    // Use `in` instead of a nested `or` — Payload+Postgres can hoist nested
+    // `or` conditions out of the enclosing `and`, causing false positives where
+    // ANY booking in the system with those statuses triggers the 409.
     const existingActive = await payload.find({
       collection: 'bookings',
       where: {
         and: [
           { tutor: { equals: tutorProfile.id } },
           { student: { equals: studentId } },
-          {
-            or: [
-              { status: { equals: 'pending' } },
-              { status: { equals: 'confirmed' } },
-              { status: { equals: 'in_progress' } },
-              { status: { equals: 'awaiting_release' } },
-            ],
-          },
+          { status: { in: ['pending', 'confirmed', 'in_progress', 'awaiting_release'] } },
         ],
       },
       limit: 1,
