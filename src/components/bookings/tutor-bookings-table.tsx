@@ -137,7 +137,6 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                 raw: b,
                 id: b.id,
                 bookerName,
-                bookerEmail: bookerUser?.email || "",
                 avatarUrl: bookerUser?.avatar?.url || undefined,
                 bookedByParent,
                 type,
@@ -149,7 +148,7 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
     }, [bookings]);
 
     const filteredData = rows.filter((item) => {
-        const haystack = `${item.bookerName} ${item.bookerEmail} ${item.subjectNames.join(" ")}`.toLowerCase();
+        const haystack = `${item.bookerName} ${item.subjectNames.join(" ")}`.toLowerCase();
         const matchesSearch = haystack.includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "all" || item.status === statusFilter;
         const matchesType = typeFilter === "all" || item.type === typeFilter;
@@ -266,9 +265,6 @@ export function TutorBookingsTable({ bookings = [] }: { bookings?: any[] }) {
                                                 </Avatar>
                                                 <div className="flex flex-col min-w-[150px] max-w-[220px]">
                                                     <span className="font-medium text-foreground truncate">{booking.bookerName}</span>
-                                                    {booking.bookerEmail && (
-                                                        <span className="text-xs text-muted-foreground truncate">{booking.bookerEmail}</span>
-                                                    )}
                                                     <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                                                         {booking.bookedByParent ? (
                                                             <>

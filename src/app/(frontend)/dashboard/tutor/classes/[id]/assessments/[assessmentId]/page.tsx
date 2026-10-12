@@ -113,7 +113,6 @@ export default async function AssessmentPerformancePage({
       taId: String(ta.id),
       studentId: student?.id ? String(student.id) : '',
       studentName: student ? `${student.firstName || ''} ${student.lastName || ''}`.trim() : 'Student',
-      studentEmail: student?.email || '',
       status: ta.status as string,
       dueDate: ta.dueDate as string | null,
       result,
@@ -214,9 +213,6 @@ export default async function AssessmentPerformancePage({
                         <td className="py-3 pr-4">
                           <div className="flex flex-col">
                             <span className="font-semibold">{row.studentName}</span>
-                            {row.studentEmail && (
-                              <span className="text-xs text-muted-foreground">{row.studentEmail}</span>
-                            )}
                           </div>
                         </td>
                         <td className="py-3 pr-4">

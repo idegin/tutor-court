@@ -814,7 +814,6 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                     </Avatar>
                                                     <div>
                                                         <h5 className="text-sm font-bold text-foreground">{student.firstName} {student.lastName}</h5>
-                                                        <p className="text-xs text-muted-foreground">{student.email}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
