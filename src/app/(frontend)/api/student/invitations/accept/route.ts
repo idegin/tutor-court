@@ -112,9 +112,10 @@ export async function POST(request: Request) {
       })
     }
 
+    const serverUrl = getEmailServerUrl(headers)
+    const studentName = `${user.firstName} ${user.lastName}`
+
     if (tutorEmail) {
-      const serverUrl = getEmailServerUrl(headers)
-      const studentName = `${user.firstName} ${user.lastName}`
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
         <p class="text">Great news! Student <strong>${studentName}</strong> has accepted your invitation to join the class <strong>"${cls.title}"</strong>.</p>
@@ -129,6 +130,20 @@ export async function POST(request: Request) {
         html: emailHtml,
       }).catch((err) => console.error('[student-accept-invite] Error sending email:', err))
     }
+
+    // Confirmation to the student themselves.
+    const studentConfirmHtml = `
+      <p class="text">Hi ${user.firstName},</p>
+      <p class="text">You've successfully joined the class <strong>"${cls.title}"</strong>. Your tutor will be in touch with session details.</p>
+      <div class="btn-container">
+        <a href="${serverUrl}/dashboard/student" class="btn">Go to Dashboard</a>
+      </div>
+    `
+    sendEmail({
+      to: user.email,
+      subject: `You've joined "${cls.title}" - TutorCourt`,
+      html: getBaseEmailLayout('Class Joined', studentConfirmHtml, serverUrl),
+    }).catch((err) => console.error('[student-accept-invite] Error sending confirmation to student:', err))
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

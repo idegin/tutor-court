@@ -147,8 +147,9 @@ export async function POST(request: Request) {
       })
     }
 
+    const serverUrl = getEmailServerUrl(headers)
+
     if (tutorEmail) {
-      const serverUrl = getEmailServerUrl(headers)
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
         <p class="text">Great news! Parent <strong>${user.firstName} ${user.lastName}</strong> has accepted your invitation to join the class <strong>"${cls.title}"</strong>.</p>
@@ -164,6 +165,20 @@ export async function POST(request: Request) {
         html: emailHtml,
       })
     }
+
+    // Confirmation to the parent themselves.
+    const parentConfirmHtml = `
+      <p class="text">Hi ${user.firstName},</p>
+      <p class="text">You've successfully joined the class <strong>"${cls.title}"</strong>. You can now manage your child's enrollment from your parent dashboard.</p>
+      <div class="btn-container">
+        <a href="${serverUrl}/dashboard/parent/classes/${cls.id}" class="btn">View Class</a>
+      </div>
+    `
+    await sendEmail({
+      to: user.email,
+      subject: `You've joined "${cls.title}" - TutorCourt`,
+      html: getBaseEmailLayout('Class Joined', parentConfirmHtml, serverUrl),
+    }).catch((err) => console.error('[parent-accept-invite] Error sending confirmation to parent:', err))
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

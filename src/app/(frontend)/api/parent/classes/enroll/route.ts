@@ -89,16 +89,17 @@ export async function POST(request: Request) {
       overrideAccess: true,
     })
 
-    // 7. Send email to class tutor
+    const serverUrl = getEmailServerUrl(headers)
     const tutor = cls.tutor
     const tutorEmail = typeof tutor === 'object' ? tutor?.email : null
     const tutorName = typeof tutor === 'object' ? `${tutor?.firstName} ${tutor?.lastName}` : 'Tutor'
+    const studentName = `${(studentDoc as any).firstName} ${(studentDoc as any).lastName}`.trim()
 
+    // 7. Send email to class tutor
     if (tutorEmail) {
-      const serverUrl = getEmailServerUrl(headers)
       const emailContent = `
         <p class="text">Hi ${tutorName},</p>
-        <p class="text">Parent <strong>${user.firstName} ${user.lastName}</strong> has enrolled their child <strong>${studentDoc.firstName} ${studentDoc.lastName}</strong> in your class <strong>"${cls.title}"</strong>.</p>
+        <p class="text">Parent <strong>${user.firstName} ${user.lastName}</strong> has enrolled their child <strong>${studentName}</strong> in your class <strong>"${cls.title}"</strong>.</p>
         <div class="btn-container">
           <a href="${serverUrl}/dashboard/tutor/classes/${cls.id}" class="btn">View Class Details</a>
         </div>
@@ -108,7 +109,43 @@ export async function POST(request: Request) {
         to: tutorEmail,
         subject: `New Student Enrolled in ${cls.title}`,
         html: emailHtml,
-      })
+      }).catch((err) => console.error('[enroll] failed to email tutor:', err))
+    }
+
+    // Confirmation to the parent.
+    const parentConfirmHtml = `
+      <p class="text">Hi ${user.firstName},</p>
+      <p class="text">You've successfully enrolled <strong>${studentName}</strong> in the class <strong>"${cls.title}"</strong>. Your tutor will be in touch with session details.</p>
+      <div class="btn-container">
+        <a href="${serverUrl}/dashboard/parent/classes/${cls.id}" class="btn">View Class</a>
+      </div>
+    `
+    await sendEmail({
+      to: user.email,
+      subject: `${studentName} enrolled in "${cls.title}" - TutorCourt`,
+      html: getBaseEmailLayout('Student Enrolled', parentConfirmHtml, serverUrl),
+    }).catch((err) => console.error('[enroll] failed to email parent:', err))
+
+    // Notify the student if they have a real email (managed accounts may not).
+    const studentUser = await payload.findByID({
+      collection: 'users',
+      id: studentUserId,
+      depth: 0,
+      overrideAccess: true,
+    }).catch(() => null) as any
+    if (studentUser?.email && !studentUser.isManagedAccount) {
+      const studentConfirmHtml = `
+        <p class="text">Hi ${studentUser.firstName},</p>
+        <p class="text">Your parent enrolled you in the class <strong>"${cls.title}"</strong>. Your tutor will be in touch with session details.</p>
+        <div class="btn-container">
+          <a href="${serverUrl}/dashboard/student" class="btn">Go to Dashboard</a>
+        </div>
+      `
+      await sendEmail({
+        to: studentUser.email,
+        subject: `You've been enrolled in "${cls.title}" - TutorCourt`,
+        html: getBaseEmailLayout('Enrolled in Class', studentConfirmHtml, serverUrl),
+      }).catch((err) => console.error('[enroll] failed to email student:', err))
     }
 
     return NextResponse.json({ success: true })

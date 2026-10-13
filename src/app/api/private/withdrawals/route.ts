@@ -3,6 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getServerSideUser } from '@/lib/auth'
 import { reserveLockedAtomic } from '@/lib/escrow'
+import { emailUserById } from '@/lib/transactional-email'
+import { headers as getHeaders } from 'next/headers'
 
 /**
  * POST /api/private/withdrawals — a tutor requests a withdrawal of spendable
@@ -128,6 +130,19 @@ export async function POST(request: Request) {
     })
 
     if (transactionID) await payload.db.commitTransaction(transactionID)
+
+    // Acknowledgement email — fire-and-forget so a mail failure never blocks the withdrawal.
+    const requestHeaders = await getHeaders()
+    await emailUserById(
+      payload,
+      user.id,
+      'Withdrawal request received - TutorCourt',
+      'Withdrawal request received',
+      `<p class="text">Hi ${user.firstName},</p>
+       <p class="text">Your withdrawal request of <strong>₦${amount.toLocaleString()}</strong> to ${accountName} (${bankName}) has been received and is under review. We'll email you once it's processed.</p>`,
+      { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet', headers: requestHeaders },
+    ).catch(() => {})
+
     return NextResponse.json({ success: true, request: record })
   } catch (e: any) {
     if (transactionID) await payload.db.rollbackTransaction(transactionID)

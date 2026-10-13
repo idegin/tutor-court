@@ -236,6 +236,8 @@ export async function POST(req: Request) {
     }
 
     const bookerName = `${user.firstName} ${user.lastName}`.trim()
+    const headers = await getHeaders()
+    const serverUrl = getEmailServerUrl(headers)
 
     // In-app notification for the tutor.
     if (tutorUserId) {
@@ -254,8 +256,6 @@ export async function POST(req: Request) {
 
     // Email the tutor.
     if (tutorEmail) {
-      const headers = await getHeaders()
-      const serverUrl = getEmailServerUrl(headers)
       const htmlContent = `
         <p class="text">Hi there,</p>
         <p class="text">You have received a new booking request from ${bookerName}.</p>
@@ -273,6 +273,38 @@ export async function POST(req: Request) {
         html: getBaseEmailLayout('New Booking Request', htmlContent, serverUrl),
       }).catch((e) => console.error('[bookings] failed to email tutor:', e?.message))
     }
+
+    // Confirmation to the booker (student or parent).
+    const bookerDashLink = user.accountType === 'parent' ? '/dashboard/parent/bookings' : '/dashboard/student/bookings'
+    const fmt = (d: string) =>
+      new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const dateStr =
+      parsed.endDate && parsed.endDate !== parsed.startDate
+        ? `${fmt(parsed.startDate)} – ${fmt(parsed.endDate)}`
+        : fmt(parsed.startDate)
+    const priceStr = new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      maximumFractionDigits: 0,
+    }).format(price.totalPrice)
+    const bookerConfirmHtml = `
+      <p class="text">Hi ${user.firstName},</p>
+      <p class="text">Your booking request has been sent to the tutor. You'll receive another email once they respond.</p>
+      <table style="border-collapse:collapse;margin:16px 0;">
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Subject</td><td style="padding:4px 0;font-size:14px;">${subjectNames.join(', ')}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Dates</td><td style="padding:4px 0;font-size:14px;">${dateStr}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Schedule</td><td style="padding:4px 0;font-size:14px;">${parsed.daysOfWeek.join(', ')} · ${parsed.hoursPerDay}h/day</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px;">Total</td><td style="padding:4px 0;font-size:14px;font-weight:600;">${priceStr}</td></tr>
+      </table>
+      <div class="btn-container">
+        <a href="${serverUrl}${bookerDashLink}" class="btn">View Booking</a>
+      </div>
+    `
+    await sendEmail({
+      to: user.email,
+      subject: 'Booking Request Sent - TutorCourt',
+      html: getBaseEmailLayout('Booking Request Sent', bookerConfirmHtml, serverUrl),
+    }).catch((e) => console.error('[bookings] failed to email booker:', e?.message))
 
     return NextResponse.json({ success: true, booking, price })
   } catch (error: any) {

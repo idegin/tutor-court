@@ -422,11 +422,9 @@ export async function holdBookingEscrow({
     // class-gen hiccup never rolls back the payment).
     await materializeClassFromBooking(payload, bookingId).catch(() => {})
 
-    // Notify the tutor that the booking is funded — for EVERY funding source
-    // (wallet pay, Paystack verify, Paystack webhook), so a gateway-funded
-    // booking isn't silently un-announced.
+    // Notify both parties that the booking is funded.
+    const bookerName = bookerDisplayName(booking)
     if (tutorUserId) {
-      const bookerName = bookerDisplayName(booking)
       await createNotification({
         recipientId: String(tutorUserId),
         type: 'payment_received',
@@ -443,6 +441,34 @@ export async function holdBookingEscrow({
         'Booking funded',
         `<p class="text">Good news — <strong>${bookerName}</strong> funded their booking. The payment is held securely in escrow and released to you after the sessions.</p>`,
         { link: '/dashboard/tutor/bookings', linkLabel: 'View booking' },
+      ).catch(() => {})
+    }
+    // Payment receipt for the booker (student or parent).
+    if (bookerUserId) {
+      const price = Number(booking.price) || 0
+      const priceStr = new Intl.NumberFormat('en-NG', {
+        style: 'currency',
+        currency: 'NGN',
+        maximumFractionDigits: 0,
+      }).format(price)
+      const bookerLink = booking.parent ? '/dashboard/parent/bookings' : '/dashboard/student/bookings'
+      await createNotification({
+        recipientId: String(bookerUserId),
+        type: 'payment_received',
+        title: 'Payment confirmed',
+        message: `Your payment of ${priceStr} is held securely in escrow until the sessions are complete.`,
+        link: bookerLink,
+        relatedCollection: 'bookings',
+        relatedId: String(bookingId),
+      }).catch(() => {})
+      await emailUserById(
+        payload,
+        bookerUserId,
+        'Payment confirmed - TutorCourt',
+        'Payment confirmed',
+        `<p class="text">Your payment of <strong>${priceStr}</strong> has been received and is held securely in escrow. It will be released to your tutor only after the sessions are complete.</p>
+         <p class="text">If anything goes wrong, you can raise a dispute and our team will step in.</p>`,
+        { link: bookerLink, linkLabel: 'View booking' },
       ).catch(() => {})
     }
 

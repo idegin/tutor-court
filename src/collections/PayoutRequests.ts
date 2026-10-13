@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { debitWalletAtomic, unlockEscrowAtomic } from '@/lib/escrow'
 import { emailUserById } from '@/lib/transactional-email'
+import { createNotification } from '@/lib/notification-service'
 
 /**
  * A tutor's request to withdraw spendable wallet funds to a bank account.
@@ -161,6 +162,23 @@ export const PayoutRequests: CollectionConfig = {
         } else if (isRejection) {
           // Release the reservation back to spendable (atomic).
           await unlockEscrowAtomic(payload, req, wallet.id, amount)
+          // Notify the tutor — their funds are back, they can retry or fix details.
+          await createNotification({
+            recipientId: String(tutorId),
+            type: 'general',
+            title: 'Withdrawal request rejected',
+            message: `Your withdrawal request of ₦${amount.toLocaleString()} was not approved. The funds are back in your available balance.`,
+            link: '/dashboard/tutor/wallet',
+          }).catch(() => {})
+          await emailUserById(
+            payload,
+            tutorId,
+            'Your withdrawal request was not approved - TutorCourt',
+            'Withdrawal request rejected',
+            `<p class="text">Your withdrawal request of <strong>₦${amount.toLocaleString()}</strong> was reviewed and not approved${doc.adminNote ? ` — ${doc.adminNote}` : ''}. The funds have been returned to your available balance.</p>
+             <p class="text">You can update your bank details or contact support if you believe this is an error.</p>`,
+            { link: '/dashboard/tutor/wallet', linkLabel: 'View wallet' },
+          ).catch(() => {})
         }
       },
     ],
