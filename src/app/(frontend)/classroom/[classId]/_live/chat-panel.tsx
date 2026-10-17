@@ -133,7 +133,7 @@ function MessageRow({
               <HiOutlineFaceSmile />
             </button>
             {pickerOpen && (
-              <div className="absolute top-0 left-8 z-20 flex items-center gap-0.5 rounded-full border border-white/10 bg-neutral-900 p-1 shadow-xl">
+              <div className="absolute top-0 right-0 z-20 flex max-w-[calc(100vw-4rem)] origin-top-right items-center gap-0.5 rounded-full border border-white/10 bg-neutral-900 p-1 shadow-xl">
                 {REACTIONS.slice(0, 6).map((e) => (
                   <button
                     key={e}
