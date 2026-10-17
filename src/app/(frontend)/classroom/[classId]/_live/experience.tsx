@@ -122,6 +122,40 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   const playSfx = useSfx(soundOn)
   const media = useLocalMedia()
   const isDesktop = useIsDesktop()
+  const mobilePanelHistoryActiveRef = React.useRef(false)
+
+  // Give an open mobile sheet its own same-URL history entry. The browser/OS
+  // back gesture then closes chat/people instead of navigating out of class.
+  React.useEffect(() => {
+    if (!panel || isDesktop) return
+    if (!mobilePanelHistoryActiveRef.current) {
+      const current =
+        typeof window.history.state === 'object' && window.history.state
+          ? window.history.state
+          : {}
+      window.history.pushState({ ...current, tutorCourtLivePanel: true }, '')
+      mobilePanelHistoryActiveRef.current = true
+    }
+
+    const handlePopState = () => {
+      mobilePanelHistoryActiveRef.current = false
+      setPanel(null)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [panel, isDesktop])
+
+  const closePanel = React.useCallback(() => {
+    if (
+      mobilePanelHistoryActiveRef.current &&
+      window.history.state?.tutorCourtLivePanel
+    ) {
+      window.history.back()
+      return
+    }
+    mobilePanelHistoryActiveRef.current = false
+    setPanel(null)
+  }, [])
 
   // Real realtime is active once the tutor has started (we hold a live-session
   // id) and we have a real identity. The backend readiness is already enforced
@@ -625,7 +659,8 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   }
 
   const openPanel = (k: Exclude<PanelKind, null>) => {
-    setPanel((cur) => (cur === k ? null : k))
+    if (panel === k) closePanel()
+    else setPanel(k)
     if (k === 'chat') setUnread(0)
   }
 
@@ -898,7 +933,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
                 {panel === 'chat' ? <HiOutlineChatBubbleOvalLeft className="size-4" /> : <HiOutlineUsers className="size-4" />}
                 {panel === 'chat' ? 'In-class chat' : `People · ${everyone.length}`}
               </h2>
-              <button onClick={() => setPanel(null)} aria-label="Close panel" className="grid size-7 place-items-center rounded-lg text-white/50 hover:bg-white/8 hover:text-white [&_svg]:size-4">
+              <button type="button" onClick={closePanel} aria-label="Close panel" className="grid size-7 place-items-center rounded-lg text-white/50 hover:bg-white/8 hover:text-white [&_svg]:size-4">
                 <HiXMark />
               </button>
             </div>
@@ -929,17 +964,18 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
 
       {/* Mobile panel as a bottom sheet — only mounted below lg so its
           full-screen overlay never blurs the desktop docked layout. */}
-      <Sheet open={!!panel && !isDesktop} onOpenChange={(o) => !o && setPanel(null)}>
+      <Sheet open={!!panel && !isDesktop} onOpenChange={(o) => !o && closePanel()}>
         <SheetContent
           side="bottom"
-          className="flex h-[82dvh] flex-col gap-0 rounded-t-3xl border-white/10 bg-neutral-900 p-0 text-white lg:hidden [&>button]:hidden"
+          showCloseButton={false}
+          className="flex h-[82dvh] flex-col gap-0 rounded-t-3xl border-white/10 bg-neutral-900 p-0 text-white lg:hidden"
         >
           <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
             <SheetTitle className="flex items-center gap-2 text-sm font-semibold text-white">
               {panel === 'chat' ? <HiOutlineChatBubbleOvalLeft className="size-4" /> : <HiOutlineUsers className="size-4" />}
               {panel === 'chat' ? 'In-class chat' : `People · ${everyone.length}`}
             </SheetTitle>
-            <button onClick={() => setPanel(null)} aria-label="Close" className="grid size-8 place-items-center rounded-lg text-white/60 hover:bg-white/8 [&_svg]:size-5">
+            <button type="button" onClick={closePanel} aria-label="Close chat or people panel" className="grid size-10 place-items-center rounded-xl text-white/70 hover:bg-white/8 [&_svg]:size-6">
               <HiXMark />
             </button>
           </div>
