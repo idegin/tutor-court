@@ -34,7 +34,8 @@ export function TutorAbout({ description, subjects, videoUrl }: TutorAboutProps)
                 </div>
             </section>
 
-            <section>
+            {process.env.NODE_ENV !== 'production' && (
+                <section>
                 <h2 className="text-3xl font-black text-foreground mb-6">Meet Your Tutor</h2>
                 <div className="relative w-full aspect-video bg-muted rounded-[2rem] border-[3px] border-foreground overflow-hidden flex items-center justify-center">
                     {videoUrl ? (
@@ -53,7 +54,8 @@ export function TutorAbout({ description, subjects, videoUrl }: TutorAboutProps)
                         </div>
                     )}
                 </div>
-            </section>
+                </section>
+            )}
         </div>
     );
 }

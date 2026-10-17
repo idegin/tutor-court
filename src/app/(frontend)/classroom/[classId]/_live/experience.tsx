@@ -413,7 +413,16 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
           return
         }
         if (typeof data.balance === 'number') {
-          setCredit((c) => ({ ...c, balance: data.balance, consumed: data.consumed ?? c.consumed }))
+          setCredit((c) => {
+            const burnPerMinute = data.burnPerMinute ?? c.burnPerMinute
+            return {
+              ...c,
+              balance: data.balance,
+              consumed: data.consumed ?? c.consumed,
+              burnPerMinute,
+              lowThreshold: burnPerMinute * 10,
+            }
+          })
         }
         if (data.lowCredit && !lowFiredRef.current) {
           lowFiredRef.current = true
@@ -442,6 +451,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     user: realtime?.user ?? { id: local.id, name: local.name, accountType: local.accountType, role: local.role },
     canPublish: realtime?.canPublish ?? isTutor,
     localStream: media.stream,
+    screenStream: media.screenStream,
     onChat: (m) => {
       const cm: ChatMessage = {
         id: m.id, senderId: m.senderId, senderName: m.senderName,
@@ -580,20 +590,12 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     if (realtimeEnabled) room.actions.sendReaction(emoji)
   }
 
-  // Screen share swaps the outgoing video track (camera ⇄ screen) on the mesh, so
-  // every peer sees the shared screen in the sharer's tile. Both the tutor and
-  // enrolled students can share (anyone who may publish).
+  // Camera and screen are independent WebRTC tracks, so the presenter stays
+  // visible in the participant rail while their screen owns the main stage.
   const toggleScreen = () => {
     if (media.screenOn) void media.stopScreenShare()
     else void media.shareScreen()
   }
-  // Toggling the camera while sharing stops the share first (they share one video
-  // sender), so the two controls never fight over the outgoing track.
-  const handleToggleCam = () => {
-    if (media.screenOn) { void media.stopScreenShare(); return }
-    media.toggleCam()
-  }
-
   const sendChat = (body: string) => {
     const m: ChatMessage = {
       id: rid(), senderId: String(localId), senderName: local.name, senderAccountType: local.accountType,
@@ -813,7 +815,8 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
     realtimeEnabled && room.ready
       ? room.participants.filter((p) => p.id !== String(localId)).map(roomToParticipant)
       : remote
-  const remoteStreams = realtimeEnabled ? room.streams : undefined
+  const remoteCameraStreams = realtimeEnabled ? room.cameraStreams : undefined
+  const remoteScreenStreams = realtimeEnabled ? room.screenStreams : undefined
   const everyone = [local, ...effectiveRemote]
   const handCount = effectiveRemote.filter((p) => p.handRaisedAt).length
   // Retries have been exhausted — the realtime backend can't be reached (network
@@ -877,7 +880,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
               mediaState={room.mediaState}
               ready={room.ready}
               participantCount={everyone.length}
-              streamCount={room.streams.size}
+              streamCount={room.cameraStreams.size + room.screenStreams.size}
             />
           )}
           {connectionFailed && (
@@ -902,7 +905,14 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
             </div>
           )}
           {whiteboardOn ? (
-            <Stage participants={everyone} localStream={media.stream} remoteStreams={remoteStreams} filmstrip>
+            <Stage
+              participants={everyone}
+              localCameraStream={media.stream}
+              localScreenStream={media.screenStream}
+              remoteCameraStreams={remoteCameraStreams}
+              remoteScreenStreams={remoteScreenStreams}
+              filmstrip
+            >
               <BoardsPanel
                 boards={boards}
                 activeId={activeBoard}
@@ -921,7 +931,13 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
               />
             </Stage>
           ) : (
-            <Stage participants={everyone} localStream={media.stream} remoteStreams={remoteStreams} />
+            <Stage
+              participants={everyone}
+              localCameraStream={media.stream}
+              localScreenStream={media.screenStream}
+              remoteCameraStreams={remoteCameraStreams}
+              remoteScreenStreams={remoteScreenStreams}
+            />
           )}
         </main>
 
@@ -953,7 +969,7 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
           handRaised={Boolean(local.handRaisedAt)}
           unreadChat={unread}
           onToggleMic={media.toggleMic}
-          onToggleCam={handleToggleCam}
+          onToggleCam={media.toggleCam}
           onToggleScreen={toggleScreen}
           onToggleHand={toggleHand}
           onReact={pushReaction}

@@ -391,7 +391,7 @@ export function TutorWalletClient({
               {formatCredits(credits)}
             </h2>
             <p className="text-xs text-gray-500">
-              1 credit = ₦{CREDIT_RATE.nairaPerCoin} · {CREDIT_RATE.coinsPerHour} credits / hour live class
+              1 credit = ₦{CREDIT_RATE.nairaPerCoin} · charged per connected participant minute
             </p>
           </div>
         </div>

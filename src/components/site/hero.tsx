@@ -155,6 +155,7 @@ export function SiteHero() {
 
                                 {isOpen && dropdownRect && typeof document !== 'undefined' && createPortal(
                                     <div
+                                        onMouseDown={(event) => event.stopPropagation()}
                                         style={{
                                             position: 'fixed',
                                             top: dropdownRect.bottom + 8,

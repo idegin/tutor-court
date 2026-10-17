@@ -48,8 +48,8 @@ export function buildInitialState(bootstrap: ClassroomBootstrap): InitialState {
     credit: {
       balance: bootstrap.creditBalance ?? 0,
       consumed: 0,
-      // Fixed per-minute class burn; the heartbeat returns the authoritative
-      // balance/consumed, this is only the meter's projection baseline.
+      // One-person baseline until the heartbeat returns the current participant
+      // burn rate. The live meter then projects time remaining accurately.
       burnPerMinute: CREDIT_RATE.coinsPerMinute,
       lowThreshold: LOW_CREDIT_THRESHOLD,
     },

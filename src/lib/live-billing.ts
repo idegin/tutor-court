@@ -1,6 +1,11 @@
 import { sql } from '@payloadcms/db-postgres'
 import { CREDIT_RATE } from '@/lib/constants'
 
+// Bound a stale open participation interval. The heartbeat normally closes a
+// log when somebody disappears from room presence, but this prevents an
+// abandoned log from accruing forever if both presence and leave fail.
+const MAX_OPEN_LOG_SECONDS = 6 * 60 * 60
+
 /**
  * Live-class billing math, shared by the status poll (incremental charging),
  * the manual /end route, and the out-of-credits auto-close.
@@ -13,18 +18,38 @@ import { CREDIT_RATE } from '@/lib/constants'
  * auto-close only settle the final remaining delta rather than re-charging.
  */
 
-// A live class costs one credit-rate unit per elapsed minute. Attendance must
-// never multiply the tutor's burn rate: a group class with five students costs
-// the same per minute as a one-to-one class. Participant logs remain an input
-// for API compatibility and attendance reporting, but do not affect billing.
+// Charge participant minutes because TURN/SFU egress grows as more clients
+// receive media. Each attendee, including the tutor, contributes their actual
+// connected time. If logs are temporarily unavailable, retain a one-participant
+// elapsed-time baseline so an active class is never free by accident.
 export function computeBillableMinutes(
-  _participantLogs: any[],
+  participantLogs: any[],
   session: any,
   nowMs: number,
 ): number {
   const startedTime = new Date(session.startedAt || session.createdAt).getTime()
-  if (!Number.isFinite(startedTime)) return 1
-  return Math.max(1, Math.ceil(Math.max(0, nowMs - startedTime) / (1000 * 60)))
+  const sessionDurationMinutes = Number.isFinite(startedTime)
+    ? Math.max(1, Math.ceil(Math.max(0, nowMs - startedTime) / (1000 * 60)))
+    : 1
+
+  let totalParticipantMinutes = 0
+  for (const log of participantLogs) {
+    let logSeconds: number
+    if (log.leftAt) {
+      logSeconds =
+        Number(log.durationSeconds) ||
+        Math.max(0, (new Date(log.leftAt).getTime() - new Date(log.joinedAt).getTime()) / 1000)
+    } else {
+      const joinedTime = new Date(log.joinedAt).getTime()
+      const openInterval = Number.isFinite(joinedTime)
+        ? Math.max(0, (nowMs - joinedTime) / 1000)
+        : 0
+      logSeconds = (Number(log.durationSeconds) || 0) + Math.min(openInterval, MAX_OPEN_LOG_SECONDS)
+    }
+    totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
+  }
+
+  return totalParticipantMinutes > 0 ? totalParticipantMinutes : sessionDurationMinutes
 }
 
 export interface ChargeResult {

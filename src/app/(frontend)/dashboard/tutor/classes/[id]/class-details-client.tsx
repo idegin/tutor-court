@@ -1156,7 +1156,7 @@ export function ClassDetailsClient({ cls, initialWhiteboards, subjects }: ClassD
                                                     Start Live Classroom Session
                                                 </DialogTitle>
                                                 <DialogDescription>
-                                                    Starting a live session costs <strong>1 credit per minute</strong>, including group classes. A minimum of {CREDIT_RATE.minimumClassCredits} credits (1 hour) is required to start.
+                                                    Live sessions cost <strong>1 credit per connected participant per minute</strong>, including the tutor. A minimum of {CREDIT_RATE.minimumClassCredits} credits is required to start.
                                                 </DialogDescription>
                                             </DialogHeader>
 

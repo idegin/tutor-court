@@ -90,13 +90,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ ended: true, reason: 'out_of_credits', balance: 0, consumed: result.consumed })
   }
 
+  let activeParticipantCount = activeRaw?.length
+    ? new Set(activeRaw.map((value: unknown) => String(value))).size
+    : 0
+  if (activeParticipantCount === 0) {
+    const activeLogs = await payload.find({
+      collection: 'live-session-participants',
+      where: { and: [{ liveSession: { equals: session.id } }, { leftAt: { exists: false } }] },
+      limit: 1000,
+      depth: 0,
+    })
+    activeParticipantCount = Math.max(1, activeLogs.totalDocs)
+  }
+  const burnPerMinute = Math.max(1, activeParticipantCount) * CREDIT_RATE.coinsPerMinute
   const minutesRemaining =
-    CREDIT_RATE.coinsPerMinute > 0 ? Math.floor(result.balance / CREDIT_RATE.coinsPerMinute) : null
+    burnPerMinute > 0 ? Math.floor(result.balance / burnPerMinute) : null
   return NextResponse.json(
     {
       ended: false,
       balance: result.balance,
       consumed: result.consumed,
+      burnPerMinute,
       minutesRemaining,
       lowCredit: minutesRemaining !== null && minutesRemaining <= 10,
     },

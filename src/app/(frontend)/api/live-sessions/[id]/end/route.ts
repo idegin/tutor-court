@@ -166,8 +166,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       })
     }
 
-    // 3. Compute cost from elapsed class time. Participant logs are still used
-    // for attendance and activity reporting, but do not multiply the burn rate.
+    // 3. Compute connected participant minutes, which tracks the number of
+    // clients receiving media and therefore the service's bandwidth exposure.
     const participantLogs = await payload.find({
       collection: 'live-session-participants',
       where: {

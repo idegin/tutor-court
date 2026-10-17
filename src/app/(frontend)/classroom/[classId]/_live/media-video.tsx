@@ -11,11 +11,13 @@ export function MediaVideo({
   stream,
   mirror = true,
   muted = true,
+  fit = 'contain',
   className,
 }: {
   stream: MediaStream | null
   mirror?: boolean
   muted?: boolean
+  fit?: 'contain' | 'cover'
   className?: string
 }) {
   const ref = React.useRef<HTMLVideoElement>(null)
@@ -36,7 +38,12 @@ export function MediaVideo({
       autoPlay
       playsInline
       muted={muted}
-      className={cn('size-full object-cover', mirror && '-scale-x-100', className)}
+      className={cn(
+        'size-full bg-black',
+        fit === 'contain' ? 'object-contain' : 'object-cover',
+        mirror && '-scale-x-100',
+        className,
+      )}
     />
   )
 }

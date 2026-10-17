@@ -29,7 +29,7 @@ function buildConfig(iceServers: RTCIceServer[]): RTCConfiguration {
 
 interface PeerHandlers {
   sendSignal: (to: string, data: SignalData) => void
-  onTrack: (peerId: string, stream: MediaStream) => void
+  onTrack: (peerId: string, kind: 'camera' | 'screen', stream: MediaStream) => void
   onState: (peerId: string, state: RTCPeerConnectionState) => void
 }
 
@@ -41,8 +41,9 @@ interface PeerEntry {
   ignoreOffer: boolean
   pendingCandidates: RTCIceCandidateInit[]
   /** Senders kept so we can hot-swap outgoing tracks without renegotiating. */
-  audioSender: RTCRtpSender | null
-  videoSender: RTCRtpSender | null
+  audioTransceiver: RTCRtpTransceiver | null
+  cameraTransceiver: RTCRtpTransceiver | null
+  screenTransceiver: RTCRtpTransceiver | null
   mediaAttached: boolean
   /** Pending grace timer before forcing an ICE restart on a transient drop. */
   iceRestartTimer: ReturnType<typeof setTimeout> | null
@@ -51,25 +52,30 @@ interface PeerEntry {
 export class PeerManager {
   private peers = new Map<string, PeerEntry>()
   private localStream: MediaStream
+  private screenStream: MediaStream
   private handlers: PeerHandlers
   private selfId: string
   private config: RTCConfiguration
   /** Latest outgoing tracks, applied to peers created later. */
-  private currentVideoTrack: MediaStreamTrack | null
+  private currentCameraTrack: MediaStreamTrack | null
+  private currentScreenTrack: MediaStreamTrack | null
   private currentAudioTrack: MediaStreamTrack | null
   private destroyed = false
 
   constructor(
     selfId: string,
     localStream: MediaStream,
+    screenStream: MediaStream = new MediaStream(),
     handlers: PeerHandlers,
     iceServers: RTCIceServer[] = DEFAULT_ICE_SERVERS,
   ) {
     this.selfId = selfId
     this.localStream = localStream
+    this.screenStream = screenStream
     this.handlers = handlers
     this.config = buildConfig(iceServers)
-    this.currentVideoTrack = localStream.getVideoTracks()[0] ?? null
+    this.currentCameraTrack = localStream.getVideoTracks()[0] ?? null
+    this.currentScreenTrack = screenStream.getVideoTracks()[0] ?? null
     this.currentAudioTrack = localStream.getAudioTracks()[0] ?? null
   }
 
@@ -101,8 +107,9 @@ export class PeerManager {
       makingOffer: false,
       ignoreOffer: false,
       pendingCandidates: [],
-      audioSender: null,
-      videoSender: null,
+      audioTransceiver: null,
+      cameraTransceiver: null,
+      screenTransceiver: null,
       mediaAttached: false,
       iceRestartTimer: null,
     }
@@ -129,7 +136,14 @@ export class PeerManager {
     }
 
     pc.ontrack = (e) => {
-      if (e.streams[0]) this.handlers.onTrack(peerId, e.streams[0])
+      // A reserved transceiver can arrive without an msid while its sender has
+      // no track (screen sharing normally starts later). Keep its receiver track
+      // in a synthetic stream so replaceTrack begins rendering immediately when
+      // the remote participant starts sharing, without another negotiation.
+      const stream = e.streams[0] ?? new MediaStream([e.track])
+      const kind =
+        e.transceiver === entry.screenTransceiver ? 'screen' : 'camera'
+      this.handlers.onTrack(peerId, kind, stream)
     }
 
     pc.oniceconnectionstatechange = () => {
@@ -175,33 +189,26 @@ export class PeerManager {
   }
 
   /**
-   * Attach our audio + video to a connection exactly once. We always reserve one
-   * sendrecv audio m-line and one sendrecv video m-line (even when a track is
-   * currently missing — mic muted-off, camera off, or an observer/parent with no
-   * media) so every toggle afterwards is a zero-renegotiation `replaceTrack`.
+   * Attach media to a connection exactly once. Camera and screen use separate
+   * sendrecv video m-lines so sharing never replaces the presenter's face.
    */
   private attachLocalMedia(entry: PeerEntry): void {
     if (entry.mediaAttached) return
     entry.mediaAttached = true
     const pc = entry.pc
 
-    if (this.currentAudioTrack) {
-      entry.audioSender = pc.addTrack(this.currentAudioTrack, this.localStream)
-    } else {
-      entry.audioSender = pc.addTransceiver('audio', {
-        direction: 'sendrecv',
-        streams: [this.localStream],
-      }).sender
-    }
-
-    if (this.currentVideoTrack) {
-      entry.videoSender = pc.addTrack(this.currentVideoTrack, this.localStream)
-    } else {
-      entry.videoSender = pc.addTransceiver('video', {
-        direction: 'sendrecv',
-        streams: [this.localStream],
-      }).sender
-    }
+    entry.audioTransceiver = pc.addTransceiver(this.currentAudioTrack ?? 'audio', {
+      direction: 'sendrecv',
+      streams: [this.localStream],
+    })
+    entry.cameraTransceiver = pc.addTransceiver(this.currentCameraTrack ?? 'video', {
+      direction: 'sendrecv',
+      streams: [this.localStream],
+    })
+    entry.screenTransceiver = pc.addTransceiver(this.currentScreenTrack ?? 'video', {
+      direction: 'sendrecv',
+      streams: [this.screenStream],
+    })
   }
 
   async handleSignal(from: string, data: SignalData): Promise<void> {
@@ -254,15 +261,24 @@ export class PeerManager {
   }
 
   /**
-   * Swap the outgoing video on every peer. Pass a track for camera/screen-share,
-   * or `null` to blank it (camera off / device released / observer). Uses the
-   * stored video sender so it keeps working after the track has been set to null.
+   * Swap the outgoing camera on every peer, or pass null when it is off.
    */
-  replaceVideoTrack(track: MediaStreamTrack | null): void {
-    this.currentVideoTrack = track
+  replaceCameraTrack(track: MediaStreamTrack | null): void {
+    this.currentCameraTrack = track
     for (const entry of this.peers.values()) {
-      entry.videoSender?.replaceTrack(track).catch((err) => {
-        console.error('replaceTrack (video) failed', err)
+      entry.cameraTransceiver?.sender.replaceTrack(track).catch((err) => {
+        console.error('replaceTrack (camera) failed', err)
+      })
+    }
+  }
+
+  /** Publish or stop the independent display-capture track. */
+  replaceScreenTrack(track: MediaStreamTrack | null, stream?: MediaStream): void {
+    this.currentScreenTrack = track
+    if (stream) this.screenStream = stream
+    for (const entry of this.peers.values()) {
+      entry.screenTransceiver?.sender.replaceTrack(track).catch((err) => {
+        console.error('replaceTrack (screen) failed', err)
       })
     }
   }
@@ -271,7 +287,7 @@ export class PeerManager {
   replaceAudioTrack(track: MediaStreamTrack | null): void {
     this.currentAudioTrack = track
     for (const entry of this.peers.values()) {
-      entry.audioSender?.replaceTrack(track).catch((err) => {
+      entry.audioTransceiver?.sender.replaceTrack(track).catch((err) => {
         console.error('replaceTrack (audio) failed', err)
       })
     }

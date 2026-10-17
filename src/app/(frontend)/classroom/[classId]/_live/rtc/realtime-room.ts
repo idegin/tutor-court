@@ -30,7 +30,7 @@ export type { PresenceData, RoomParticipant, ChatMessagePayload }
 
 export interface RoomEvents {
   onParticipants?: (list: RoomParticipant[]) => void
-  onStream?: (userId: string, stream: MediaStream) => void
+  onStream?: (userId: string, kind: 'camera' | 'screen', stream: MediaStream) => void
   onStreamGone?: (userId: string) => void
   onChat?: (msg: ChatMessagePayload) => void
   onReaction?: (emoji: ReactionEmoji, fromId: string) => void
@@ -58,10 +58,11 @@ export class RealtimeRoom {
   private canPublishNow: boolean
   private closed = false
   private joinedOnce = false
-  /** Aggregated remote stream per peer (userId → stream) for teardown events. */
-  private streams = new Map<string, MediaStream>()
-  /** The current local stream we publish (kept so a reconnect re-attaches it). */
+  /** Camera/screen streams per peer, retained for teardown and reconnects. */
+  private streams = new Map<string, { camera?: MediaStream; screen?: MediaStream }>()
+  /** Current local media, kept so a reconnect re-attaches both video sources. */
   private localStream: MediaStream | null = null
+  private localScreenStream: MediaStream | null = null
   private local: PresenceData
 
   constructor(private readonly opts: RoomOptions) {
@@ -78,8 +79,9 @@ export class RealtimeRoom {
     }
   }
 
-  async join(localStream: MediaStream | null): Promise<void> {
+  async join(localStream: MediaStream | null, screenStream: MediaStream | null): Promise<void> {
     this.localStream = localStream
+    this.localScreenStream = screenStream
 
     // Mint the socket token first (fails fast with a clear reason if we're not a
     // member / the session ended). The React hook retries join() with backoff.
@@ -97,14 +99,17 @@ export class RealtimeRoom {
     // need the socket id first. Publishers attach their real tracks; observers
     // (parents) attach an empty stream and still receive everyone else.
     const meshStream = this.canPublishNow && localStream ? localStream : new MediaStream()
+    const meshScreenStream =
+      this.canPublishNow && screenStream ? screenStream : new MediaStream()
     this.pm = new PeerManager(
       this.selfId,
       meshStream,
+      meshScreenStream,
       {
         sendSignal: (to, data) => this.socket?.emit('signal', { to, data }),
-        onTrack: (peerId, stream) => {
-          this.streams.set(peerId, stream)
-          this.opts.events.onStream?.(peerId, stream)
+        onTrack: (peerId, kind, stream) => {
+          this.streams.set(peerId, { ...this.streams.get(peerId), [kind]: stream })
+          this.opts.events.onStream?.(peerId, kind, stream)
         },
         onState: (_peerId, state) => this.opts.events.onMediaState?.(state),
       },
@@ -207,14 +212,19 @@ export class RealtimeRoom {
     this.pm?.destroy()
     const meshStream =
       this.canPublishNow && this.localStream ? this.localStream : new MediaStream()
+    const meshScreenStream =
+      this.canPublishNow && this.localScreenStream
+        ? this.localScreenStream
+        : new MediaStream()
     this.pm = new PeerManager(
       this.selfId,
       meshStream,
+      meshScreenStream,
       {
         sendSignal: (to, data) => this.socket?.emit('signal', { to, data }),
-        onTrack: (peerId, stream) => {
-          this.streams.set(peerId, stream)
-          this.opts.events.onStream?.(peerId, stream)
+        onTrack: (peerId, kind, stream) => {
+          this.streams.set(peerId, { ...this.streams.get(peerId), [kind]: stream })
+          this.opts.events.onStream?.(peerId, kind, stream)
         },
         onState: (_peerId, state) => this.opts.events.onMediaState?.(state),
       },
@@ -223,8 +233,12 @@ export class RealtimeRoom {
     // Re-apply the current outgoing tracks on the fresh mesh.
     if (this.canPublishNow && this.localStream) {
       this.pm.replaceAudioTrack(this.localStream.getAudioTracks()[0] ?? null)
-      this.pm.replaceVideoTrack(this.localStream.getVideoTracks()[0] ?? null)
+      this.pm.replaceCameraTrack(this.localStream.getVideoTracks()[0] ?? null)
     }
+    this.pm.replaceScreenTrack(
+      this.canPublishNow ? (this.localScreenStream?.getVideoTracks()[0] ?? null) : null,
+      this.localScreenStream ?? undefined,
+    )
   }
 
   /**
@@ -247,7 +261,9 @@ export class RealtimeRoom {
       if (presentIds.has(peerId)) continue
       this.pm.disconnect(peerId)
       if (this.streams.has(peerId)) {
-        this.streams.get(peerId)?.getTracks().forEach((t) => t.stop())
+        const media = this.streams.get(peerId)
+        media?.camera?.getTracks().forEach((t) => t.stop())
+        media?.screen?.getTracks().forEach((t) => t.stop())
         this.streams.delete(peerId)
       }
       this.opts.events.onStreamGone?.(peerId)
@@ -260,7 +276,17 @@ export class RealtimeRoom {
     this.localStream = stream
     if (!this.canPublishNow) return
     this.pm.replaceAudioTrack(stream.getAudioTracks()[0] ?? null)
-    this.pm.replaceVideoTrack(stream.getVideoTracks()[0] ?? null)
+    this.pm.replaceCameraTrack(stream.getVideoTracks()[0] ?? null)
+  }
+
+  /** Push the independent screen stream to every peer. */
+  async publishScreenStream(stream: MediaStream | null): Promise<void> {
+    if (this.closed || !this.pm) return
+    this.localScreenStream = stream
+    this.pm.replaceScreenTrack(
+      this.canPublishNow ? (stream?.getVideoTracks()[0] ?? null) : null,
+      stream ?? undefined,
+    )
   }
 
   /** Host promoted this viewer to the stage: grant publish + start sending. */
@@ -270,7 +296,7 @@ export class RealtimeRoom {
     this.localStream = stream
     if (stream && this.pm) {
       this.pm.replaceAudioTrack(stream.getAudioTracks()[0] ?? null)
-      this.pm.replaceVideoTrack(stream.getVideoTracks()[0] ?? null)
+      this.pm.replaceCameraTrack(stream.getVideoTracks()[0] ?? null)
     }
     this.socket?.emit('presence', { micOn: this.local.micOn, camOn: this.local.camOn })
   }
@@ -280,7 +306,8 @@ export class RealtimeRoom {
     this.local.role = 'viewer'
     // Stop sending media; the PCs stay up so we keep receiving the stage.
     this.pm?.replaceAudioTrack(null)
-    this.pm?.replaceVideoTrack(null)
+    this.pm?.replaceCameraTrack(null)
+    this.pm?.replaceScreenTrack(null)
   }
 
   // ── outbound ──────────────────────────────────────────────────────────────
@@ -314,7 +341,10 @@ export class RealtimeRoom {
     this.closed = true
     this.pm?.destroy()
     this.pm = null
-    for (const s of this.streams.values()) s.getTracks().forEach((t) => t.stop())
+    for (const media of this.streams.values()) {
+      media.camera?.getTracks().forEach((t) => t.stop())
+      media.screen?.getTracks().forEach((t) => t.stop())
+    }
     this.streams.clear()
     this.socket?.removeAllListeners()
     this.socket?.disconnect()

@@ -16,12 +16,15 @@ export interface DeviceOption {
 }
 
 export interface LocalMedia {
+  /** Microphone + camera stream. The camera stays live during screen sharing. */
   stream: MediaStream | null
+  /** Display-capture video only, published separately from the camera. */
+  screenStream: MediaStream | null
   permission: MediaPermission
   error: string | null
   micOn: boolean
   camOn: boolean
-  /** True while the local user is sharing their screen (screen replaces camera). */
+  /** True while the local user is sharing their screen alongside their camera. */
   screenOn: boolean
   /** 0..1 smoothed microphone level for the meter. */
   level: number
@@ -58,6 +61,7 @@ function humanizeError(e: unknown): string {
 
 export function useLocalMedia(): LocalMedia {
   const [stream, setStream] = React.useState<MediaStream | null>(null)
+  const [screenStream, setScreenStream] = React.useState<MediaStream | null>(null)
   const [permission, setPermission] = React.useState<MediaPermission>('idle')
   const [error, setError] = React.useState<string | null>(null)
   const [micOn, setMicOn] = React.useState(true)
@@ -72,6 +76,7 @@ export function useLocalMedia(): LocalMedia {
   const [speakerId, setSpeakerId] = React.useState<string>()
 
   const streamRef = React.useRef<MediaStream | null>(null)
+  const screenStreamRef = React.useRef<MediaStream | null>(null)
   const acRef = React.useRef<AudioContext | null>(null)
   const rafRef = React.useRef<number>(0)
   // mirror toggle state into refs so re-acquiring a stream applies them
@@ -258,11 +263,9 @@ export function useLocalMedia(): LocalMedia {
     }
   }, [reacquireVideo, rebuildStream])
 
-  // Screen share: swap the camera video track for a display-capture track. The
-  // new stream identity re-fires the publish effect, so peers receive the screen
-  // through the existing video sender (zero renegotiation). Mic audio is untouched.
+  // Screen capture is a separate stream so peers can receive the camera and the
+  // shared screen at the same time.
   const screenTrackRef = React.useRef<MediaStreamTrack | null>(null)
-  const camBeforeShareRef = React.useRef(false)
 
   const stopScreenShare = React.useCallback(async () => {
     const track = screenTrackRef.current
@@ -271,11 +274,10 @@ export function useLocalMedia(): LocalMedia {
       track.onended = null
       track.stop()
     }
+    screenStreamRef.current = null
+    setScreenStream(null)
     setScreenOn(false)
-    // Restore whatever the camera was doing before the share started.
-    if (camBeforeShareRef.current) await reacquireVideo()
-    else rebuildStream(null)
-  }, [reacquireVideo, rebuildStream])
+  }, [])
 
   const shareScreen = React.useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
@@ -286,16 +288,14 @@ export function useLocalMedia(): LocalMedia {
       const ds = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
       const track = ds.getVideoTracks()[0]
       if (!track) return
-      // Remember camera state, then release the live camera device so its
-      // indicator light goes off while the screen is shared.
-      camBeforeShareRef.current = camOnRef.current
-      streamRef.current?.getVideoTracks().forEach((t) => t.stop())
+      const displayStream = new MediaStream([track])
       screenTrackRef.current = track
+      screenStreamRef.current = displayStream
       // The browser's own "Stop sharing" bar ends the track — mirror it in-app.
       track.onended = () => {
         void stopScreenShare()
       }
-      rebuildStream(track)
+      setScreenStream(displayStream)
       setScreenOn(true)
       setError(null)
     } catch (e) {
@@ -304,7 +304,7 @@ export function useLocalMedia(): LocalMedia {
         setError('Could not start screen sharing.')
       }
     }
-  }, [rebuildStream, stopScreenShare])
+  }, [stopScreenShare])
 
   const selectDevice = React.useCallback(
     (kind: 'camera' | 'mic' | 'speaker', deviceId: string) => {
@@ -329,8 +329,12 @@ export function useLocalMedia(): LocalMedia {
   const stop = React.useCallback(() => {
     stopMeter()
     streamRef.current?.getTracks().forEach((t) => t.stop())
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
+    screenStreamRef.current = null
     setStream(null)
+    setScreenStream(null)
+    setScreenOn(false)
   }, [stopMeter])
 
   // Cleanup on unmount.
@@ -338,6 +342,7 @@ export function useLocalMedia(): LocalMedia {
     return () => {
       stopMeter()
       streamRef.current?.getTracks().forEach((t) => t.stop())
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop())
     }
   }, [stopMeter])
 
@@ -351,6 +356,7 @@ export function useLocalMedia(): LocalMedia {
 
   return {
     stream,
+    screenStream,
     permission,
     error,
     micOn,

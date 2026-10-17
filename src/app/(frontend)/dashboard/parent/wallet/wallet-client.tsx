@@ -211,7 +211,7 @@ export function WalletClient({ initialWallet, initialTransactions, userEmail }: 
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-tight">{formatCredits(credits)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            1 credit = ₦{CREDIT_RATE.nairaPerCoin} · {CREDIT_RATE.coinsPerHour} credits / hour live class
+            1 credit = ₦{CREDIT_RATE.nairaPerCoin} · charged per connected participant minute
           </p>
         </div>
       </div>

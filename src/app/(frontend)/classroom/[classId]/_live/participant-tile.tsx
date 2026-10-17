@@ -23,16 +23,20 @@ export function ParticipantTile({
   p,
   spotlight = false,
   stream = null,
+  mediaKind = 'camera',
   className,
 }: {
   p: Participant
   spotlight?: boolean
   stream?: MediaStream | null
+  mediaKind?: 'camera' | 'screen'
   className?: string
 }) {
   const hue = seededHue(p.name)
   const isHost = p.role === 'host'
   const handRaised = Boolean(p.handRaisedAt)
+  const isScreen = mediaKind === 'screen'
+  const mediaOn = isScreen ? p.screenOn : p.camOn
 
   return (
     <div
@@ -46,11 +50,23 @@ export function ParticipantTile({
     >
       {/* Camera surface — real media when a stream is present (local mirrored,
           remote not), else the gradient stand-in used in demo mode. */}
-      {p.camOn && stream ? (
+      {mediaOn && stream ? (
         <div className="absolute inset-0">
-          <MediaVideo stream={stream} mirror={Boolean(p.isLocal)} muted={Boolean(p.isLocal)} />
+          <MediaVideo
+            stream={stream}
+            mirror={!isScreen && Boolean(p.isLocal)}
+            muted={Boolean(p.isLocal)}
+            fit="contain"
+          />
         </div>
-      ) : p.camOn ? (
+      ) : mediaOn && isScreen ? (
+        <div className="absolute inset-0 grid place-items-center bg-black text-white/55">
+          <div className="flex flex-col items-center gap-2 text-xs">
+            <HiOutlineComputerDesktop className="size-7" />
+            Connecting shared screen…
+          </div>
+        </div>
+      ) : mediaOn ? (
         <div
           className="absolute inset-0"
           style={{

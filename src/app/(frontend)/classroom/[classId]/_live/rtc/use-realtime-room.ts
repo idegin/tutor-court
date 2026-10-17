@@ -25,7 +25,8 @@ export interface UseRealtimeRoomResult {
   /** SFU PeerConnection (media) state — for diagnostics. */
   mediaState: string
   participants: RoomParticipant[]
-  streams: Map<string, MediaStream>
+  cameraStreams: Map<string, MediaStream>
+  screenStreams: Map<string, MediaStream>
   actions: RealtimeRoomActions
   ready: boolean
 }
@@ -48,6 +49,7 @@ export function useRealtimeRoom(opts: {
   user: { id: string; name: string; accountType: 'tutor' | 'student' | 'parent'; role: 'host' | 'publisher' | 'viewer' }
   canPublish: boolean
   localStream: MediaStream | null
+  screenStream: MediaStream | null
   onChat?: (msg: ChatMessagePayload) => void
   onReaction?: (emoji: string, fromId: string) => void
   onControl?: (action: string, data: any, fromId: string) => void
@@ -56,7 +58,8 @@ export function useRealtimeRoom(opts: {
   const [connectionState, setConnectionState] = React.useState('initialized')
   const [mediaState, setMediaState] = React.useState('new')
   const [participants, setParticipants] = React.useState<RoomParticipant[]>([])
-  const [streams, setStreams] = React.useState<Map<string, MediaStream>>(new Map())
+  const [cameraStreams, setCameraStreams] = React.useState<Map<string, MediaStream>>(new Map())
+  const [screenStreams, setScreenStreams] = React.useState<Map<string, MediaStream>>(new Map())
   const [ready, setReady] = React.useState(false)
   const roomRef = React.useRef<RealtimeRoom | null>(null)
 
@@ -64,7 +67,7 @@ export function useRealtimeRoom(opts: {
   const cbs = React.useRef({ onChat: opts.onChat, onReaction: opts.onReaction, onControl: opts.onControl, onWhiteboard: opts.onWhiteboard })
   cbs.current = { onChat: opts.onChat, onReaction: opts.onReaction, onControl: opts.onControl, onWhiteboard: opts.onWhiteboard }
 
-  const { enabled, liveSessionId, canPublish, localStream } = opts
+  const { enabled, liveSessionId, canPublish, localStream, screenStream } = opts
   const userKey = `${opts.user.id}:${opts.user.role}`
 
   React.useEffect(() => {
@@ -93,14 +96,22 @@ export function useRealtimeRoom(opts: {
               onConnectionState: (s) => setConnectionState(s),
               onMediaState: (s) => setMediaState(s),
               onParticipants: (list) => setParticipants(list),
-              onStream: (userId, stream) =>
-                setStreams((prev) => new Map(prev).set(userId, stream)),
-              onStreamGone: (userId) =>
-                setStreams((prev) => {
+              onStream: (userId, kind, stream) => {
+                const setter = kind === 'screen' ? setScreenStreams : setCameraStreams
+                setter((prev) => new Map(prev).set(userId, stream))
+              },
+              onStreamGone: (userId) => {
+                setCameraStreams((prev) => {
                   const next = new Map(prev)
                   next.delete(userId)
                   return next
-                }),
+                })
+                setScreenStreams((prev) => {
+                  const next = new Map(prev)
+                  next.delete(userId)
+                  return next
+                })
+              },
               onChat: (m) => cbs.current.onChat?.(m),
               onReaction: (e, from) => cbs.current.onReaction?.(e, from),
               onControl: (a, d, from) => cbs.current.onControl?.(a, d, from),
@@ -108,7 +119,7 @@ export function useRealtimeRoom(opts: {
             },
           })
           roomRef.current = room
-          await room.join(localStream)
+          await room.join(localStream, screenStream)
           // Publish now if media was already granted (join covers the ready case);
           // the effect below covers a stream that arrives after join.
           if (!cancelled && localStream) room.publishStream(localStream).catch(() => {})
@@ -157,6 +168,11 @@ export function useRealtimeRoom(opts: {
     roomRef.current?.publishStream(localStream).catch(() => {})
   }, [enabled, ready, localStream])
 
+  React.useEffect(() => {
+    if (!enabled || !ready) return
+    roomRef.current?.publishScreenStream(screenStream).catch(() => {})
+  }, [enabled, ready, screenStream])
+
   const actions = React.useMemo<RealtimeRoomActions>(() => {
     if (!enabled) return NOOP_ACTIONS
     return {
@@ -172,5 +188,13 @@ export function useRealtimeRoom(opts: {
     }
   }, [enabled])
 
-  return { connectionState, mediaState, participants, streams, actions, ready }
+  return {
+    connectionState,
+    mediaState,
+    participants,
+    cameraStreams,
+    screenStreams,
+    actions,
+    ready,
+  }
 }
