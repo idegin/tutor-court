@@ -524,12 +524,12 @@ export function ClassroomExperience({ bootstrap }: { bootstrap: ClassroomBootstr
   // Broadcast local mic/cam/screen changes to presence in real mode.
   const roomUpdateMedia = room.actions.updateMedia
   React.useEffect(() => {
-    if (realtimeEnabled) roomUpdateMedia({ micOn: media.micOn, camOn: media.camOn })
-  }, [media.micOn, media.camOn, realtimeEnabled, roomUpdateMedia])
+    if (realtimeEnabled && room.ready) roomUpdateMedia({ micOn: media.micOn, camOn: media.camOn })
+  }, [media.micOn, media.camOn, realtimeEnabled, room.ready, roomUpdateMedia])
 
   React.useEffect(() => {
-    if (realtimeEnabled) roomUpdateMedia({ screenOn: media.screenOn })
-  }, [media.screenOn, realtimeEnabled, roomUpdateMedia])
+    if (realtimeEnabled && room.ready) roomUpdateMedia({ screenOn: media.screenOn })
+  }, [media.screenOn, realtimeEnabled, room.ready, roomUpdateMedia])
 
   // ── actions ─────────────────────────────────────────────────────────────
   const toggleHand = () => {

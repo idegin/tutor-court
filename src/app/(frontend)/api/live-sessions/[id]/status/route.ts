@@ -272,7 +272,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       })
     }
 
-    // 2. Compute cost based on participant logs
+    // 2. Compute cost from elapsed class time. Participant logs are retained for
+    // attendance and activity reporting; attendee count does not multiply cost.
     const participantLogs = await payload.find({
       collection: 'live-session-participants',
       where: {

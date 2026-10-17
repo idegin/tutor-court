@@ -58,9 +58,6 @@ export function ChatPanel({
 
       <form onSubmit={submit} className="border-t border-white/8 p-3">
         <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20">
-          <button type="button" aria-label="Emoji" className="grid size-9 shrink-0 place-items-center rounded-xl text-white/50 transition-colors hover:bg-white/8 hover:text-white [&_svg]:size-5">
-            <HiOutlineFaceSmile />
-          </button>
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

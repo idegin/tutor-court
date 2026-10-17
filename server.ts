@@ -139,6 +139,7 @@ app.prepare().then(() => {
           role: verified.role,
           micOn: true,
           camOn: true,
+          screenOn: false,
           handRaisedAt: null,
         },
       }
@@ -172,6 +173,7 @@ app.prepare().then(() => {
       // Only these fields are self-updatable; identity/role come from the token.
       if (typeof patch.micOn === 'boolean') me.presence.micOn = patch.micOn
       if (typeof patch.camOn === 'boolean') me.presence.camOn = patch.camOn
+      if (typeof patch.screenOn === 'boolean') me.presence.screenOn = patch.screenOn
       if ('handRaisedAt' in patch) me.presence.handRaisedAt = patch.handRaisedAt ?? null
       io.to(sessionId).emit('roster', rosterOf(r))
     })

@@ -12,7 +12,7 @@ import {
 import type { Whiteboard } from './types'
 import { HScroll } from './ui'
 
-const PEN_COLORS = ['#34d399', '#f472b6', '#fbbf24', '#60a5fa', '#ffffff']
+const PEN_COLORS = ['#000000', '#34d399', '#f472b6', '#fbbf24', '#60a5fa', '#ffffff']
 
 interface Stroke {
   d: string
@@ -232,7 +232,10 @@ export function BoardsPanel({
                   type="button"
                   onClick={() => setColor(c)}
                   aria-label={`Pen ${c}`}
-                  className={cn('size-6 rounded-full ring-2 ring-offset-2 ring-offset-neutral-950 transition-transform hover:scale-110', color === c ? 'ring-white' : 'ring-transparent')}
+                  className={cn(
+                    'size-6 rounded-full border border-white/25 ring-2 ring-offset-2 ring-offset-neutral-950 transition-transform hover:scale-110',
+                    color === c ? 'ring-white' : 'ring-transparent',
+                  )}
                   style={{ background: c }}
                 />
               ))}

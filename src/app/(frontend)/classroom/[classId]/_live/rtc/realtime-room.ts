@@ -73,6 +73,7 @@ export class RealtimeRoom {
       role: opts.user.role,
       micOn: true,
       camOn: true,
+      screenOn: false,
       handRaisedAt: null,
     }
   }

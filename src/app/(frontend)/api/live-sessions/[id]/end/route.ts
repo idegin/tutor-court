@@ -166,7 +166,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       })
     }
 
-    // 3. Compute cost based on additional participants (students & parents)
+    // 3. Compute cost from elapsed class time. Participant logs are still used
+    // for attendance and activity reporting, but do not multiply the burn rate.
     const participantLogs = await payload.find({
       collection: 'live-session-participants',
       where: {
@@ -179,8 +180,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       depth: 0,
     })
 
-    // If no students/parents joined, charge a baseline of 1 credit/min of tutor's session duration.
-    // Otherwise, charge based on the total student/parent participant minutes.
     const billableMinutes = computeBillableMinutes(participantLogs.docs as any[], session, endedTime)
     const cost = billableMinutes * CREDIT_RATE.coinsPerMinute
 

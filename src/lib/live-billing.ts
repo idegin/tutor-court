@@ -1,13 +1,6 @@
 import { sql } from '@payloadcms/db-postgres'
 import { CREDIT_RATE } from '@/lib/constants'
 
-// Hard ceiling on a single OPEN log's countable interval. Until server-side
-// presence/heartbeat lands (Phase 4/6), a participant who drops without a
-// /leave beacon leaves an open log that would otherwise accrue billable minutes
-// forever. Capping the open interval bounds the worst case to one session's
-// worth rather than unbounded (a real class never approaches this).
-const MAX_OPEN_LOG_SECONDS = 6 * 60 * 60
-
 /**
  * Live-class billing math, shared by the status poll (incremental charging),
  * the manual /end route, and the out-of-credits auto-close.
@@ -20,35 +13,18 @@ const MAX_OPEN_LOG_SECONDS = 6 * 60 * 60
  * auto-close only settle the final remaining delta rather than re-charging.
  */
 
-// Sum the billable (student/parent) participant minutes for a session from its
-// participant logs. Open logs count time up to `nowMs`; closed logs carry their
-// full accumulated `durationSeconds` (which spans rejoins). If nobody billable
-// ever joined, fall back to the tutor's own session duration as a baseline.
+// A live class costs one credit-rate unit per elapsed minute. Attendance must
+// never multiply the tutor's burn rate: a group class with five students costs
+// the same per minute as a one-to-one class. Participant logs remain an input
+// for API compatibility and attendance reporting, but do not affect billing.
 export function computeBillableMinutes(
-  participantLogs: any[],
+  _participantLogs: any[],
   session: any,
   nowMs: number,
 ): number {
   const startedTime = new Date(session.startedAt || session.createdAt).getTime()
-  const sessionDurationMinutes = Math.max(1, Math.ceil((nowMs - startedTime) / (1000 * 60)))
-
-  let totalParticipantMinutes = 0
-  for (const log of participantLogs) {
-    let logSeconds: number
-    if (log.leftAt) {
-      logSeconds =
-        Number(log.durationSeconds) ||
-        Math.max(0, (new Date(log.leftAt).getTime() - new Date(log.joinedAt).getTime()) / 1000)
-    } else {
-      const openInterval = Math.max(0, (nowMs - new Date(log.joinedAt).getTime()) / 1000)
-      logSeconds = (Number(log.durationSeconds) || 0) + Math.min(openInterval, MAX_OPEN_LOG_SECONDS)
-    }
-    // No per-interval 1-minute floor beyond a single minimum: intervals
-    // accumulate across rejoins in durationSeconds.
-    totalParticipantMinutes += Math.max(1, Math.ceil(logSeconds / 60))
-  }
-
-  return totalParticipantMinutes > 0 ? totalParticipantMinutes : sessionDurationMinutes
+  if (!Number.isFinite(startedTime)) return 1
+  return Math.max(1, Math.ceil(Math.max(0, nowMs - startedTime) / (1000 * 60)))
 }
 
 export interface ChargeResult {

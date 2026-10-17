@@ -8,7 +8,7 @@ import { computeBillableMinutes, chargeSessionDelta } from '@/lib/live-billing'
 const idOf = (v: any): string => String(v && typeof v === 'object' ? v.id : v)
 
 /**
- * Charge the tutor's wallet for the minutes elapsed since the last charge.
+ * Charge the tutor's wallet for class minutes elapsed since the last charge.
  * Returns the fresh balance + whether the wallet is now empty. Booking-backed
  * (escrow) classes are skipped inside chargeSessionDelta.
  */
