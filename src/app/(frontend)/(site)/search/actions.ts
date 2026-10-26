@@ -132,7 +132,7 @@ export async function fetchTutors(searchParams: any, page: number = 1) {
         : 'Professional Tutor',
       tags: doc.subjects?.map((s: any) => s.name?.toUpperCase()) || [],
       imageUrl: user?.avatar?.url || '/user-placeholder.png',
-      isVerified: doc.isApproved || false,
+      isVerified: doc.isVerified || false,
       mode: doc.mode,
       type: doc.type,
     }

@@ -1053,10 +1053,14 @@ export interface AssessmentQuestion {
   id: number;
   assessment: number | Assessment;
   /**
-   * Supports Markdown syntax
+   * Supports Markdown syntax. For flashcard questions this is the front (term/question).
    */
   questionText: string;
-  type: 'single_choice' | 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
+  /**
+   * Flashcard back side (definition/answer). Only used when type is "flashcard".
+   */
+  backText?: string | null;
+  type: 'single_choice' | 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' | 'flashcard';
   /**
    * Optional image to accompany the question (useful for younger grades).
    */
@@ -1149,6 +1153,10 @@ export interface AssessmentResult {
    * Optional tutor feedback on the result
    */
   feedback?: string | null;
+  /**
+   * Flashcard mastery percentage (0-100). Only meaningful when assessment type is "flashcard".
+   */
+  mastery?: number | null;
   /**
    * True when the result contains short-answer/essay questions that still need to be graded by the tutor.
    */
@@ -1879,6 +1887,7 @@ export interface AssessmentsSelect<T extends boolean = true> {
 export interface AssessmentQuestionsSelect<T extends boolean = true> {
   assessment?: T;
   questionText?: T;
+  backText?: T;
   type?: T;
   image?: T;
   options?:
@@ -1943,6 +1952,7 @@ export interface AssessmentResultsSelect<T extends boolean = true> {
   submittedAt?: T;
   timeTakenSeconds?: T;
   feedback?: T;
+  mastery?: T;
   pendingManualGrading?: T;
   updatedAt?: T;
   createdAt?: T;

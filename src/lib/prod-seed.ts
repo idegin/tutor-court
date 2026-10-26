@@ -56,7 +56,19 @@ export async function runProdSeed(payload: Payload): Promise<void> {
 
   const defaultSubjects = [
     { name: 'Mathematics', categoryName: 'Mathematics' },
+    { name: 'Further Mathematics', categoryName: 'Mathematics' },
     { name: 'English', categoryName: 'Language Arts / English' },
+    { name: 'Literature in English', categoryName: 'Language Arts / English' },
+    { name: 'Physics', categoryName: 'Science' },
+    { name: 'Chemistry', categoryName: 'Science' },
+    { name: 'Biology', categoryName: 'Science' },
+    { name: 'Agricultural Science', categoryName: 'Science' },
+    { name: 'Geography', categoryName: 'Social Studies' },
+    { name: 'History', categoryName: 'Social Studies' },
+    { name: 'Economics', categoryName: 'Social Studies' },
+    { name: 'Government', categoryName: 'Social Studies' },
+    { name: 'Commerce', categoryName: 'Social Studies' },
+    { name: 'Computer Science', categoryName: 'Computing' },
   ]
 
   for (const subject of defaultSubjects) {
@@ -83,6 +95,38 @@ export async function runProdSeed(payload: Payload): Promise<void> {
       }
     } catch (err) {
       console.error(`[prod-seed] Failed to create subject "${subject.name}":`, err)
+    }
+  }
+
+  // Seed the primary admin account
+  const adminEmail = 'admin@tutorcourt.com'
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD
+  if (adminPassword) {
+    try {
+      const existing = await payload.find({
+        collection: 'users',
+        where: { email: { equals: adminEmail } },
+        limit: 1,
+        overrideAccess: true,
+      })
+      if (existing.totalDocs === 0) {
+        await payload.create({
+          collection: 'users',
+          data: {
+            firstName: 'TutorCourt',
+            lastName: 'Admin',
+            email: adminEmail,
+            password: adminPassword,
+            accountType: 'admin',
+            isActive: true,
+            _verified: true,
+          } as any,
+          overrideAccess: true,
+        })
+        console.log(`[prod-seed] Admin account created: ${adminEmail}`)
+      }
+    } catch (err) {
+      console.error(`[prod-seed] Failed to create admin account:`, err)
     }
   }
 }

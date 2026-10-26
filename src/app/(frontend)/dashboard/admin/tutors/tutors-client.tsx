@@ -31,6 +31,7 @@ import {
     HiOutlineChevronLeft,
     HiOutlineChevronRight,
     HiOutlineArrowTopRightOnSquare,
+    HiOutlineEye,
 } from 'react-icons/hi2';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -352,6 +353,17 @@ export function TutorsPageClient({
                                                     Revoke
                                                 </Button>
                                             )}
+                                            <Button
+                                                asChild
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                                            >
+                                                <Link href={`/dashboard/admin/tutors/${tutor.id}`}>
+                                                    <HiOutlineEye className="h-3.5 w-3.5" />
+                                                    <span className="sr-only">View details</span>
+                                                </Link>
+                                            </Button>
                                             <Button
                                                 asChild
                                                 size="sm"

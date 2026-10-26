@@ -80,7 +80,15 @@ function LoginContent() {
                 }
             }
         },
-        onError: (err: any) => {
+        onError: (err: any, variables: any) => {
+            if (err.message === 'Please verify your email before logging in.') {
+                toast.info('Email not verified', {
+                    description: 'Check your inbox for a verification link, or request a new one below.',
+                    position: 'top-center',
+                })
+                router.push(`/auth/check-email?email=${encodeURIComponent(variables?.email || '')}`)
+                return
+            }
             if (err.message === 'The email or password provided is incorrect.') {
                 toast.error(err.message, {
                     description: 'Please check your credentials and try again.',

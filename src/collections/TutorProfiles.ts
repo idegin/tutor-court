@@ -92,6 +92,18 @@ export const TutorProfiles: CollectionConfig = {
       },
     },
     {
+      name: 'isVerified',
+      type: 'checkbox',
+      defaultValue: false,
+      index: true,
+      admin: {
+        description: 'Manually verified by the TutorCourt team. Shows the "Verified" badge on the public profile.',
+      },
+      access: {
+        update: ({ req: { user } }) => Boolean(user?.accountType === 'admin'),
+      },
+    },
+    {
       name: 'backgroundCheckStatus',
       type: 'select',
       defaultValue: 'none',

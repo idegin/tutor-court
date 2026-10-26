@@ -150,10 +150,15 @@ function RegisterContent() {
                 router.push(`/auth/check-email?email=${encodeURIComponent(values.email)}`)
             } catch (err: any) {
                 const raw = err.message || ''
-                const message = raw.toLowerCase().includes('invalid: email')
-                    ? 'This email is already registered. Please log in or use a different email.'
-                    : raw || 'Failed to create account. Please try again.'
-                toast.error(message, { position: 'top-center' })
+                if (raw.toLowerCase().includes('invalid: email')) {
+                    toast.info('Email already registered', {
+                        description: "If you haven't verified yet, you can request a new link.",
+                        position: 'top-center',
+                    })
+                    router.push(`/auth/check-email?email=${encodeURIComponent(values.email)}`)
+                    return
+                }
+                toast.error(raw || 'Failed to create account. Please try again.', { position: 'top-center' })
                 setIsSubmitting(false)
             }
         },
