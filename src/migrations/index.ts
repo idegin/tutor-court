@@ -22,6 +22,8 @@ import * as migration_20261011_000000_tutor_rejection_reason from './20261011_00
 import * as migration_20261011_000001_patch_admin_account_type from './20261011_000001_patch_admin_account_type';
 import * as migration_20261011_000002_assessment_answers_textarea from './20261011_000002_assessment_answers_textarea';
 import * as migration_20261011_000003_flashcard_fields from './20261011_000003_flashcard_fields';
+import * as migration_20261026_100000_tutor_is_verified from './20261026_100000_tutor_is_verified';
+import * as migration_20261101_101020 from './20261101_101020';
 
 export const migrations = [
   {
@@ -102,7 +104,7 @@ export const migrations = [
   {
     up: migration_20260804_101918_live_classroom_v2_fields.up,
     down: migration_20260804_101918_live_classroom_v2_fields.down,
-    name: '20260804_101918_live_classroom_v2_fields'
+    name: '20260804_101918_live_classroom_v2_fields',
   },
   {
     up: migration_20260808_000000_booking_awaiting_release.up,
@@ -143,5 +145,15 @@ export const migrations = [
     up: migration_20261011_000003_flashcard_fields.up,
     down: migration_20261011_000003_flashcard_fields.down,
     name: '20261011_000003_flashcard_fields',
+  },
+  {
+    up: migration_20261026_100000_tutor_is_verified.up,
+    down: migration_20261026_100000_tutor_is_verified.down,
+    name: '20261026_100000_tutor_is_verified',
+  },
+  {
+    up: migration_20261101_101020.up,
+    down: migration_20261101_101020.down,
+    name: '20261101_101020'
   },
 ];
