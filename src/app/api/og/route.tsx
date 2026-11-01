@@ -71,12 +71,11 @@ export async function GET(req: NextRequest) {
           <div style={{
             position: 'absolute',
             left: '-40px',
-            top: '50%',
+            top: '65px',
             width: '500px',
             height: '500px',
             borderRadius: '50%',
-            background: `radial-gradient(circle, rgba(79,243,151,0.12) 0%, transparent 70%)`,
-            transform: 'translateY(-50%)',
+            background: `radial-gradient(circle, rgba(79,243,151,0.10) 0%, rgba(79,243,151,0) 70%)`,
             display: 'flex',
           }} />
 
@@ -95,14 +94,13 @@ export async function GET(req: NextRequest) {
             padding: '50px 0 50px 55px',
           }}>
             <div style={{
-              width: '270px',
-              height: '270px',
+              width: '274px',
+              height: '274px',
               borderRadius: '50%',
-              background: `conic-gradient(${BRAND}, #1a3d2a, ${BRAND})`,
+              background: BRAND,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '4px',
               flexShrink: 0,
             }}>
               <div style={{
@@ -116,7 +114,7 @@ export async function GET(req: NextRequest) {
                 justifyContent: 'center',
               }}>
                 {safeImageUrl ? (
-                  <img src={safeImageUrl} width={262} height={262} style={{ objectFit: 'cover' }} />
+                  <img src={safeImageUrl} width={262} height={262} />
                 ) : (
                   <div style={{ color: BRAND, fontSize: '120px', display: 'flex' }}>👤</div>
                 )}
