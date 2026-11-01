@@ -42,14 +42,24 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 
     titleStr += ' | TutorCourt Search';
 
+    const description = `Search and filter through our verified expert tutors. ${titleStr}`
+
     return {
         title: titleStr,
-        description: `Search and filter through our verified expert tutors. ${titleStr}`,
+        description,
         openGraph: {
             title: titleStr,
-            description: `Search and filter through our verified expert tutors. ${titleStr}`,
+            description,
             type: 'website',
-        }
+            images: [{ url: '/api/og?type=default', width: 1200, height: 630 }],
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: titleStr,
+            description,
+            images: ['/api/og?type=default'],
+        },
+        alternates: { canonical: 'https://www.tutorcourt.com/search' },
     }
 }
 
@@ -180,7 +190,7 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
             description: doc.bio ? (doc.bio.length > 150 ? doc.bio.substring(0, 150) + '...' : doc.bio) : 'Professional Tutor',
             tags: doc.subjects?.map((s: any) => s.name?.toUpperCase()) || [],
             imageUrl: user?.avatar?.url || '/user-placeholder.png',
-            isVerified: doc.isApproved || false,
+            isVerified: doc.isVerified || false,
             mode: doc.mode,
             type: doc.type,
         };

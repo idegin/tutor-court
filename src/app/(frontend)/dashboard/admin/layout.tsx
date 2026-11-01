@@ -8,6 +8,14 @@ import {
     HiHome,
     HiOutlineUsers,
     HiUsers,
+    HiOutlineBookOpen,
+    HiBookOpen,
+    HiOutlineCalendarDays,
+    HiCalendarDays,
+    HiOutlineTableCells,
+    HiTableCells,
+    HiOutlineUserGroup,
+    HiUserGroup,
 } from 'react-icons/hi2';
 import { DashboardLayout } from '@/components/layout/dashboard-layout/dashboard-layout';
 import type { NavItem } from '@/components/layout/dashboard-layout/dashboard-layout';
@@ -25,10 +33,34 @@ const adminNavItems: NavItem[] = [
         icon: HiOutlineUsers,
         activeIcon: HiUsers,
     },
+    {
+        name: 'Users',
+        href: '/dashboard/admin/users',
+        icon: HiOutlineUserGroup,
+        activeIcon: HiUserGroup,
+    },
+    {
+        name: 'Subjects',
+        href: '/dashboard/admin/subjects',
+        icon: HiOutlineBookOpen,
+        activeIcon: HiBookOpen,
+    },
+    {
+        name: 'Classes',
+        href: '/dashboard/admin/classes',
+        icon: HiOutlineTableCells,
+        activeIcon: HiTableCells,
+    },
+    {
+        name: 'Calendar',
+        href: '/dashboard/admin/calendar',
+        icon: HiOutlineCalendarDays,
+        activeIcon: HiCalendarDays,
+    },
 ];
 
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
-    const { user } = useAuth();
+    const { user, isSuspended } = useAuth();
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState(false);
 
@@ -36,13 +68,13 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
         if (user === undefined) return;
 
         if (!user) {
-            router.push('/auth/login');
+            router.push(isSuspended ? '/auth/login?reason=suspended' : '/auth/login');
         } else if (user.accountType !== 'admin') {
             router.push(`/dashboard/${user.accountType}`);
         } else {
             setIsAuthorized(true);
         }
-    }, [user, router]);
+    }, [user, isSuspended, router]);
 
     if (!isAuthorized) {
         return (

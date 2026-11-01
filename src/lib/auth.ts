@@ -13,6 +13,8 @@ export async function getRouteUser() {
   headers.delete('origin')
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers })
+  // Suspended users treated as unauthenticated
+  if (user && (user as any).isActive === false) return { user: null, payload }
   return { user, payload }
 }
 
@@ -30,13 +32,20 @@ export const getServerSideUser = async () => {
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers })
 
+  // Suspended users (isActive: false) are treated as unauthenticated.
+  // isSuspended=true is passed to AuthProvider so dashboard layouts can
+  // redirect to /auth/login?reason=suspended instead of the generic expired redirect.
+  if (user && (user as any).isActive === false) {
+    return { user: null, tutorProfile: null, isSuspended: true, dependencies: { subjects: [] } }
+  }
+
   const { docs: subjects } = await payload.find({
       collection: 'subjects',
       depth: 0,
       limit: 100,
   })
 
-  if (!user) return { user: null, tutorProfile: null, dependencies: { subjects } }
+  if (!user) return { user: null, tutorProfile: null, isSuspended: false, dependencies: { subjects } }
 
   let tutorProfile = null
   if (user.accountType === 'tutor') {
@@ -48,5 +57,5 @@ export const getServerSideUser = async () => {
       tutorProfile = docs[0] || null
   }
 
-  return { user, tutorProfile, dependencies: { subjects } }
+  return { user, tutorProfile, isSuspended: false, dependencies: { subjects } }
 }

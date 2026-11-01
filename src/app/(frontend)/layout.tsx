@@ -39,14 +39,14 @@ export const metadata = {
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
-  const { user, tutorProfile, dependencies } = await getServerSideUser()
+  const { user, tutorProfile, isSuspended, dependencies } = await getServerSideUser()
 
   return (
     <html lang="en" className={`${lato.className} ${lato.variable}`}>
       <body className="bg-background text-foreground min-h-screen">
         <Providers>
           <OptionsProvider initialSubjects={dependencies?.subjects || []}>
-            <AuthProvider initialUser={user} initialTutorProfile={tutorProfile}>
+            <AuthProvider initialUser={user} initialTutorProfile={tutorProfile} isSuspended={isSuspended}>
               <QueryProvider>
                 {children}
                 <Toaster position="top-right" />

@@ -34,13 +34,19 @@ function LoginContent() {
     const [errors, setErrors] = React.useState<ReturnType<typeof validateLogin>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-    // When SessionGuard bounces an expired session here, tell the user plainly
-    // why they're back on the login screen instead of leaving them guessing.
+    // When SessionGuard bounces back to login, tell the user why.
     React.useEffect(() => {
-        if (searchParams.get('reason') === 'expired') {
+        const reason = searchParams.get('reason')
+        if (reason === 'expired') {
             toast.info('Please log in again to continue.', {
                 description: 'Your session ended. Signing back in takes a moment.',
                 position: 'top-center',
+            })
+        } else if (reason === 'suspended') {
+            toast.error('Account suspended', {
+                description: 'Your account has been suspended for violating our platform guidelines. Contact support if you think this is a mistake.',
+                position: 'top-center',
+                duration: 10000,
             })
         }
     }, [searchParams])
@@ -80,7 +86,7 @@ function LoginContent() {
                 }
             }
         },
-        onError: (err: any, variables: any) => {
+        onError: async (err: any, variables: any) => {
             if (err.message === 'Please verify your email before logging in.') {
                 toast.info('Email not verified', {
                     description: 'Check your inbox for a verification link, or request a new one below.',
@@ -90,6 +96,25 @@ function LoginContent() {
                 return
             }
             if (err.message === 'The email or password provided is incorrect.') {
+                // Check if the account is suspended before showing generic error
+                try {
+                    const res = await fetch('/api/auth/check-suspension', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: variables?.email }),
+                    })
+                    const data = await res.json()
+                    if (data.suspended) {
+                        toast.error('Account suspended', {
+                            description: 'Your account has been suspended for violating our platform guidelines. Contact support if you think this is a mistake.',
+                            position: 'top-center',
+                            duration: 8000,
+                        })
+                        return
+                    }
+                } catch {
+                    // Ignore check-suspension failure — fall through to generic error
+                }
                 toast.error(err.message, {
                     description: 'Please check your credentials and try again.',
                     position: 'top-center',

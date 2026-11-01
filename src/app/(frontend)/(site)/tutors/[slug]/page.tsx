@@ -1,14 +1,60 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { TutorHero } from '@/components/tutors/tutor-hero';
 import { TutorAbout } from '@/components/tutors/tutor-about';
 import { TutorBookingSidebar } from '@/components/tutors/tutor-booking-sidebar';
 import { SimilarTutors } from '@/components/tutors/similar-tutors';
-import { HiBeaker, HiCalculator, HiBolt, HiChartBar } from 'react-icons/hi2';
+import { HiBeaker } from 'react-icons/hi2';
 import { getPayload } from 'payload';
 import configPromise from '@payload-config';
 import { notFound } from 'next/navigation';
 import { getServerSideUser } from '@/lib/auth';
 import { TutorReviews } from '@/components/tutors/tutor-reviews';
+import { JsonLd } from '@/components/seo/json-ld';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+    const { slug } = await params;
+    const decodedSlug = decodeURIComponent(slug);
+    const payload = await getPayload({ config: configPromise });
+    const isById = /^\d+$/.test(decodedSlug) || /^[0-9a-fA-F]{24}$/.test(decodedSlug);
+
+    const { docs } = await payload.find({
+        collection: 'tutor-profiles',
+        where: isById ? { id: { equals: decodedSlug } } : { slug: { equals: decodedSlug } },
+        depth: 2,
+    });
+
+    const profile = docs[0] as any;
+    if (!profile) return { title: 'Tutor Not Found | TutorCourt' };
+
+    const user = profile.user;
+    const fullName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Expert Tutor';
+    const subjects = (profile.subjects ?? []).map((s: any) => s.name ?? s).filter(Boolean).slice(0, 3).join(', ');
+    const bio = profile.bio ? profile.bio.slice(0, 155) : `${fullName} is a verified tutor on TutorCourt.`;
+    const avatarUrl = user?.avatar?.url ?? '';
+    const headline = profile.headline ?? 'Professional Tutor';
+
+    const ogUrl = `/api/og?type=tutor&name=${encodeURIComponent(fullName)}&headline=${encodeURIComponent(headline)}&subjects=${encodeURIComponent(subjects)}&imageUrl=${encodeURIComponent(avatarUrl)}&isVerified=${profile.isVerified ?? false}`;
+
+    return {
+        title: `${fullName} — ${subjects || 'Tutor'} | TutorCourt`,
+        description: bio,
+        openGraph: {
+            title: `${fullName} — ${subjects || 'Tutor'} | TutorCourt`,
+            description: bio,
+            type: 'profile',
+            url: `https://www.tutorcourt.com/tutors/${decodedSlug}`,
+            images: [{ url: ogUrl, width: 1200, height: 630, alt: fullName }],
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: `${fullName} | TutorCourt`,
+            description: bio,
+            images: [ogUrl],
+        },
+        alternates: { canonical: `https://www.tutorcourt.com/tutors/${decodedSlug}` },
+    };
+}
 
 export default async function TutorDetailsPage({
     params,
@@ -23,7 +69,6 @@ export default async function TutorDetailsPage({
     const payload = await getPayload({ config: configPromise });
     const { user: currentUser } = await getServerSideUser();
 
-    // Support lookup by slug, numeric (Postgres) id, or legacy 24-char ObjectId.
     const isById = /^\d+$/.test(decodedSlug) || /^[0-9a-fA-F]{24}$/.test(decodedSlug);
 
     const { docs } = await payload.find({
@@ -38,8 +83,6 @@ export default async function TutorDetailsPage({
         return notFound();
     }
 
-    // Unapproved / mid-onboarding profiles are not publicly viewable —
-    // only the owning tutor or an admin may preview them.
     const profileUserId = tutorProfile.user?.id ?? tutorProfile.user;
     const isOwnerOrAdmin =
         !!currentUser &&
@@ -51,9 +94,6 @@ export default async function TutorDetailsPage({
     let hasActiveBooking = false;
     let parentChildren: { id: string; name: string }[] = [];
     if (currentUser) {
-        // Only a self-booking student is blocked from re-booking the same tutor.
-        // A parent may have multiple children, so the per-child guard is enforced
-        // server-side at booking time — the CTA stays available for them.
         if (currentUser.accountType === 'student') {
             const activeBookings = await payload.find({
                 collection: 'bookings',
@@ -76,7 +116,6 @@ export default async function TutorDetailsPage({
             hasActiveBooking = activeBookings.totalDocs > 0;
         }
 
-        // A parent booking on behalf of a child must pick which child.
         if (currentUser.accountType === 'parent') {
             const { docs: childDocs } = await payload.find({
                 collection: 'users',
@@ -96,9 +135,6 @@ export default async function TutorDetailsPage({
         }
     }
 
-    // Rebook prefill: if `?rebook=<bookingId>` is present and the booking belongs
-    // to the current user (booker or their parent account), seed the booking modal
-    // from it and auto-open. Dates are left blank (past dates fail validation).
     let rebookInitial:
         | { subjects: string[]; daysOfWeek: string[]; hoursPerDay: number }
         | null = null;
@@ -126,7 +162,6 @@ export default async function TutorDetailsPage({
                 }
             }
         } catch {
-            // Unknown / inaccessible booking id — ignore the rebook hint silently.
             rebookInitial = null;
         }
     }
@@ -148,7 +183,6 @@ export default async function TutorDetailsPage({
         depth: 2
     });
 
-    // Formatting currency
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-NG', {
             style: 'currency',
@@ -157,20 +191,17 @@ export default async function TutorDetailsPage({
         }).format(amount);
     };
 
-    // Prepare data
     const user = tutorProfile.user;
     const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Anonymous Tutor';
 
-    // Fallback Mock Data for missing properties
     const rating = tutorProfile.rating || 0;
     const totalReviews = tutorProfile.totalReviews || 0;
     const pricePerHour = tutorProfile.hourlyRate || 0;
 
     const avatarUrl = user?.avatar?.url || "/user-placeholder.png";
-    // We don't have cover image in schema currently, so static fallback
     const coverImageUrl = "https://d1csarkz8obe9u.cloudfront.net/posterpreviews/preschool-tutor-service-banner-design-template-00d3fc803b78ce48f1034ff3b7382dab_screen.jpg?ts=1698451931";
 
-    const isVerified = tutorProfile.isApproved || false;
+    const isVerified = tutorProfile.isVerified || false;
     const responseTimeText = "2 hours";
 
     const description = tutorProfile.bio ? (
@@ -196,7 +227,7 @@ export default async function TutorDetailsPage({
         ];
         return {
             name: subj.name,
-            icon: <HiBeaker className="w-5 h-5" />, // Standard icon, could be dynamic 
+            icon: <HiBeaker className="w-5 h-5" />,
             colorClass: colors[index % colors.length]
         };
     }) : [];
@@ -206,7 +237,7 @@ export default async function TutorDetailsPage({
         const simFullName = `${simUser?.firstName || ''} ${simUser?.lastName || ''}`.trim() || 'Anonymous Tutor';
 
         return {
-            id: doc.slug, // Use slug for id so the link works correctly
+            id: doc.slug,
             name: simFullName,
             title: doc.headline || 'Professional Tutor',
             rating: doc.rating || 0,
@@ -215,7 +246,6 @@ export default async function TutorDetailsPage({
         };
     });
 
-    // Fetch Tutor Reviews
     const { docs: reviewDocs } = await payload.find({
         collection: 'reviews',
         where: {
@@ -239,8 +269,57 @@ export default async function TutorDetailsPage({
         }
     }));
 
+    const subjectNames = (tutorProfile.subjects ?? []).map((s: any) => s.name ?? s).filter(Boolean);
+
+    const personSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name: fullName,
+        jobTitle: tutorProfile.headline || 'Tutor',
+        description: tutorProfile.bio || undefined,
+        image: user?.avatar?.url || undefined,
+        url: `https://www.tutorcourt.com/tutors/${decodedSlug}`,
+        knowsAbout: subjectNames,
+        worksFor: {
+            '@type': 'Organization',
+            name: 'TutorCourt',
+            url: 'https://www.tutorcourt.com',
+        },
+    };
+
+    const serviceSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'Service',
+        name: `${fullName} — Tutoring on TutorCourt`,
+        provider: {
+            '@type': 'Person',
+            name: fullName,
+        },
+        serviceType: 'Tutoring',
+        areaServed: { '@type': 'Country', name: 'Nigeria' },
+        offers: pricePerHour > 0 ? {
+            '@type': 'Offer',
+            price: pricePerHour,
+            priceCurrency: 'NGN',
+            priceSpecification: {
+                '@type': 'UnitPriceSpecification',
+                price: pricePerHour,
+                priceCurrency: 'NGN',
+                unitText: 'HOUR',
+            },
+        } : undefined,
+        aggregateRating: totalReviews > 0 ? {
+            '@type': 'AggregateRating',
+            ratingValue: rating,
+            reviewCount: totalReviews,
+            bestRating: 5,
+            worstRating: 1,
+        } : undefined,
+    };
+
     return (
         <div className="w-full bg-background min-h-screen pb-24">
+            <JsonLd data={[personSchema, serviceSchema]} />
             <TutorHero
                 name={fullName}
                 title={tutorProfile.headline || 'Professional Tutor'}
@@ -257,7 +336,7 @@ export default async function TutorDetailsPage({
                     <TutorAbout
                         description={description}
                         subjects={subjects}
-                        videoUrl={''} // No video string in schema yet
+                        videoUrl={''}
                     />
 
                     <TutorReviews
@@ -275,7 +354,7 @@ export default async function TutorDetailsPage({
                         avatarUrl={avatarUrl}
                         pricePerHour={pricePerHour}
                         responseTimeText={responseTimeText}
-                        isVerified={Boolean(tutorProfile.isApproved)}
+                        isVerified={Boolean(tutorProfile.isVerified)}
                         offeredSubjects={tutorProfile.subjects?.map((s: any) => s.name) || []}
                         availability={tutorProfile.weeklyAvailability || []}
                         gradesTaught={tutorProfile.gradesTaught || []}

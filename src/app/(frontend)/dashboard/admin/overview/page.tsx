@@ -13,6 +13,7 @@ import {
     HiOutlineCheckBadge,
     HiOutlineArrowRight,
     HiOutlineCalendarDays,
+    HiOutlineBanknotes,
 } from 'react-icons/hi2';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -70,6 +71,19 @@ export default async function AdminOverviewPage() {
             <div>
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Platform Overview</h1>
                 <p className="text-muted-foreground mt-1">At-a-glance stats and pending actions.</p>
+            </div>
+
+            {/* Zenith account reminder */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <div className="h-8 w-8 shrink-0 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center mt-0.5">
+                    <HiOutlineBanknotes className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                    <p className="font-semibold text-blue-900 text-sm">Reminder: Add your Zenith Bank account to Paystack</p>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                        Log in to your Paystack dashboard → Settings → Bank Accounts and add your Zenith Bank account as a settlement account. Without this, tutor payouts cannot be processed.
+                    </p>
+                </div>
             </div>
 
             {pendingCount > 0 && (
