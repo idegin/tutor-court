@@ -1,0 +1,25 @@
+# TutorCourt
+
+TutorCourt is a Nigerian online tutoring marketplace connecting K-12 students and parents with vetted, expert tutors.
+
+## About
+- Founded in Nigeria; primarily serves Nigerian students (K-12, WAEC, JAMB, Common Entrance)
+- All tutors undergo identity verification and background checks
+- Payments are escrow-protected in Naira (NGN)
+- Supports both one-on-one and group tutoring sessions (online and hybrid)
+
+## Key pages
+- Homepage: https://www.tutorcourt.com
+- Find tutors: https://www.tutorcourt.com/search
+- Browse subjects: https://www.tutorcourt.com/subjects
+- For parents: https://www.tutorcourt.com/for-parents
+- For tutors: https://www.tutorcourt.com/for-tutors
+
+## How it works
+1. Parents or students browse and filter tutors by subject, grade level, price, and rating
+2. Book a free introductory session
+3. Pay via escrow — funds are held until the session is complete
+4. Rate and review the tutor after each session
+
+## Contact
+Website: https://www.tutorcourt.com

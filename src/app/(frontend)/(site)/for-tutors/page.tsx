@@ -16,6 +16,20 @@ export const metadata: Metadata = {
     title: 'For Tutors | TutorCourt',
     description:
         'Teach what you love, set your own rate and get paid on time — every time. Join TutorCourt and turn your expertise into a thriving tutoring business.',
+    openGraph: {
+        title: 'For Tutors | TutorCourt',
+        description: 'Teach what you love, set your own rate and get paid on time — every time.',
+        type: 'website',
+        url: 'https://www.tutorcourt.com/for-tutors',
+        images: [{ url: 'https://www.tutorcourt.com/api/og?type=default', width: 1200, height: 630, alt: 'TutorCourt for Tutors' }],
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'For Tutors | TutorCourt',
+        description: 'Teach what you love, set your own rate and get paid on time — every time.',
+        images: ['https://www.tutorcourt.com/api/og?type=default'],
+    },
+    alternates: { canonical: 'https://www.tutorcourt.com/for-tutors' },
 }
 
 const benefits = [

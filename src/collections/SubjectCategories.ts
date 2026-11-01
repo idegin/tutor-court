@@ -41,6 +41,24 @@ export const SubjectCategories: CollectionConfig = {
         ],
       },
     },
+    {
+      name: 'description',
+      type: 'textarea',
+    },
+    {
+      name: 'icon',
+      type: 'text',
+      admin: {
+        description: 'Emoji or icon name for this category',
+      },
+    },
+    {
+      name: 'color',
+      type: 'text',
+      admin: {
+        description: 'Hex color accent e.g. #7ab62c',
+      },
+    },
   ],
   timestamps: true,
 }

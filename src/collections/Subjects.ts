@@ -37,6 +37,68 @@ export const Subjects: CollectionConfig = {
       options: NIGERIAN_GRADES as any,
     },
     {
+      name: 'shortDescription',
+      type: 'text',
+      admin: {
+        description: '1-2 sentence summary shown in cards',
+      },
+    },
+    {
+      name: 'description',
+      type: 'textarea',
+    },
+    {
+      name: 'image',
+      type: 'upload',
+      relationTo: 'media',
+    },
+    {
+      name: 'icon',
+      type: 'text',
+      admin: {
+        description: 'Emoji or icon name',
+      },
+    },
+    {
+      name: 'color',
+      type: 'text',
+      admin: {
+        description: 'Hex accent color',
+      },
+    },
+    {
+      name: 'sortOrder',
+      type: 'number',
+      defaultValue: 0,
+      admin: {
+        description: 'Lower = shown first',
+      },
+    },
+    {
+      name: 'isPopular',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        description: 'Feature on the home page',
+      },
+    },
+    {
+      name: 'seoTitle',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        description: 'Overrides page title on the public subject page',
+      },
+    },
+    {
+      name: 'seoDescription',
+      type: 'text',
+      admin: {
+        position: 'sidebar',
+        description: 'Overrides meta description on the public subject page',
+      },
+    },
+    {
       name: 'slug',
       type: 'text',
       unique: true,

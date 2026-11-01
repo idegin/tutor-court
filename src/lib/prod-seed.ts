@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import type { Payload } from 'payload'
 
 /**
@@ -21,7 +22,7 @@ export async function runProdSeed(payload: Payload): Promise<void> {
     { name: 'Other', slug: 'other' },
   ]
 
-  const categoryMap: Record<string, string> = {}
+  const categoryMap: Record<string, number | string> = {}
 
   for (const cat of defaultCategories) {
     try {
@@ -36,17 +37,17 @@ export async function runProdSeed(payload: Payload): Promise<void> {
         limit: 1,
         overrideAccess: true,
       })
-      let catId: string
+      let catId: number | string
       if (existing.totalDocs === 0) {
         const created = await payload.create({
           collection: 'subject-categories',
           data: cat as any,
           overrideAccess: true,
         })
-        catId = String(created.id)
+        catId = created.id as number | string
         console.log(`[prod-seed] Subject Category created: ${cat.name}`)
       } else {
-        catId = String(existing.docs[0].id)
+        catId = existing.docs[0].id as number | string
       }
       categoryMap[cat.name] = catId
     } catch (err) {
@@ -98,35 +99,62 @@ export async function runProdSeed(payload: Payload): Promise<void> {
     }
   }
 
-  // Seed the primary admin account
+  // Seed the primary admin account. Requires SEED_ADMIN_PASSWORD env var.
+  // On conflict (account already exists) it only patches accountType / status
+  // so a user-changed password is never overwritten by a redeploy.
   const adminEmail = 'admin@tutorcourt.com'
   const adminPassword = process.env.SEED_ADMIN_PASSWORD
-  if (adminPassword) {
+
+  if (!adminPassword) {
+    console.warn('[prod-seed] SEED_ADMIN_PASSWORD is not set — admin account will NOT be seeded. Set this Fly secret and redeploy.')
+  } else {
     try {
-      const existing = await payload.find({
-        collection: 'users',
-        where: { email: { equals: adminEmail } },
-        limit: 1,
-        overrideAccess: true,
-      })
-      if (existing.totalDocs === 0) {
-        await payload.create({
+      const db = (payload.db as any)
+      const pool = db.pool ?? db.drizzle?.session?.client
+
+      // Generate pbkdf2 salt+hash the same way Payload does internally.
+      const saltBuf = await new Promise<Buffer>((res, rej) =>
+        crypto.randomBytes(32, (err, buf) => (err ? rej(err) : res(buf)))
+      )
+      const salt = saltBuf.toString('hex')
+      const hashRaw = await new Promise<Buffer>((res, rej) =>
+        crypto.pbkdf2(adminPassword, salt, 25000, 512, 'sha256', (err, buf) => (err ? rej(err) : res(buf)))
+      )
+      const hash = hashRaw.toString('hex')
+
+      await pool.query(`
+        INSERT INTO users (first_name, last_name, email, account_type, is_active, salt, hash, _verified, updated_at, created_at)
+        VALUES ($1, $2, $3, 'admin', true, $4, $5, true, NOW(), NOW())
+        ON CONFLICT (email) DO UPDATE
+          SET account_type = 'admin',
+              is_active    = true,
+              _verified    = true,
+              updated_at   = NOW()
+      `, ['TutorCourt', 'Admin', adminEmail, salt, hash])
+
+      console.log(`[prod-seed] Admin account upserted: ${adminEmail}`)
+    } catch (err) {
+      console.error(`[prod-seed] Failed to seed admin account via raw SQL:`, err)
+      // Fallback: if pool is unavailable, at least patch accountType on an existing user.
+      try {
+        const existing = await payload.find({
           collection: 'users',
-          data: {
-            firstName: 'TutorCourt',
-            lastName: 'Admin',
-            email: adminEmail,
-            password: adminPassword,
-            accountType: 'admin',
-            isActive: true,
-            _verified: true,
-          } as any,
+          where: { email: { equals: adminEmail } },
+          limit: 1,
           overrideAccess: true,
         })
-        console.log(`[prod-seed] Admin account created: ${adminEmail}`)
+        if (existing.totalDocs > 0) {
+          const adminId = existing.docs[0].id as string | number
+          await payload.db.drizzle?.execute(
+            `UPDATE users SET account_type = 'admin', is_active = true, _verified = true WHERE email = '${adminEmail}'`
+          )
+          console.log(`[prod-seed] Admin account_type patched via Drizzle fallback for: ${adminEmail} (id=${adminId})`)
+        } else {
+          console.error(`[prod-seed] Admin user ${adminEmail} does not exist and could not be created — set SEED_ADMIN_PASSWORD`)
+        }
+      } catch (fallbackErr) {
+        console.error(`[prod-seed] Drizzle fallback also failed:`, fallbackErr)
       }
-    } catch (err) {
-      console.error(`[prod-seed] Failed to create admin account:`, err)
     }
   }
 }

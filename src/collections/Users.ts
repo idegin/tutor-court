@@ -68,6 +68,7 @@ export const Users: CollectionConfig = {
       return { id: { equals: user.id } }
     },
     delete: ({ req: { user } }) => (user as any)?.accountType === 'admin',
+    admin: ({ req: { user } }) => (user as any)?.accountType === 'admin',
   },
   hooks: {
     beforeValidate: [

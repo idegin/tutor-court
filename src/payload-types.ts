@@ -326,6 +326,36 @@ export interface Subject {
         | 'others'
       )[]
     | null;
+  /**
+   * 1-2 sentence summary shown in cards
+   */
+  shortDescription?: string | null;
+  description?: string | null;
+  image?: (number | null) | Media;
+  /**
+   * Emoji or icon name
+   */
+  icon?: string | null;
+  /**
+   * Hex accent color
+   */
+  color?: string | null;
+  /**
+   * Lower = shown first
+   */
+  sortOrder?: number | null;
+  /**
+   * Feature on the home page
+   */
+  isPopular?: boolean | null;
+  /**
+   * Overrides page title on the public subject page
+   */
+  seoTitle?: string | null;
+  /**
+   * Overrides meta description on the public subject page
+   */
+  seoDescription?: string | null;
   slug?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -338,6 +368,15 @@ export interface SubjectCategory {
   id: number;
   name: string;
   slug?: string | null;
+  description?: string | null;
+  /**
+   * Emoji or icon name for this category
+   */
+  icon?: string | null;
+  /**
+   * Hex color accent e.g. #7ab62c
+   */
+  color?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -356,6 +395,10 @@ export interface TutorProfile {
    * Check to approve this tutor profile.
    */
   isApproved?: boolean | null;
+  /**
+   * Manually verified by the TutorCourt team. Shows the "Verified" badge on the public profile.
+   */
+  isVerified?: boolean | null;
   /**
    * K-12 safety: tutors should be cleared before teaching minors.
    */
@@ -1505,6 +1548,7 @@ export interface TutorProfilesSelect<T extends boolean = true> {
   slug?: T;
   user?: T;
   isApproved?: T;
+  isVerified?: T;
   backgroundCheckStatus?: T;
   backgroundCheckCompletedAt?: T;
   identityVerified?: T;
@@ -1558,6 +1602,15 @@ export interface SubjectsSelect<T extends boolean = true> {
   name?: T;
   category?: T;
   gradeLevels?: T;
+  shortDescription?: T;
+  description?: T;
+  image?: T;
+  icon?: T;
+  color?: T;
+  sortOrder?: T;
+  isPopular?: T;
+  seoTitle?: T;
+  seoDescription?: T;
   slug?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -1569,6 +1622,9 @@ export interface SubjectsSelect<T extends boolean = true> {
 export interface SubjectCategoriesSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
+  description?: T;
+  icon?: T;
+  color?: T;
   updatedAt?: T;
   createdAt?: T;
 }

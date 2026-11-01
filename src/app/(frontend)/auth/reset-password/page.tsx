@@ -63,8 +63,8 @@ export default function ResetPasswordPage() {
     return (
         <AuthLayout
             imageUrl="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=2070&auto=format&fit=crop"
-            heading={isSuccess ? "Check your email" : "Forgot Password?"}
-            subheading={isSuccess ? "We've sent a link to reset your password if that account exists." : "Don't worry, it happens. Enter your email address below and we'll send you a link to reset your password."}
+            heading={isSuccess ? undefined : "Forgot Password?"}
+            subheading={isSuccess ? undefined : "Don't worry, it happens. Enter your email address below and we'll send you a link to reset your password."}
             panelTitle="Stay focused on what matters"
             panelDescription="Let us help you get back to learning without any interruptions."
             navLinks={NAV_LINKS}

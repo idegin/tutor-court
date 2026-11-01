@@ -15,6 +15,20 @@ export const metadata: Metadata = {
     title: 'For Parents | TutorCourt',
     description:
         'Give your child the edge with vetted, expert tutors. Track progress, pay safely with escrow, and watch grades climb — all from one dashboard.',
+    openGraph: {
+        title: 'For Parents | TutorCourt',
+        description: 'Give your child the edge with vetted, expert tutors. Track progress, pay safely with escrow, and watch grades climb.',
+        type: 'website',
+        url: 'https://www.tutorcourt.com/for-parents',
+        images: [{ url: 'https://www.tutorcourt.com/api/og?type=default', width: 1200, height: 630, alt: 'TutorCourt for Parents' }],
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'For Parents | TutorCourt',
+        description: 'Give your child the edge with vetted, expert tutors.',
+        images: ['https://www.tutorcourt.com/api/og?type=default'],
+    },
+    alternates: { canonical: 'https://www.tutorcourt.com/for-parents' },
 }
 
 const benefits = [

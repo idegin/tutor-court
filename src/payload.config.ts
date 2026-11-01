@@ -34,6 +34,7 @@ import { TutorAssessments } from './collections/TutorAssessments'
 import { AssessmentResults } from './collections/AssessmentResults'
 import { Notifications } from './collections/Notifications'
 import { ActivityLogs } from './collections/ActivityLogs'
+import { runProdSeed } from './lib/prod-seed'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -97,6 +98,9 @@ export default buildConfig({
   csrf: trustedOrigins,
   telemetry: false,
   cookiePrefix: 'tutorcourt',
+  onInit: async (payload) => {
+    await runProdSeed(payload)
+  },
   admin: {
     user: Users.slug,
     meta: {
@@ -174,7 +178,7 @@ export default buildConfig({
           secretAccessKey: process.env.TIGRIS_STORAGE_SECRET_ACCESS_KEY || '',
         },
         region: 'auto',
-        endpoint: process.env.TIGRIS_ENDPOINT || 'https://t3.storage.dev',
+        endpoint: process.env.TIGRIS_ENDPOINT || 'https://fly.storage.tigris.dev',
       },
     }),
   ],

@@ -33,12 +33,12 @@ export function SiteHero() {
         const normalized = query.trim().toLowerCase()
 
         if (!normalized) {
-            return subjectOptions.slice(0, 10)
+            return subjectOptions.slice(0, 20)
         }
 
         return subjectOptions
             .filter((subject) => subject.name.toLowerCase().includes(normalized))
-            .slice(0, 10)
+            .slice(0, 20)
     }, [query, subjectOptions])
 
     useEffect(() => {

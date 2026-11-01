@@ -110,6 +110,9 @@ export function SubjectsClient({ subjects: initialSubjects, categories }: Props)
     const handleFormSubmit = async () => {
         if (!formName.trim()) { setFormError('Name is required'); return; }
         if (!formCategory) { setFormError('Category is required'); return; }
+        if (formColor.trim() && !/^#[0-9a-fA-F]{3,8}$/.test(formColor.trim())) {
+            setFormError('Accent color must be a valid hex value e.g. #7ab62c'); return;
+        }
 
         setLoading('form');
         setFormError(null);

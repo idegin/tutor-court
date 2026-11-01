@@ -74,13 +74,13 @@ export function SearchClient({ initialTutors = [], totalDocs = 0, initialHasNext
     };
 
     return (
-        <div className="container mx-auto max-w-7xl relative z-10 flex flex-col md:flex-row md:items-start gap-8">
+        <div className="container mx-auto max-w-7xl px-4 md:px-6 relative z-10 flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
             {/* Mobile Filters Toggle */}
             <button
                 onClick={() => setShowFilters(prev => !prev)}
-                className="md:hidden flex items-center justify-center gap-2 w-full bg-card border-2 border-muted rounded-2xl py-3 font-black text-foreground"
+                className="md:hidden flex items-center justify-center gap-2 w-full bg-card border-2 border-muted rounded-2xl py-3 font-black text-foreground text-sm"
             >
-                <HiOutlineAdjustmentsHorizontal className="w-6 h-6" />
+                <HiOutlineAdjustmentsHorizontal className="w-5 h-5" />
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
 
@@ -92,41 +92,43 @@ export function SearchClient({ initialTutors = [], totalDocs = 0, initialHasNext
             </Suspense>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
                 {/* Header Options */}
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
-                    <div>
-                        <h1 className="text-4xl md:text-5xl font-black text-foreground mb-2">{totalDocs} Tutors found</h1>
-                        <p className="text-lg font-bold text-muted-foreground">Showing top-rated specialists matching your criteria</p>
-                    </div>
+                <div className="flex flex-col gap-3 mb-6 md:mb-8">
+                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                        <div className="min-w-0">
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-foreground mb-1 leading-tight">{totalDocs} Tutors found</h1>
+                            <p className="text-sm md:text-base font-medium text-muted-foreground">Showing top-rated specialists matching your criteria</p>
+                        </div>
 
-                    <div className="flex items-center gap-2 relative z-20">
-                        <Select value={currentSort} onValueChange={handleSortChange}>
-                            <SelectTrigger className="w-[180px] rounded-2xl font-bold">
-                                <SelectValue placeholder="Sort by" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SORT_OPTIONS.map(opt => (
-                                    <SelectItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2 relative z-20 shrink-0">
+                            <Select value={currentSort} onValueChange={handleSortChange}>
+                                <SelectTrigger className="w-[150px] sm:w-[180px] rounded-xl font-bold text-sm">
+                                    <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {SORT_OPTIONS.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                        <div className="flex items-center gap-2 bg-muted p-1.5 rounded-2xl border-2 border-transparent w-fit">
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`p-3 rounded-xl transition-all ${viewMode === 'list' ? 'bg-card border-none text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                <HiListBullet className="w-6 h-6" />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-3 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-card border-none text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                            >
-                                <HiSquares2X2 className="w-6 h-6" />
-                            </button>
+                            <div className="flex items-center gap-1 bg-muted p-1 rounded-xl border-2 border-transparent w-fit">
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    <HiListBullet className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-card text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    <HiSquares2X2 className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -209,7 +209,7 @@ export default async function SearchPage(props: { searchParams: Promise<{ [key: 
     const initialSearchParams = await searchParams;
 
     return (
-        <div className="min-h-screen bg-background pt-8 pb-24 relative">
+        <div className="min-h-screen bg-background pt-4 md:pt-8 pb-24 relative">
             {/* Decorative background shape from image */}
             <div className="absolute top-0 left-0 w-[40%] h-full bg-tutor-purple-50 dark:bg-tutor-purple-950/20 z-0 rounded-br-[10rem] pointer-events-none" />
 
