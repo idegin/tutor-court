@@ -4,7 +4,7 @@ import { TutorHero } from '@/components/tutors/tutor-hero';
 import { TutorAbout } from '@/components/tutors/tutor-about';
 import { TutorBookingSidebar } from '@/components/tutors/tutor-booking-sidebar';
 import { SimilarTutors } from '@/components/tutors/similar-tutors';
-import { HiBeaker } from 'react-icons/hi2';
+import { HiBeaker, HiBookOpen, HiCalculator, HiGlobeAlt, HiAcademicCap, HiPencil, HiLanguage, HiMusicalNote, HiGlobeEuropeAfrica, HiComputerDesktop } from 'react-icons/hi2';
 import { getPayload } from 'payload';
 import configPromise from '@payload-config';
 import { notFound } from 'next/navigation';
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const avatarUrl = user?.avatar?.url ?? '';
     const headline = profile.headline ?? 'Professional Tutor';
 
-    const ogUrl = `/api/og?type=tutor&name=${encodeURIComponent(fullName)}&headline=${encodeURIComponent(headline)}&subjects=${encodeURIComponent(subjects)}&imageUrl=${encodeURIComponent(avatarUrl)}&isVerified=${profile.isVerified ?? false}`;
+    const ogUrl = `https://www.tutorcourt.com/api/og?type=tutor&name=${encodeURIComponent(fullName)}&headline=${encodeURIComponent(headline)}&subjects=${encodeURIComponent(subjects)}&imageUrl=${encodeURIComponent(avatarUrl)}&isVerified=${profile.isVerified ?? false}`;
 
     return {
         title: `${fullName} — ${subjects || 'Tutor'} | TutorCourt`,
@@ -218,6 +218,7 @@ export default async function TutorDetailsPage({
         </>
     );
 
+    const subjectFallbackIcons = [HiBookOpen, HiCalculator, HiGlobeAlt, HiAcademicCap, HiBeaker, HiPencil, HiLanguage, HiMusicalNote, HiGlobeEuropeAfrica, HiComputerDesktop];
     const subjects = tutorProfile.subjects?.length > 0 ? tutorProfile.subjects.map((subj: any, index: number) => {
         const colors = [
             'bg-tutor-purple-100 text-tutor-purple-800',
@@ -225,9 +226,12 @@ export default async function TutorDetailsPage({
             'bg-muted text-foreground',
             'bg-tutor-red-100 text-tutor-red-600'
         ];
+        const FallbackIcon = subjectFallbackIcons[index % subjectFallbackIcons.length];
         return {
             name: subj.name,
-            icon: <HiBeaker className="w-5 h-5" />,
+            icon: subj.icon
+                ? <span className="text-base leading-none">{subj.icon}</span>
+                : <FallbackIcon className="w-5 h-5" />,
             colorClass: colors[index % colors.length]
         };
     }) : [];

@@ -135,21 +135,6 @@ export function TutorBookingSidebar({
                         </div>
                     </div>
 
-                    {offeredSubjects.length > 0 && (
-                        <div className="mt-5">
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Subjects offered</p>
-                            <div className="flex flex-wrap gap-2">
-                                {offeredSubjects.map((subject) => (
-                                    <span
-                                        key={subject}
-                                        className="px-2.5 py-1 rounded-full border-2 border-border bg-tutor-purple-50 text-xs font-bold text-tutor-purple-800"
-                                    >
-                                        {subject}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
                     {gradesTaught.length > 0 && (
                         <div className="mt-5">

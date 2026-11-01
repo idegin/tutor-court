@@ -42,7 +42,15 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 
     titleStr += ' | TutorCourt Search';
 
-    const description = `Search and filter through our verified expert tutors. ${titleStr}`
+    const q = typeof params['q'] === 'string' ? params['q'] : ''
+    const description = subjectNames.length > 0
+        ? `Find verified ${subjectNames.join(', ')} tutors on TutorCourt. Browse profiles, compare rates and book a session.`
+        : 'Search and filter through our verified expert tutors on TutorCourt. Compare rates, read reviews and book a session.'
+
+    const ogParams = new URLSearchParams({ type: 'search' })
+    if (q) ogParams.set('q', q)
+    if (subjectNames.length > 0) ogParams.set('subjects', subjectNames.slice(0, 3).join(','))
+    const ogUrl = `https://www.tutorcourt.com/api/og?${ogParams.toString()}`
 
     return {
         title: titleStr,
@@ -51,13 +59,14 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
             title: titleStr,
             description,
             type: 'website',
-            images: [{ url: '/api/og?type=default', width: 1200, height: 630 }],
+            url: 'https://www.tutorcourt.com/search',
+            images: [{ url: ogUrl, width: 1200, height: 630 }],
         },
         twitter: {
             card: 'summary_large_image',
             title: titleStr,
             description,
-            images: ['/api/og?type=default'],
+            images: [ogUrl],
         },
         alternates: { canonical: 'https://www.tutorcourt.com/search' },
     }
