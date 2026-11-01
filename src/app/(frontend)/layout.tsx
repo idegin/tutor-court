@@ -19,7 +19,7 @@ const lato = localFont({
 })
 
 export const viewport = {
-  themeColor: '#7ab62c',
+  themeColor: '#4FF397',
 }
 
 export const metadata = {
